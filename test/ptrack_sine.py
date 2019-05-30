@@ -15,7 +15,9 @@ a,phi,corr,err=apt.proc(x,w0)
 
 y=a*np.cos(phi)
 
-fig,ax=plt.subplots(4,1)
+frq=np.diff(np.unwrap(phi))
+
+fig,ax=plt.subplots(6,1)
 
 ax[0].specgram(x, NFFT=1024, Fs=2*np.pi, Fc=0, noverlap=4,
                cmap=None, xextent=None, pad_to=None, sides='default',
@@ -29,6 +31,9 @@ ax[2].plot(t,corr)
 ax[3].specgram(err, NFFT=1024, Fs=2*np.pi, Fc=0, noverlap=4,
                cmap=None, xextent=None, pad_to=None, sides='default',
                scale_by_freq=None, mode='default', scale='default')
+
+ax[4].plot(t[:-1],frq)
+ax[5].plot(t,a)
 
 plt.show()
 

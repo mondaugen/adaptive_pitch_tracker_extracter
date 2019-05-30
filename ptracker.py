@@ -109,6 +109,28 @@ class apt:
         self.cnnf.plot_freqz(axs[2])
         plt.show()
 
+class apt_array:
+    """
+    A array of partial trackers
+    """
+    def __init__(self,
+        # arguments passed to apt
+        apt_args,
+        # number of partials
+        Np):
+        self.apts=[apt(*apt_args) for n in range(Np)]
+    def proc(self,
+        x,
+        # fundamental
+        w0,
+        # how to determine the frequency of the partial from w0 and the index
+        wn=lambda w0,n: (n+1)*w0):
+        ret=[]
+        for n,ap in enumerate(self.apts):
+            a,phi,corr,err=ap.proc(x,wn(w0,n))
+            ret.append((a,phi,corr,err))
+        return ret
+
 class pitch_check_comb:
     """
     A comb filter tuned so that it has maxima at harmonic multiples of a fundamental.
