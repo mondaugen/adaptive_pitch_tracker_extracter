@@ -59,7 +59,9 @@ class apt:
         # instantaneous frequency correction weighting coefficient
         alph_w,
         # output amplitude smoothing
-        alph_a=0.99
+        alph_a=0.99,
+        # threshold of gain under which this does nothing
+        g_thresh=1e-3
     ):
         self.lpf = lpfilt(a_lp)
         self.cpnf = dirfilt(a_pn,d=1)
@@ -70,6 +72,26 @@ class apt:
         self.alph_w = alph_w
         self.alph_a = alph_a
         self.a_=None
+        self.g_thresh=g_thresh
+    def proc2(self,x,w0):
+        p = 0
+        a=np.zeros(x.shape,dtype='float')
+        phi=np.zeros(x.shape,dtype='float')
+        hf_=1
+        g=1
+        for n,x_ in enumerate(x):
+            h = x_ / g
+            hf = self.lpf.filter(np.array([h]))[0]
+            p = (1-self.alph_p)*np.abs(hf)+self.alph_p*p
+            if p > self.g_thresh:
+                w_=np.angle(hf/hf_)
+                w0 += w_*self.alph_w
+                hf_=hf
+            g *= np.exp(complex("j")*w0)
+            phi[n]=np.angle(g)
+            a[n]=p
+        return (a,phi)
+            
     def proc(self,
         # Array of input values
         x,
