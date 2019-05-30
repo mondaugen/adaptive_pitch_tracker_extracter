@@ -109,3 +109,69 @@ class apt:
         self.cnnf.plot_freqz(axs[2])
         plt.show()
 
+class pitch_check_comb:
+    """
+    A comb filter tuned so that it has maxima at harmonic multiples of a fundamental.
+    """
+    def __init__(self,
+        # fundamental, between 0 and 0.5 (0.5 is nyquist frequency)
+        f,
+        # sharpness of filter
+        alph,
+        # mode of implementation
+        # truncate uses a truncated delay line
+        # all-pass uses an all-pass filter to make up the missing delay that
+        # would occur from truncation
+        mode='truncate'):
+        if mode == 'all-pass':
+            raise NotImplementedError
+        self.alph = alph
+        self.K = int(1/f)
+        #print(self.K)
+        self.dline=np.zeros((self.K,))
+        self.norm=0.5/f
+    def _get_b_a(self):
+        a = np.zeros((self.K+1,))
+        a[0]=1
+        a[self.K]=-self.alph
+        ret=([(1-self.alph)],a)
+        #ret=([1],a)
+        #print(ret[0])
+        #print(ret[1])
+        return ret
+    def plot(self,ax):
+        w,h=freqz(*self._get_b_a())
+        ax.plot(w,20*np.log10(np.abs(h)))
+    def proc(self,x):
+        y = lfilter(*self._get_b_a(),x)/self.norm
+        return y
+
+def avg_filter(x,alph=0.9):
+    return lfilter([1-alph],[1,-alph],x)
+
+def diff_filter(x,n=1):
+    N=2*n
+    b=np.zeros((N,))
+    b[:n]=1
+    b[-n:]=-1
+    return lfilter(b,[1],x)
+
+class pitch_check_comb_array:
+    """
+    Check the presence of a bunch of pitches in a signal.
+    """
+    def __init__(self,
+    pitches=np.arange(128),
+    sr=16000,
+    alph=0.99):
+        self.filters=list()
+        for p in pitches:
+            self.filters.append(pitch_check_comb(440*2**((p-69)/12)/sr,alph))
+    def proc(self,x):
+        y = np.zeros((len(self.filters),len(x)))
+        for i,filt in enumerate(self.filters):
+            y[i,:]=avg_filter(filt.proc(x))
+        return y
+        
+
+
