@@ -53,7 +53,8 @@ static void zdouble_ptrackerprod(char **args, npy_intp *dimensions,
          *g_thresh = *args++,
     /* outputs */
          *a = *args++,
-         *phi = *args++;
+         *phi = *args++,
+         *w = *args++;
 
     /* input steps */
     npy_intp x_step = *steps++,
@@ -64,7 +65,8 @@ static void zdouble_ptrackerprod(char **args, npy_intp *dimensions,
              g_thresh_step = *steps++,
     /* output steps */
              a_step = *steps++,
-             phi_step = *steps++;
+             phi_step = *steps++,
+             w_step = *steps++;
 
     double p = 0,    /* power */
            phi_g = 0,/* the phase of the signal we use to heterodyne */
@@ -96,6 +98,7 @@ static void zdouble_ptrackerprod(char **args, npy_intp *dimensions,
         phi_g += w0_;
         wrap_phase(phi_g);
         g = cexp(-1*I*phi_g);
+        *((double*)w) = w0_;
         *((double*)phi) = phi_g;
         *((double*)a) = p;
 
@@ -107,6 +110,7 @@ static void zdouble_ptrackerprod(char **args, npy_intp *dimensions,
         g_thresh += g_thresh_step; 
         a += a_step; 
         phi += phi_step; 
+        w += w_step;
     }
 }
 
@@ -116,7 +120,8 @@ PyUFuncGenericFunction funcs[1] = {&zdouble_ptrackerprod};
 
 /* These are the input and return dtypes of ptracker.*/
 
-static char types[8] = {
+static char types[9] = {
+NPY_DOUBLE,
 NPY_DOUBLE,
 NPY_DOUBLE,
 NPY_DOUBLE,
@@ -152,7 +157,9 @@ const char ptracker_docstring[] =
 "a:\n"
 "    the instantaneous amplitudes of the tracked sinusoid\n"
 "phi:\n"
-"    the instantaneous phases of the tracked sinusoid\n";
+"    the instantaneous phases of the tracked sinusoid\n"
+"w:\n"
+"    the instantaneous frequencies of the tracked sinusoid\n";
 
 #if PY_VERSION_HEX >= 0x03000000
 static struct PyModuleDef moduledef = {
@@ -179,7 +186,7 @@ PyMODINIT_FUNC PyInit_ptrackers(void)
     import_array();
     import_umath();
 
-    ptracker = PyUFunc_FromFuncAndData(funcs, data, types, 1, 6, 2,
+    ptracker = PyUFunc_FromFuncAndData(funcs, data, types, 1, 6, 3,
                                     PyUFunc_None, "ptracker",
                                     ptracker_docstring, 0);
 
@@ -204,7 +211,7 @@ PyMODINIT_FUNC initptrackers(void)
     import_array();
     import_umath();
 
-    ptracker = PyUFunc_FromFuncAndData(funcs, data, types, 1, 6, 2,
+    ptracker = PyUFunc_FromFuncAndData(funcs, data, types, 1, 6, 3,
                                     PyUFunc_None, "ptracker",
                                     ptracker_docstring, 0);
 

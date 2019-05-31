@@ -9,7 +9,7 @@ x=np.cos(t*w)+np.random.standard_normal(t.shape)*.1
 
 print(dir(ptrackers))
 
-a,phi=ptrackers.ptracker(
+a,phi,w=ptrackers.ptracker(
 x,
 w0,
 0.99,

@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.signal import lfilter, freqz
 import matplotlib.pyplot as plt
+from ptracking import ptrackers
 
 class lpfilt:
     """
@@ -217,5 +218,21 @@ class pitch_check_comb_array:
             y[i,:]=avg_filter(filt.proc(x))
         return y
         
-
-
+def multi_ptrackers(
+x,
+w0,
+n_partials,
+# function taking partial number and fundamental and giving a frequency
+# partial numbering starts at 0
+part_to_w=lambda w, n: (n+1)*w,
+ptrack_args=
+(0.999, #a_lp
+0.9,    #alph_p
+1e-3,   #alph_w
+1e-4)   #g_thresh
+):
+    ret=[]
+    for n in range(n_partials):
+        w=part_to_w(w0,n)
+        ret.append(ptrackers.ptracker(x,w,*ptrack_args))
+    return ret
