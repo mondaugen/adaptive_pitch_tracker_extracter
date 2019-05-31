@@ -7,7 +7,7 @@ class lpfilt:
     Low pass filter.
     """
     def __init__(self,a):
-        self.a = a
+        self.a = -a
         self.b0 = (1-a)
         self.zi = None
     def _get_b_a(self):
@@ -80,15 +80,15 @@ class apt:
         hf_=1
         g=1
         for n,x_ in enumerate(x):
-            h = x_ / g
+            h = x_ * g
             hf = self.lpf.filter(np.array([h]))[0]
             p = (1-self.alph_p)*np.abs(hf)+self.alph_p*p
             if p > self.g_thresh:
                 w_=np.angle(hf/hf_)
                 w0 += w_*self.alph_w
                 hf_=hf
-            g *= np.exp(complex("j")*w0)
-            phi[n]=np.angle(g)
+            g *= np.exp(-1*complex("j")*w0)
+            phi[n]=-1*np.angle(g)
             a[n]=p
         return (a,phi)
             
