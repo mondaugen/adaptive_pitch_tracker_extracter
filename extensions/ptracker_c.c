@@ -77,6 +77,10 @@ static void zdouble_ptrackerprod(char **args, npy_intp *dimensions,
             hf_ = 1, /* last heterodyned, low-pass filtered sample */
             g = 1;   /* the the signal we use to heterodyne */
 
+    /* cannot deviate more than += 50 cents */
+    double devmax = w0_ * 1.03,
+           devmin = w0_ / 1.03;
+
     /* The low-pass filter for heterodyning */
     struct zdouble_lpfilt hlpfilt = {
         .a = -1 * *((double*)a_lp),
@@ -92,6 +96,8 @@ static void zdouble_ptrackerprod(char **args, npy_intp *dimensions,
             w_ = carg(hf/hf_);
             wrap_phase(w_);
             w0_ += w_ * *((double*)alph_w);
+            w0_ = (w0_ > devmax) ? devmax : w0_;
+            w0_ = (w0_ < devmin) ? devmin : w0_;
             hf_ = hf;
         }
         phi_g += w0_;
