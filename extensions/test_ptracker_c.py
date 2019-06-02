@@ -1,11 +1,13 @@
 from ptracking import ptrackers
 import numpy as np
 import matplotlib.pyplot as plt
+import librosa
 
 w=0.4
 w0=.5
-t=np.arange(0,10000)
-x=np.cos(t*w)+np.random.standard_normal(t.shape)*.1
+t=np.arange(0,16000*5)
+x=np.cos(t*w)+np.random.standard_normal(t.shape)*.5
+#librosa.output.write_wav("/tmp/sine.wav",x,16000)
 
 print(dir(ptrackers))
 
@@ -14,7 +16,7 @@ x,
 w0,
 0.99,
 0.9,
-.1,
+1e-2,
 1e-3)
 
 y=a*np.cos(phi)

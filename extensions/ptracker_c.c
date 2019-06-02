@@ -37,7 +37,6 @@ zdouble_lpfilt_filt(
 }
 
 /* The loop definition must precede the PyMODINIT_FUNC. */
-
 static void zdouble_ptrackerprod(char **args, npy_intp *dimensions,
                             npy_intp* steps, void* data)
 {
@@ -88,7 +87,7 @@ static void zdouble_ptrackerprod(char **args, npy_intp *dimensions,
     for (i = 0; i < n; i++) {
         h = *((double*)x) * g;
         hf = zdouble_lpfilt_filt(&hlpfilt,h);
-        p = (1 - *((double*)alph_p)) * cabs(hf) + *((double*)alph_p)*p;
+        p = (1 - *((double*)alph_p)) * cabs(hf) + *((double*)alph_p) * p;
         if (p >= *((double*)g_thresh)) {
             w_ = carg(hf/hf_);
             wrap_phase(w_);

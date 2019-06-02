@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import librosa
 
 sr=16000
-x,sr=librosa.load("sounds/one_guitar_note.wav",sr)
+x=np.fromfile('/tmp/one_guitar_note.f64',dtype='float64')
 t=np.arange(len(x))/sr
 w0=65.406/sr*2*np.pi # frequency of c2
 n_parts=16
@@ -13,7 +13,13 @@ n_parts=16
 parts=ptracker.multi_ptrackers(
 x,
 w0,
-n_parts)
+n_parts,
+ptrack_args=(
+0.999,
+0.9,
+1e-4,
+1e-4)
+)
 
 t=np.arange(len(x))/sr
 
