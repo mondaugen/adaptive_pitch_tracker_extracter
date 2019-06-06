@@ -4,12 +4,17 @@ from scipy import signal
 
 def find_attacks(
 x,
+# samples with values below this are not considered
 thresh=1e-4,
-smooth=0.99
-):
-    p=signal.lfilter([1-smooth],[1,-smooth],x*x)
-    rect=p>thresh
-    return (rect,p)
+# amount of smoothing for local maximum algorithm
+smooth=0.9999,
+# amount of samples to way before letting another attack through (limits the
+# number of attacks that can occur over an interval of time)
+N=1000):
+    # find local maximum using full-wave rectified signal
+    xm=fast_max(np.abs(x),alph=smooth)
+    xmp=thresh_local_max_samples(np.diff(xm),alph=smooth,beta=1,N=N,thresh=thresh)
+    return np.where(xmp > 0)[0]
 
 def _shifted_lp(N=8,rs=80,Wn=0.5):
     b,a=signal.cheby2(N,rs,Wn)

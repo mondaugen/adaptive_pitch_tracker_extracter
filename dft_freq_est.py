@@ -25,7 +25,7 @@ class peak_analyzer:
         self.start_i=start_i
         self.end_i=end_i
         self.N_FFT=N_FFT
-        self.N_W=N_FFT
+        self.N_W=N_W
         self.H=H
     def freqs_amps(self,x,max_n_peaks=20,peak_thresh=-80):
         """
@@ -43,14 +43,25 @@ class peak_analyzer:
         xh1[self.start_i:self.end_i]=x[self.H:]*self.w
         Xh0=np.fft.rfft(xh0)
         Xh1=np.fft.rfft(xh1)
-        Xh0_a=np.abs(Xh0_a)
-        peaks_i=pick_peaks(Xh0_a,thresh=peak_thresh)
+        Xh0_a=np.abs(Xh0)
+        peaks_i=pick_peaks(Xh0_a,thresh=np.power(10,peak_thresh/20))
         peaks_i=peaks_i[np.argsort(Xh0_a[peaks_i])[::-1]][:max_n_peaks]
         Xh0_=Xh0[peaks_i]
         Xh1_=Xh1[peaks_i]
         ph=np.angle(Xh0_)
+        ph1=np.angle(Xh1_)
         a=np.abs(Xh0_)
-        dph=(np.angle(Xh1_)-np.angle(Xh0_))/self.H
+
+        # phase unwrap calc
+        # use bin frequencies of peaks to get an estimate of the frequency
+        w_k=peaks_i/self.N_FFT*2*np.pi
+        # we now see how many times we need to unwrap in order to minimize the
+        # difference between the estimated frequency and the bin frequency
+        A=(self.H*w_k - ph1 + ph)/self.H
+        # how many times to unwrap by 2*pi
+        M=np.round(self.H*A/(2*np.pi))
+
+        dph=(ph1+M*np.pi*2-ph)/self.H
         da=np.power(np.abs(Xh1_/Xh0_),1./self.H)
         return (ph,a,dph,da)
 
