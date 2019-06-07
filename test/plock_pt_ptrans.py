@@ -36,10 +36,10 @@ N_H)
 # range of peaks we are looking for
 pitch_f0=36
 f0=440*np.power(2,(pitch_f0-69)/12.)
-n_parts=2
+n_parts=48
 max_detune_cents=200
 # amount of transposition when resynthesizing
-resynth_ptrans=np.power(2,-2./12)
+resynth_ptrans=np.power(2,-4./12)
 print(resynth_ptrans)
 f0s=(np.arange(n_parts)+1)*f0
 #print(f0s)
@@ -59,16 +59,18 @@ for n in np.arange(0,n_max,N_H):
 
 # synthesize results
 y=np.zeros((n_max,))
-for (_,phk,ak,dphk,dak),(__,phk1,ak1,dphk1,dak1),n in zip(res[:-1],res[1:],np.arange(0,n_max-1,N_H)):
-    phk%=2*np.pi
-    phk1%=2*np.pi
-    ph=cat_to_cols(phk,phk1)
+ph_last=res[0][1]
+for (_,_,ak,dphk,dak),(__,phk1,ak1,dphk1,dak1),n in zip(res[:-1],res[1:],np.arange(0,n_max-1,N_H)):
+    #ph_last%=2*np.pi
+    #phk1%=2*np.pi
+    ph=cat_to_cols(ph_last,phk1)
     a=cat_to_cols(ak,ak1)
     dph=cat_to_cols(dphk,dphk1)
     da=cat_to_cols(dak,dak1)
-    y[n:n+N_H]=pa.synth_peaks(ph,a,dph*resynth_ptrans,da)
+    y[n:n+N_H],ph_last,_,_=pa.synth_peaks_trans(ph,a,dph,da,ptrans=resynth_ptrans)
 
-y.tofile('/tmp/resynth.f64')
+out=np.concatenate((y,x))
+out.tofile('/tmp/resynth.f64')
 
 if do_plot == True:
 
