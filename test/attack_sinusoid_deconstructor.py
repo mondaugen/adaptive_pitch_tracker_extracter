@@ -14,6 +14,7 @@ from scipy import signal
 import librosa
 import dft_freq_est
 import attack_finder
+from common import normalize
 
 def calc_damped_sine_filters(bet,w,amps=None):
     """
@@ -33,11 +34,6 @@ def calc_damped_sine_filters(bet,w,amps=None):
         g=amps*(1-bet*(1-bet))/(1-bet/2)
         b=b*g[:,None]
     return (b,a)
-
-def normalize(x):
-    x-=np.mean(x)
-    x/=np.max(np.abs(x))
-    return x
 
 sr=16000
 x=np.fromfile('/tmp/snd.f64')

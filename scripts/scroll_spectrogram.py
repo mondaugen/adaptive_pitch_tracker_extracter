@@ -48,19 +48,12 @@ def run(data):
     ax.set_xlim(0, sr/2)
     ax.plot(xdata,y[:N_FFT//2],label="%f" % (t,))
     ax.legend()
-    #xdata.append(t)
-    #ydata.append(y)
-    #xmin, xmax = ax.get_xlim()
 
-    #if t >= xmax:
-    #    ax.set_xlim(xmin, 2*xmax)
-    #    ax.figure.canvas.draw()
-
-Writer = animation.writers['ffmpeg']
-writer = Writer(fps=15)
+#Writer = animation.writers['ffmpeg']
+#writer = Writer(fps=15)
 
 ani = animation.FuncAnimation(fig, run, data_gen, blit=False, interval=200,
                               repeat=False, init_func=init)
 
-ani.save('/tmp/spec.mp4',writer=writer)
-#plt.show()
+#ani.save('/tmp/spec.mp4',writer=writer)
+plt.show()
