@@ -44,9 +44,9 @@ x=np.fromfile('/tmp/snd.f64')
 
 N_W=1024
 N_FFT=2048
-N_H=512
+N_H=1024
 
-peak_thresh=-100
+peak_thresh=-80
 
 # estimate where the attacks are
 attack_i=attack_finder.find_attacks(x)
@@ -67,7 +67,7 @@ N_H)
 
 # analyse some time after the attack
 x_=x[ad:ad+pa.N_W+pa.H]
-ph,amps,w_,bet=pa.freqs_amps(x_,max_n_peaks=50,peak_thresh=peak_thresh)
+ph,amps,w_,bet=pa.freqs_amps(x_,max_n_peaks=8,peak_thresh=peak_thresh)
 bet[bet>=1]=max_bet
 
 pitch_trans=0
