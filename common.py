@@ -16,7 +16,6 @@ def frame(x,hop_size,window_size):
     n_hops=(len(x)-window_size)//hop_size
     n=np.add.outer(np.arange(window_size),np.arange(n_hops)*hop_size)
     ret=x[n]
-    print(n)
     return ret
 
 def get_env(name,default,conv=None):
