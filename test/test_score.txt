@@ -1,0 +1,7 @@
+60.f64 0 'gain_db gain=0|lowpass_1pole cutoff=2000|truncate length=0.5 fadetime=0.3'
+64.f64 0.5 'gain_db gain=-6|lowpass_1pole cutoff=1000|truncate length=0.5 fadetime=0.3'
+67.f64 1 'gain_db gain=-12|lowpass_1pole cutoff=500|truncate length=0.5 fadetime=0.3'
+50.f64 0.25 'gain_db gain=-12|lowpass_1pole cutoff=500|truncate length=0.5 fadetime=0.3'
+47.f64 0.75 'gain_db gain=-12|lowpass_1pole cutoff=1500|truncate length=1.5 fadetime=0.3'
+45.f64 1.75 'gain_db gain=-12|lowpass_1pole cutoff=2500|truncate length=0.5 fadetime=0.3'
+42.f64 2

@@ -5,3 +5,12 @@ synth_midi_to_wav ()
     outname="${1%%.mid}.wav"
     fluidsynth -F "$outname" "$SOUNDFONT" "$1"
 }
+
+check_env_set ()
+{
+    if [[ -z "${!1}" ]]; then
+        echo "$2"
+        exit -1
+    fi
+}
+    

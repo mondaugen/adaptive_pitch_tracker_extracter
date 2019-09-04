@@ -1,3 +1,6 @@
+# if you haven't already done so, generate /tmp/guit.f64 by doing
+# sox sounds/guitar.wav -t f64 -r 16k -c 1 /tmp/guit.f64
+
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
@@ -32,13 +35,17 @@ weight=weight_fun,
 N_frame=N,
 N_window=W)
 
-C._plot_tables()
-plt.show()
+#C._plot_tables()
+#plt.show()
 
 x=common.frame(x,H,N)
 X=C(x)
 
+# find index of maximum in each column
+X_argmax=np.argmax(X,axis=0)
+
 ax=plt.imshow(np.log(X),origin='lower',aspect='auto')
+ax.axes.scatter(np.arange(X.shape[1]),X_argmax)
 ax.axes.set_yticks([_ for _ in range(len(p_range))])
 ax.axes.set_yticklabels(p_range)
 

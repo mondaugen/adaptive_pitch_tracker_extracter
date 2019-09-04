@@ -18,10 +18,13 @@ def frame(x,hop_size,window_size):
     ret=x[n]
     return ret
 
-def get_env(name,default,conv=None):
+def get_env(name,default=None,conv=None,check_if_none=False):
     try:
         ret=environ[name]
     except KeyError:
-        return default
+        ret=default
+    if check_if_none and ret is None:
+            raise Exception("Specify " + name + ".")
     if conv is not None:
         return conv(ret)
+    return ret
