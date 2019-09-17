@@ -49,3 +49,23 @@ out_frames_H4_W8_filtered_W8_time_pairs=[
 locked_out_frames_H4_W8_filtered_W8_time_pairs=[locked_frame_info_out(*tup) for
     tup in out_frames_H4_W8_filtered_W8_time_pairs]
 
+in_locked_frames_H4_W8_filtered_W8=[
+7,
+8,
+9,
+10,
+11,
+14,
+18,
+21,
+24,
+28,
+31,
+35,
+39,
+43,
+47,
+60,
+64,
+76,
+80]

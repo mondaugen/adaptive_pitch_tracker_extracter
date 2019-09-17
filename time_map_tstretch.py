@@ -156,7 +156,9 @@ def out_locked_frames(
 
 def in_locked_frames(
     # the output frames (e.g., as determined by out_locked_frames)
-    out_frames):
+    out_frames,
+    # the analysis frame length
+    L_w):
     """ Returns a list of sample numbers representing the start times of the
     input frames (analysis frames)"""
     assert(len(out_frames)>0)
@@ -185,15 +187,16 @@ def in_locked_frames(
         # otherwise, the local_hop_size could be negative, in which case the
         # in_frames might advance backwards, which is not really wrong, just
         # maybe surprising
-        prev_lock_input_frame_start_time
-        local_hop_size = (lock_input_frame_start_time -
-            in_frames[n_in_frame-1])/out_frame.nframes_to_prev_locked
-        h_local = in_frames[n_in_frame-1]+local_hop_size
-        for n in range(out_frame.nframes_to_prev_locked-1):
-            # in_frames[n_in_frame] = round(h_local)
-            in_frames.append(round(h_local))
-            h_local+=local_hop_size
-            n_in_frame += 1
+        prev_lock_input_frame_start_time = out_frame.locked_time_pair.in_time - L_w
+        if out_frame.nframes_to_prev_locked > 1:
+            local_hop_size = (prev_lock_input_frame_start_time -
+                in_frames[n_in_frame-1])/(out_frame.nframes_to_prev_locked-1)
+            h_local = in_frames[n_in_frame-1]+local_hop_size
+            for n in range(out_frame.nframes_to_prev_locked-1):
+                # in_frames[n_in_frame] = round(h_local)
+                in_frames.append(round(h_local))
+                h_local+=local_hop_size
+                n_in_frame += 1
         in_frames.append(lock_input_frame_start_time)
         n_in_frame += 1
     return in_frames
