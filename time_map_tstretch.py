@@ -18,6 +18,10 @@ class io_time_pair:
     def __init__(self,in_time,out_time):
         self.in_time=in_time
         self.out_time=out_time
+    def __eq__(self,other):
+        return (self.in_time==other.in_time) and (self.out_time==other.out_time)
+    def __str__(self):
+        return '(i: %d, o: %d)' % (self.in_time,self.out_time)
 
 def io_time_pair_in_time(x):
     return x.in_time
@@ -54,23 +58,26 @@ def check_io_time_pairs_in_bounds(io_time_pairs,H,L_w,L_lb,L_ub):
     # this value <= the upper bound
     ret &= (max_io_time_pair.in_time
         - ((max_io_time_pair.out_time 
-            - min_io_time_pair.out_time) % H) + L) <= L_ub
+            - min_io_time_pair.out_time) % H) + L_w) <= L_ub
     return ret
 
 def check_io_time_pairs_out_time_increasing(io_time_pairs):
     """ Check to see all the out_times are monotonically increasing, i.e.,
     io_time_pairs[i+1]>=io_time_pairs[i] for all i """
     return reduce(lambda x,y: x and y,
-        [(x-y)>=0 for x,y in zip(io_time_pairs[1:],io_time_pairs[:-1])])
+        [(x.out_time-y.out_time)>=0 for x,y in zip(io_time_pairs[1:],io_time_pairs[:-1])])
 
-def filter_close_io_time_maps(
+def filter_close_inc_io_time_maps(
     # a list of [(intime,outtime),...] pairs
     io_time_pairs,
     # minimum allowed time between input times (typically the length of the analysis window L_w)
     t_in_min,
     # minimum allowed time between output times (typically H+L_w where H is the (output) hop size)
     t_out_min):
-    """filter out impossible time mappings"""
+    """
+    filter out time mappings smaller than some values
+    this function is designed to work on monotonically increasing mappings
+    """
     if len(io_time_pairs) < 1:
         return ValueError('io_time_pairs must contain at least 1 pair')
     assert(t_in_min>0)
@@ -106,6 +113,14 @@ class locked_frame_info_out:
         self.start_time=start_time
         self.locked_time_pair=locked_time_pair
         self.nframes_to_prev_locked=nframes_to_prev_locked
+    def __eq__(self,other):
+        return ((self.start_time==other.start_time)
+            and (self.locked_time_pair == other.locked_time_pair)
+            and (self.nframes_to_prev_locked == other.nframes_to_prev_locked))
+    def __str__(self):
+        return (('(s: %d, ' % self.start_time)
+            + str(self.locked_time_pair)
+            + (', n: %d)' % self.nframes_to_prev_locked))
         
 def out_locked_frames(
     # a sequence of filtered pairs describing an input and output mapping
@@ -126,13 +141,13 @@ def out_locked_frames(
     frames=[locked_frame_info_out(io_time_pairs[0].out_time,io_time_pairs[0],0)]
     # n_frame=0
     # sample number
-    n=io_time_pairs[0].out_time
+    n=io_time_pairs[0].out_time+H
     # distance between frames in number of frames
     frame_dist=1
     for pair in io_time_pairs[1:]:
         while n <= pair.out_time:
             if (n+L_w) > pair.out_time:
-                frames.append(n,pair,frame_dist)
+                frames.append(locked_frame_info_out(n,pair,frame_dist))
                 frame_dist = 0
                 # n_frame += 1
             n += H
@@ -157,17 +172,28 @@ def in_locked_frames(
         # the distance from the start of the in_frame to the in_time should be
         # the same as the distance between the start of the out_frame and the
         # out_time
-        locked_frame_start_time = out_frame.locked_time_pair.in_time
+        lock_input_frame_start_time = (out_frame.locked_time_pair.in_time
                 -(out_frame.locked_time_pair.out_time
-                    - out_frame.start_time)
-        local_hop_size = (locked_frame_start_time -
+                    - out_frame.start_time))
+        # the previous locked frame input frame should not contain the locked
+        # point, and is therefore set to have a start time equal to the in_time
+        # - the analysis frame length (so that the sample just after the last
+        # sample in the previous locked frame is the locked point)
+        # If the input points are filtered so that no input points are closer
+        # than a window length, this input frame will always come at a time =>
+        # the previous input frame (in_frames[n_in_frame-1])
+        # otherwise, the local_hop_size could be negative, in which case the
+        # in_frames might advance backwards, which is not really wrong, just
+        # maybe surprising
+        prev_lock_input_frame_start_time
+        local_hop_size = (lock_input_frame_start_time -
             in_frames[n_in_frame-1])/out_frame.nframes_to_prev_locked
-        h_local = in_frames[n_in_frame-1]
+        h_local = in_frames[n_in_frame-1]+local_hop_size
         for n in range(out_frame.nframes_to_prev_locked-1):
             # in_frames[n_in_frame] = round(h_local)
             in_frames.append(round(h_local))
             h_local+=local_hop_size
             n_in_frame += 1
-        in_frames.append(locked_frame_start_time)
+        in_frames.append(lock_input_frame_start_time)
         n_in_frame += 1
     return in_frames
