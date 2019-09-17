@@ -14,3 +14,8 @@ check_env_set ()
     fi
 }
     
+fail_msg_exit ()
+{
+    echo "$1"
+    exit $2
+}

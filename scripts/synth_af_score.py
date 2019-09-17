@@ -13,6 +13,7 @@
 # argname0=argvalue0 ... argnamen=argvaluen|process_name1 ...'
 
 import common
+import os
 import shlex
 import numpy as np
 from score_synth_procs import const_sr_fun_dispatcher
@@ -25,11 +26,14 @@ def score_extract_unique_filenames(scorefile):
             filenames.add(shlex.split(line)[0])
     return filenames
 
-def load_files_into_arrays(files,dtype=np.float64):
+def load_files_into_arrays(files,sample_file_directory=None,dtype=np.float64):
     """ Returns a dict with the filenames as the keys and the array as the value. """
     loaded=dict()
     for f in files:
-        loaded[f]=np.fromfile(f,dtype=dtype)
+        file_path=f
+        if sample_file_directory is not None:
+            file_path=os.path.join(sample_file_directory,f)
+        loaded[f]=np.fromfile(file_path,dtype=dtype)
     return loaded
 
 def get_length_longest_array(arrays):
@@ -49,10 +53,10 @@ def run_procs_on_array(x,procs_str,fundisp):
         x=fundisp.parse_proc_fun(x,proc_str)
     return x
 
-def render_score_to_array(scorefile,sample_rate):
+def render_score_to_array(scorefile,sample_rate,sample_file_directory=None):
     fundisp=const_sr_fun_dispatcher(sample_rate)
     sound_files=score_extract_unique_filenames(scorefile)
-    sound_segs=load_files_into_arrays(sound_files)
+    sound_segs=load_files_into_arrays(sound_files,sample_file_directory)
     longest_seg_len=get_length_longest_array([sound_segs[k] for k in sound_segs.keys()])
     max_ts=score_extract_maximum_timestamp(scorefile)
     len_output=int(np.ceil(max_ts*sample_rate)+longest_seg_len)
@@ -73,10 +77,11 @@ def render_score_to_array(scorefile,sample_rate):
     return y
 
 if __name__ == '__main__':
+    SAMPLE_FILE_DIRECTORY=get_env('SAMPLE_FILE_DIRECTORY')
     SAMPLE_RATE=common.get_env('SAMPLE_RATE',16000,float)
     SCORE_FILE=common.get_env('SCORE_FILE',check_if_none=True)
     OUTPUT=common.get_env('OUTPUT',check_if_none=True)
-    y=render_score_to_array(SCORE_FILE,SAMPLE_RATE)
+    y=render_score_to_array(SCORE_FILE,SAMPLE_RATE,sample_file_directory=SAMPLE_FILE_DIRECTORY)
     y=common.normalize(y)
     y.tofile(OUTPUT)
     

@@ -7,6 +7,9 @@ check_env_set SOURCE_DIR "Specify SOURCE_DIR."
 check_env_set DEST_DIR "Specify DEST_DIR."
 [ -z $BASENAME_PREFIX ] && BASENAME_PREFIX=ELECTRIC_GUITAR_
 
+[ ! -d "$DEST_DIR" ] && mkdir -p "$DEST_DIR" && echo "Created directory $DEST_DIR" \
+    || fail_msg_exit "Failed creating directory $DEST_DIR"
+
 #find "$SOURCE_DIR" |perl -np -e 's/^ELECTRIC_GUITAR_([A-G]#?\d).*$/$1/'
 find "$SOURCE_DIR" -type f | xargs -d'\n' -I{} bash -c \
 '

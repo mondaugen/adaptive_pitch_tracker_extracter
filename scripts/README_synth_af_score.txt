@@ -8,7 +8,7 @@ scripts/mums_conv_fmt.sh
 
 to convert.
 
-Now you can render a score. And example score can be found at
+Now you can render a score. An example score can be found at
 
 test/test_score.txt
 

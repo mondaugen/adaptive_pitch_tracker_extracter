@@ -18,6 +18,9 @@ source "$(dirname $0)/common.sh"
 check_env_set SOURCE_DIR "Specify SOURCE_DIR."
 check_env_set DEST_DIR "Specify DEST_DIR."
 
+[ ! -d "$DEST_DIR" ] && mkdir -p "$DEST_DIR" && echo "Created directory $DEST_DIR" \
+    || fail_msg_exit "Failed creating directory $DEST_DIR"
+
 find "$SOURCE_DIR" -type f | xargs -d'\n' -I{} \
 bash -c '
 bn=$(basename {})
