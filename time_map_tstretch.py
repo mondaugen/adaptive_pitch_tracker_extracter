@@ -12,6 +12,7 @@ General assumputions:
 
 """
 
+from functools import reduce
 
 class io_time_pair:
     def __init__(self,in_time,out_time):
@@ -35,9 +36,32 @@ def check_io_time_pairs_in_bounds(io_time_pairs,H,L_w,L_lb,L_ub):
     min_io_time_pair=sorted(io_time_pairs,key=io_time_pair_in_time)[0]
     max_io_time_pair=sorted(io_time_pairs,key=io_time_pair_in_time,reverse=True)[0]
     ret = True
-    ret &= (min_io_time_pair.in_time - (min_io_time_pair.out_time % H)) >= L_lb
-    ret &= (max_io_time_pair.in_time - (max_io_time_pair.out_time % H) + L) <= L_ub
+    # for the first output frame, the locked feature is mapped onto the first
+    # sample of the output frame, so the locked feature is also on the first
+    # sample of the input frame, so nothing needs to be added to the in_time to
+    # get the frame start time
+    ret &= min_io_time_pair.in_time >= L_lb
+    # we will set the first output frame's start time to be equal to the output
+    # time of the locked feature. This means there are
+    # (max_io_time_pair.out_time - min_io_time_pair.out_time) / H frames (hops)
+    # until the last last locked feature.  Because we want the locked output
+    # feature to map to the same sample number of the input frame (i.e., we want
+    # it to have the same distance from the input frame's start as it has from
+    # the output frame's start) we subtract this remainder multiplied by the hop
+    # size from min_io_time_pair.in_time to get the last input frame's start
+    # time. The length of the input frame is L, so the last valid sample is
+    # input_frame.start_time + L - 1 (indexing starts at 0), so we check that
+    # this value <= the upper bound
+    ret &= (max_io_time_pair.in_time
+        - ((max_io_time_pair.out_time 
+            - min_io_time_pair.out_time) % H) + L) <= L_ub
     return ret
+
+def check_io_time_pairs_out_time_increasing(io_time_pairs):
+    """ Check to see all the out_times are monotonically increasing, i.e.,
+    io_time_pairs[i+1]>=io_time_pairs[i] for all i """
+    return reduce(lambda x,y: x and y,
+        [(x-y)>=0 for x,y in zip(io_time_pairs[1:],io_time_pairs[:-1])])
 
 def filter_close_io_time_maps(
     # a list of [(intime,outtime),...] pairs
@@ -90,16 +114,22 @@ def out_locked_frames(
     H,
     # the output (synthesis) window length
     L_w):
+    assert(len(io_time_pairs)>0)
+    assert(H>0)
+    assert(L_w>0)
     # the first frame is always locked
     # in the case you wanted to preallocate "frames", it needs to have length of
     # at least len(io_time_pairs)*ceil(L_w/H)
-    frames=[]
+    # the first output frame is simply set so that the first sample in the frame
+    # is the first output time we want to map to
+    # the number of frames to the previous frame is 0 because it is the first frame
+    frames=[locked_frame_info_out(io_time_pairs[0].out_time,io_time_pairs[0],0)]
     # n_frame=0
     # sample number
-    n=0
+    n=io_time_pairs[0].out_time
     # distance between frames in number of frames
-    frame_dist=0
-    for pair in io_time_pairs:
+    frame_dist=1
+    for pair in io_time_pairs[1:]:
         while n <= pair.out_time:
             if (n+L_w) > pair.out_time:
                 frames.append(n,pair,frame_dist)
@@ -113,17 +143,17 @@ def in_locked_frames(
     # the output frames (e.g., as determined by out_locked_frames)
     out_frames):
     """ Returns a list of sample numbers representing the start times of the
-    input (analysis frames)"""
+    input frames (analysis frames)"""
     assert(len(out_frames)>0)
     # in case you wanted to preallocate in_frames, it needs to have size
-    # (sum([f.frame_dist for f in out_frames])+1)
+    # (sum([f.frame_dist for f in out_frames[1:]])+1)
     in_frames=[out_frames[0].locked_time_pair.in_time
                 -(out_frames[0].locked_time_pair.out_time
                     - out_frames[0].start_time)]
     n_out_frames = len(out_frames)
     # n_out_frame = 1
     n_in_frame = 1
-    for out_frame in out_frames:
+    for out_frame in out_frames[1:]:
         # the distance from the start of the in_frame to the in_time should be
         # the same as the distance between the start of the out_frame and the
         # out_time
