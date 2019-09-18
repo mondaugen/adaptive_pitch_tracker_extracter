@@ -12,16 +12,8 @@ check_env_set MUMS_PATH "Specify MUMS_PATH"
 
 piano_path=disc2/KEYBOARDS/PIANOS/PIANO_MPP_SOFT/
 
-[ -z "$SKIP_MUMS_TO_MIDI" ] && \
-BASENAME_PREFIX=MPP_PIANO_SOFT_ \
-SOURCE_DIR="${MUMS_PATH}/${piano_path}" \
-DEST_DIR=/tmp/mums_pno_midi \
-bash scripts/mums_to_midi.sh 
-
-[ -z "$SKIP_MUMS_CONV_FMT" ] && \
-SOURCE_DIR=/tmp/mums_pno_midi \
-DEST_DIR=/tmp/mums_pno_midi_f64 \
-bash scripts/mums_conv_fmt.sh 
+# prepare the piano samples
+bash "$(dirname $0)/tstretch_prepare_piano_samples.sh"
 
 [ -z "$SKIP_SYNTH_AF_SCORE" ] && \
 PYTHONPATH=. \
