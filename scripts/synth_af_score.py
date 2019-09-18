@@ -53,6 +53,30 @@ def run_procs_on_array(x,procs_str,fundisp):
         x=fundisp.parse_proc_fun(x,proc_str)
     return x
 
+def extract_score_fields(line):
+    """ from a line of input extract the filename, timestamp and procs """
+    fields=shlex.split(line)
+    if len(fields) < 2:
+        raise Exception('Error parsing %s. Must specify filename and time' % (line,))
+    proc=None
+    if len(fields) >= 2:
+        filename,ts=fields[:2]
+    if len(fields) > 2:
+        proc=fields[2]
+    return (filename,ts,proc)
+
+def ts_to_ts_samps(ts,sample_rate):
+    """ find the timestamp's value in samples """
+    return int(np.round(float(ts)*sample_rate))
+
+def extract_ts_samps(scorefile,sample_rate):
+    ts_samps=[]
+    with open(scorefile,'r') as f:
+        for line in f.readlines():
+            _,ts,_=extract_score_fields(line)
+            ts_samps.append(ts_to_ts_samps(ts,sample_rate))
+    return ts_samps
+
 def render_score_to_array(scorefile,sample_rate,sample_file_directory=None):
     fundisp=const_sr_fun_dispatcher(sample_rate)
     sound_files=score_extract_unique_filenames(scorefile)
@@ -63,21 +87,14 @@ def render_score_to_array(scorefile,sample_rate,sample_file_directory=None):
     y=np.zeros(len_output)
     with open(scorefile,'r') as f:
         for line in f.readlines():
-            fields=shlex.split(line)
-            if len(fields) < 2:
-                raise Exception('Error parsing %s. Must specify filename and time' % (line,))
-            proc=None
-            if len(fields) >= 2:
-                filename,ts=fields[:2]
-            if len(fields) > 2:
-                proc=fields[2]
+            filename,ts,proc=extract_score_fields(line)
             x=run_procs_on_array(sound_segs[filename],proc,fundisp)
-            ts_samps=int(np.round(float(ts)*sample_rate))
+            ts_samps=ts_to_ts_samps(ts,sample_rate)
             y[ts_samps:ts_samps+len(x)]+=x
     return y
 
 if __name__ == '__main__':
-    SAMPLE_FILE_DIRECTORY=get_env('SAMPLE_FILE_DIRECTORY')
+    SAMPLE_FILE_DIRECTORY=common.get_env('SAMPLE_FILE_DIRECTORY')
     SAMPLE_RATE=common.get_env('SAMPLE_RATE',16000,float)
     SCORE_FILE=common.get_env('SCORE_FILE',check_if_none=True)
     OUTPUT=common.get_env('OUTPUT',check_if_none=True)

@@ -26,6 +26,9 @@ class io_time_pair:
 def io_time_pair_in_time(x):
     return x.in_time
 
+def sort_io_time_pairs_in_time(io_time_pairs,reverse=False):
+    return sorted(io_time_pairs,key=io_time_pair_in_time,reverse=reverse)
+
 def io_time_pair_out_time(x):
     return x.out_time
 
@@ -37,8 +40,8 @@ def check_io_time_pairs_in_bounds(io_time_pairs,H,L_w,L_lb,L_ub):
         the io_time_pair with the greatest out_time will map to analysis frame
         with start time <= L_ub - L_w (upper bound - frame length)
     """
-    min_io_time_pair=sorted(io_time_pairs,key=io_time_pair_in_time)[0]
-    max_io_time_pair=sorted(io_time_pairs,key=io_time_pair_in_time,reverse=True)[0]
+    min_io_time_pair=sort_io_time_pairs_in_time(io_time_pairs)[0]
+    max_io_time_pair=sort_io_time_pairs_in_time(io_time_pairs,reverse=True)[0]
     ret = True
     # for the first output frame, the locked feature is mapped onto the first
     # sample of the output frame, so the locked feature is also on the first
