@@ -1,6 +1,7 @@
 import librosa
 import numpy as np
 from scipy import signal
+import common
 
 def find_attacks(
 x,
@@ -98,3 +99,37 @@ def thresh_local_max_samples(x,alph=0.99,beta=0.5,N=16000*.125,thresh=1e-3):
     ret[0]=0
     #return ret
     return impulse_rate_limiter_samples(ret,N=N)
+
+def spectral_flux(x,H,W,window_type='hann'):
+    """
+    Frame-up x and take the DFT of each windowed frame. Compute the power
+    spectrum for each frame. Form the sum of the absolute values of the
+    differences between the adjacent bins. This is the spectral flux.
+    Intuitively, a more jagged spectrum will give a greater value of spectral
+    flux.
+    """
+    w=signal.get_window(window_type,W)
+    w/=np.sum(W)
+    spec_flux_i=0
+    X=np.fft.fft(common.frame(x,H,W)*w[:,None],axis=0)
+    spec_flux=np.sum(np.abs(np.diff(np.abs(X),axis=0)),axis=0)
+    return spec_flux
+
+def attack_region_estimation(x,H,W,alpha,thresh,window_type='boxcar'):
+    """
+    Return a pair (t,a) which has the times t and a signal a which is 1 if it is
+    believed to be a part of an attack portion of a signal and 0 otherwise.
+    H is the hop size, W the window size
+    alpha is the amount of smoothing applied to the spectral flux before taking
+    differences and thresholding to get the attack portions. 1 uses 100% of the
+    current value and none of the past values 0.5 uses 50% of the current value
+    and 50% of the last values, etc.
+    window_type is the type of window used before taking the DFT.
+    """
+    spec_flux=spectral_flux(x,H,W,window_type)
+    t_spec_flux=np.arange(len(spec_flux))*H+W/2
+    smooth_filter_coeffs=([alpha],[1,-(1-alpha)])
+    spec_flux=signal.lfilter(*smooth_filter_coeffs,spec_flux)
+    spec_flux_diff=spec_flux[1:]-spec_flux[:-1]
+    attacks=np.array(spec_flux_diff>thresh,dtype='float')
+    return (t_spec_flux[1:],attacks)

@@ -63,18 +63,22 @@ def extract_score_fields(line):
         filename,ts=fields[:2]
     if len(fields) > 2:
         proc=fields[2]
-    return (filename,ts,proc)
+    return (filename,float(ts),proc)
 
 def ts_to_ts_samps(ts,sample_rate):
     """ find the timestamp's value in samples """
-    return int(np.round(float(ts)*sample_rate))
+    return int(np.round(ts*sample_rate))
 
-def extract_ts_samps(scorefile,sample_rate):
-    ts_samps=[]
+def extract_ts(scorefile):
+    ts=[]
     with open(scorefile,'r') as f:
         for line in f.readlines():
-            _,ts,_=extract_score_fields(line)
-            ts_samps.append(ts_to_ts_samps(ts,sample_rate))
+            _,t,_=extract_score_fields(line)
+            ts.append(t)
+    return ts
+
+def extract_ts_samps(scorefile,sample_rate):
+    ts_samps=[ts_to_ts_samps(ts,sample_rate) for ts in extract_ts(scorefile)]
     return ts_samps
 
 def render_score_to_array(scorefile,sample_rate,sample_file_directory=None):
