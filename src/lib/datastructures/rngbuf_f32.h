@@ -1,21 +1,21 @@
 #ifndef FLOAT_BUF_H
 #define FLOAT_BUF_H 
  
-struct float_buf;
+struct rngbuf_f32;
 
 void
-float_buf_free(struct float_buf *fb);
+rngbuf_f32_free(struct rngbuf_f32 *fb);
 
-struct float_buf *
-float_buf_new(unsigned int size);
+struct rngbuf_f32 *
+rngbuf_f32_new(unsigned int size);
 
-struct float_buf_where_val { unsigned int n; float f; }; 
-
-int
-float_buf_push_copy(struct float_buf *fb, unsigned int n, const float *values);
+struct rngbuf_f32_where_val { unsigned int n; float f; }; 
 
 int
-float_buf_lookup(struct float_buf *fb, unsigned int n, float *dest);
+rngbuf_f32_push_copy(struct rngbuf_f32 *fb, unsigned int n, const float *values);
+
+int
+rngbuf_f32_lookup(struct rngbuf_f32 *fb, unsigned int n, float *dest);
 
 /*
 process a region starting at start that extends for length.
@@ -23,8 +23,8 @@ process may be called multiple times but will always be called in order (say if
 the underlying datastructure is segmented).
 */
 int
-float_buf_process_region(
-    struct float_buf *fb,
+rngbuf_f32_process_region(
+    struct rngbuf_f32 *fb,
     unsigned int start,
     unsigned int length,
     void (*process)(
@@ -34,8 +34,8 @@ float_buf_process_region(
     void *aux);
 
 int
-float_buf_shift_in(
-    struct float_buf *fb,
+rngbuf_f32_shift_in(
+    struct rngbuf_f32 *fb,
     const float *values,
     unsigned int nvalues);
 
@@ -44,25 +44,25 @@ Copy values out of the float buffer from start and extending for length into
 dest.
 */
 int
-float_buf_memcpy(
-    struct float_buf *fb,
+rngbuf_f32_memcpy(
+    struct rngbuf_f32 *fb,
     unsigned int start,
     unsigned int length,
     float *dest);
 
 /*
-Make an array of struct float_buf_where_val.
+Make an array of struct rngbuf_f32_where_val.
 The value is included in the array if chk returns non-zero when called on the
 value.
 fun is then called on the array of values.
 */
 int
-float_buf_where_values(
-    struct float_buf *fb,
+rngbuf_f32_where_values(
+    struct rngbuf_f32 *fb,
     unsigned int start,
     unsigned int length,
     int (*chk)(float val, void *aux),
-    void (*fun)(struct float_buf_where_val *v,
+    void (*fun)(struct rngbuf_f32_where_val *v,
                 unsigned int nvals,
                 void *aux),
     void *aux);

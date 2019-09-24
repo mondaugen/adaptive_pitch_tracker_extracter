@@ -1,22 +1,22 @@
-#include "float_buf.h"
+#include "rngbuf_f32.h"
 #include "ringbuffer.h"
 
-/* implementation of float_buf using ring buffer. */
+/* implementation of rngbuf_f32 using ring buffer. */
 
 void
-float_buf_free(struct float_buf *fb)
+rngbuf_f32_free(struct rngbuf_f32 *fb)
 {
     rngbuf_free((struct rngbuf *)fb);
 }
 
-struct float_buf *
-float_buf_new(unsigned int size)
+struct rngbuf_f32 *
+rngbuf_f32_new(unsigned int size)
 {
-    return (struct float_buf *)rngbuf_new(size*sizeof(float));
+    return (struct rngbuf_f32 *)rngbuf_new(size*sizeof(float));
 }
 
 int
-float_buf_lookup(struct float_buf *fb, unsigned int n, float *dest)
+rngbuf_f32_lookup(struct rngbuf_f32 *fb, unsigned int n, float *dest)
 {
     return rngbuf_memcpy(
         (struct rngbuf *)fb,
@@ -26,8 +26,8 @@ float_buf_lookup(struct float_buf *fb, unsigned int n, float *dest)
 }
 
 int
-float_buf_process_region(
-    struct float_buf *fb,
+rngbuf_f32_process_region(
+    struct rngbuf_f32 *fb,
     unsigned int start,
     unsigned int length,
     void (*process)(
@@ -51,8 +51,8 @@ float_buf_process_region(
 }
 
 int
-float_buf_shift_in(
-    struct float_buf *fb,
+rngbuf_f32_shift_in(
+    struct rngbuf_f32 *fb,
     const float *values,
     unsigned int nvalues)
 {
@@ -67,8 +67,8 @@ Copy values out of the float buffer from start and extending for length into
 dest.
 */
 int
-float_buf_memcpy(
-    struct float_buf *fb,
+rngbuf_f32_memcpy(
+    struct rngbuf_f32 *fb,
     unsigned int start,
     unsigned int length,
     float *dest)
@@ -81,18 +81,18 @@ float_buf_memcpy(
 }
 
 /*
-Make an array of struct float_buf_where_val.
+Make an array of struct rngbuf_f32_where_val.
 The value is included in the array if chk returns non-zero when called on the
 value.
 fun is then called on the array of values.
 */
 int
-float_buf_where_values(
-    struct float_buf *fb,
+rngbuf_f32_where_values(
+    struct rngbuf_f32 *fb,
     unsigned int start,
     unsigned int length,
     int (*chk)(float val, void *aux),
-    void (*fun)(struct float_buf_where_val *v,
+    void (*fun)(struct rngbuf_f32_where_val *v,
                 unsigned int nvals,
                 void *aux),
     void *aux)
@@ -117,7 +117,7 @@ float_buf_where_values(
         nwhere += chk(((float*)rbs.second_region)[n],aux) != 0 ? 1 : 0;
     }
     /* allocate space on stack for passed values */
-    struct float_buf_where_val wherevals[nwhere];
+    struct rngbuf_f32_where_val wherevals[nwhere];
     float val;
     nwhere = 0;
     /* copy in the values */
@@ -145,8 +145,8 @@ float_buf_where_values(
 }
 
 int
-float_buf_push_copy(
-struct float_buf *fb,
+rngbuf_f32_push_copy(
+struct rngbuf_f32 *fb,
 unsigned int n,
 const float *values)
 {
