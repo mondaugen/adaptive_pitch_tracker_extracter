@@ -15,26 +15,6 @@ length.
 #include "pvoc_synth_f32.h"
 #include "datastructures/rngbuf_f32.h"
 
-struct pvs_f32_init_t {
-    /* The signal is localized in time by multiplying this window (assumed 0
-    outside of this array of length window_length). */
-    float *analysis_window;
-    /* The output is multiplied by this synthesis window */
-    float *synthesis_window;
-    /* The length of the windows */
-    unsigned int window_length;
-    /* The number of samples between the beginnings of the 2 analysis windows */
-    unsigned int hop_size;
-    /* A function that is passed the auxilary data structure, and a
-    pvs_f32_sample_lookup_t structure, which then fills this with the number of
-    samples */
-    void (*get_samples)(
-        void *aux,
-        struct pvs_f32_sample_lookup_t *info);
-    /* Auxiliary structure for get_samples */
-    void *get_samples_aux;
-};
-
 struct pvs_f32_t {
     struct pvs_f32_init_t config;
     /* A buffer that output frames are overlapped and added to.
@@ -49,6 +29,10 @@ struct pvs_f32_t {
     struct pvs_z32_array_t *z_inputH;
     /* The previous complex representation of the output (updated recursively) */
     struct pvs_z32_array_t *z_outputH;
+    /* DFT auxiliary structure */
+    struct pvs_f32_dft_t *dft_aux;
+    /* Aux processing space, has size config.window_length */
+    float *workspace_f32;
 };
 
 static int
@@ -65,5 +49,22 @@ chk_init_args(struct pvs_f32_dft_init_t *init)
 void
 pvs_f32_process(pvs_f32_t *pvs, float *output, int input_time)
 {
+    /* Get input a hop size ago */
+    struct pvs_f32_sample_lookup_t 
+        f_inputH = { .first_sample_index = input_time - pvs->config.hop_size,
+                     .n_samples = pvs->config.window_length },
+        f_input0 = { .first_sample_index = input_time,
+                     .n_samples = pvs->config.window_length };
+    pvs->get_samples(pvs->get_samples_aux,&f_inputH);
+    if (!f_inputH.samples) { return; }
+    /* Get current input */
+    pvs->get_samples(pvs->get_samples_aux,&f_input0);
+    if (!f_input0.samples) { return; }
+    /* Perform DFTs */
+    pvs_f32_dft_forward(pvs->dft_aux, f_input0.samples, pvs->z_input0);
+    pvs_f32_dft_forward(pvs->dft_aux, f_inputH.samples, pvs->z_inputH);
+    /* Get magnitude spectrum of 
+    /* The previous complex representation of the output (updated recursively) */
+    struct pvs_z32_array_t *z_outputH;
 }
     

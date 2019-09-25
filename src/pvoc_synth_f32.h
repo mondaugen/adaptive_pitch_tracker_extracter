@@ -1,6 +1,34 @@
 #ifndef PVOC_SYNTH_F32_H
 #define PVOC_SYNTH_F32_H 
 
+/* Functions implementing get_samples use this structure */
+struct pvs_f32_sample_lookup_t {
+    /* the get_samples function should return samples for any value of first_sample_index */
+    int first_sample_index;
+    unsigned int n_samples;
+    float *samples;
+};
+
+struct pvs_f32_init_t {
+    /* The signal is localized in time by multiplying this window (assumed 0
+    outside of this array of length window_length). */
+    float *analysis_window;
+    /* The output is multiplied by this synthesis window */
+    float *synthesis_window;
+    /* The length of the windows */
+    unsigned int window_length;
+    /* The number of samples between the beginnings of the 2 analysis windows */
+    unsigned int hop_size;
+    /* A function that is passed the auxilary data structure, and a
+    pvs_f32_sample_lookup_t structure, which then fills this with the number of
+    samples */
+    void (*get_samples)(
+        void *aux,
+        struct pvs_f32_sample_lookup_t *info);
+    /* Auxiliary structure for get_samples */
+    void *get_samples_aux;
+};
+
 /*
 A struct holding stuff for doing a DFT, to be defined in an implementation.
 */
@@ -57,6 +85,12 @@ void
 pvs_z32_f32_mult(pvs_z32_array_t *a, const float *b);
 
 /*
+Function multiplying f32 with f32, result goes in first array. lengths must be equal.
+*/
+void
+pvs_f32_f32_mult(float *a, const float *b, unsigned int length);
+
+/*
 Performs forward DFT on a, putting the result in b. a must have length equal to b->length.
 */
 void
@@ -67,12 +101,5 @@ Performs inverse DFT on a, putting result in b. b must have length equal to a->l
 */
 void
 pvs_f32_dft_inverse(struct pvs_f32_dft_t *dft, const pvs_z32_array_t *a, float *b);
-
-/* Functions implementing get_samples use this structure */
-struct pvs_f32_sample_lookup_t {
-    unsigned int first_sample_index;
-    unsigned int n_samples;
-    float *samples;
-};
 
 #endif /* PVOC_SYNTH_F32_H */

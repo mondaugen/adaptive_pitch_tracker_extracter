@@ -1,0 +1,115 @@
+#ifndef PVOC_SYNTH_H
+#define PVOC_SYNTH_H
+
+/*
+An implementation must subclass these types and provide function
+implementations by passing a vector table.
+*/
+
+/* array of reals */
+struct pvs_real_t;
+
+/* array of complex numbers */
+struct pvs_complex_t;
+
+/* DFT initialization structure.  */
+struct pvs_dft_init_t
+{
+  /* the size of the transform */
+  unsigned int N;
+};
+
+/* DFT auxiliary stuff */
+struct pvs_dft_t;
+
+/* Overlap-and-add buffer initialization structure. The structure is designed to
+work with fixed summing-in and shifting-out lengths */
+struct pvs_ola_init_t
+{
+  /* This is usually equal to the window length of the transform */
+  unsigned int sum_in_length;
+  /* This is usually equal to the hop size or equivalently the audio
+     processing block size */
+  unsigned int shift_out_length;
+};
+
+/* Overlap-and-add buffer for reals */
+struct pvs_ola_t;
+
+/* a table of functions implementing the required functionality */
+struct pvs_func_table_t
+{
+  struct
+  {
+    /* Allocate array of reals */
+    struct pvs_real_t *(*real_alloc) (unsigned int length);
+    /* free array of reals */
+    void (*real_free) (struct pvs_real_t *);
+    /* Allocate array of complex */
+    struct pvs_complex_t (*complex_alloc) (unsigned int length);
+    /* free array of complex */
+    void (*complex_free) (struct pvs_complex_t *);
+    /* Allocate real overlap-and-add buffer */
+    struct pvs_ola_t *(*ola_alloc) (pvs_ola_init_t *);
+    /* Free real overlap-and-add buffer */
+    void (*ola_free) (struct pvs_ola_t *);
+    /* Sum in sum_in_length values into a pvs_ola_t */
+    void (*ola_sum_int) (struct pvs_ola_t *, const struct pvs_real_t *);
+    /* Shift out shift_out_length values from a pvs_ola_t into a pvs_real_t */
+    void (*ola_shift_out) (struct pvs_ola_t *, struct pvs_real_t *);
+    /* Allocate DFT auxiliary structure */
+    struct pvs_dft_t *(*dft_alloc) (pvs_dft_init_t *);
+    /* Free DFT auxiliary structure */
+    void (*dft_free) (*dft_free) (pvs_dft_t *);
+  } dstructs;
+  struct
+  {
+    /* multiply 2 complex arrays, result goes in first array (i.e., a *= b) */
+    void (*complex_complex_mult) (struct pvs_complex_t * a,
+                                  const struct pvs_complex_t * b,
+                                  unsigned int length);
+    /* multiply complex and real arrays, result goes in first array (i.e., a *= b) */
+    void (*complex_real_mult) (struct pvs_complex_t * a,
+                               const struct pvs_real_t * b,
+                               unsigned int length);
+    /* multiply 2 real arrays, result goes in first array (i.e., a *= b) */
+    void (*real_real_mult) (struct pvs_real_t * a,
+                            const struct pvs_real_t * b, unsigned int length);
+    /* divide 2 complex arrays, result goes in first array (i.e., a /= b) */
+    void (*complex_complex_div) (pvs_complex_t * a, const pvs_complex_t * b,
+                                 unsigned int length);
+    /* put absolute value (modulus) of the complex values in an array. */
+    void (*complex_abs) (const pvs_complex_t * src, pvs_real_t * dst,
+                         unsigned int length);
+    /* perform forward DFT */
+    void (*dft_forward) (struct pvs_dft_t * dft, const struct pvs_real_t * a,
+                         struct pvs_complex_t * b);
+    /* perform inverse DFT */
+    void (*dft_inverse) (struct pvs_dft_t * dft,
+                         const struct pvs_complex_t * a,
+                         struct pvs_real_t * b);
+  } math;
+};
+
+struct pvs_init_t
+{
+  /* The signal is localized in time by multiplying this window (assumed 0
+     outside of this array of length window_length). */
+  pvs_real_t *analysis_window;
+  /* The output is multiplied by this synthesis window */
+  pvs_real_t *synthesis_window;
+  /* Length of analysis and synthesis windows */
+  unsigned int window_length;
+  /* The number of samples between the beginnings of the 2 analysis windows */
+  unsigned int hop_size;
+  /* A function that is passed the auxilary data structure, and a
+     pvs_f32_sample_lookup_t structure, which then fills this with the number of
+     samples */
+  struct pvs_real_t *(*get_samples) (void *aux,
+                                     struct pvs_real_sample_lookup_t * info);
+  /* Auxiliary structure for get_samples */
+  void *get_samples_aux;
+  /* Table of functions implementing functionality */
+  const struct pvs_func_table_t *func_table;
+};
+#endif /* PVOC_SYNTH_H */
