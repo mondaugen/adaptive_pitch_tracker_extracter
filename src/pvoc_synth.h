@@ -9,6 +9,14 @@ implementations by passing a vector table.
 /* array of reals */
 struct pvs_real_t;
 
+/* Functions implementing get_samples use this structure */
+struct pvs_real_sample_lookup_t {
+    /* the get_samples function should return samples for any value of first_sample_index */
+    int first_sample_index;
+    unsigned int n_samples;
+    const struct pvs_real_t *samples;
+};
+
 /* array of complex numbers */
 struct pvs_complex_t;
 
@@ -54,9 +62,13 @@ struct pvs_func_table_t
     /* Free real overlap-and-add buffer */
     void (*ola_free) (struct pvs_ola_t *);
     /* Sum in sum_in_length values into a pvs_ola_t */
-    void (*ola_sum_int) (struct pvs_ola_t *, const struct pvs_real_t *);
-    /* Shift out shift_out_length values from a pvs_ola_t into a pvs_real_t */
-    void (*ola_shift_out) (struct pvs_ola_t *, struct pvs_real_t *);
+    void (*ola_sum_in) (struct pvs_ola_t *, const struct pvs_real_t *);
+    /*
+    Shift out shift_out_length values from a pvs_ola_t into a pvs_real_t.
+    This returns a pointer to contiguous memory holding hop_size real values and
+    advances the pvs_ola_t's internal pointer by hop_size.
+    */
+    const struct pvs_real_t *(*ola_shift_out) (struct pvs_ola_t *);
     /* Allocate DFT auxiliary structure */
     struct pvs_dft_t *(*dft_alloc) (pvs_dft_init_t *);
     /* Free DFT auxiliary structure */
@@ -75,6 +87,11 @@ struct pvs_func_table_t
     /* multiply 2 real arrays, result goes in first array (i.e., a *= b) */
     void (*real_real_mult) (struct pvs_real_t * a,
                             const struct pvs_real_t * b, unsigned int length);
+    /* multiply 2 real arrays, result goes in new array (i.e., c = a * b) */
+    void (*real_real_cpymult) (const struct pvs_real_t * a,
+                            const struct pvs_real_t * b,
+                            struct pvs_real_t * c,
+                            unsigned int length);
     /* divide 2 complex arrays, result goes in first array (i.e., a /= b) */
     void (*complex_complex_div) (pvs_complex_t * a, const pvs_complex_t * b,
                                  unsigned int length);
@@ -95,9 +112,9 @@ struct pvs_init_t
 {
   /* The signal is localized in time by multiplying this window (assumed 0
      outside of this array of length window_length). */
-  pvs_real_t *analysis_window;
+  const pvs_real_t *analysis_window;
   /* The output is multiplied by this synthesis window */
-  pvs_real_t *synthesis_window;
+  const pvs_real_t *synthesis_window;
   /* Length of analysis and synthesis windows */
   unsigned int window_length;
   /* The number of samples between the beginnings of the 2 analysis windows */
@@ -112,4 +129,11 @@ struct pvs_init_t
   /* Table of functions implementing functionality */
   const struct pvs_func_table_t *func_table;
 };
+
+struct pvs_t;
+
+void pvs_process(pvs_t *pvs, struct pvs_real_t *output, int input_time);
+void pvs_free(struct pvs_t *pvs);
+struct pvs_t * pvs_new(pvs_init_t *init);
+
 #endif /* PVOC_SYNTH_H */
