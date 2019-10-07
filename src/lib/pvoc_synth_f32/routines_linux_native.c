@@ -4,8 +4,11 @@ architecture but requires libraries generally available with every linux
 distribution.
 */
 
+#include "pvoc_synth_f32/routines_linux_native.h"
+#include <stdlib.h>
+#include <string.h>
+
 #include "kiss_fftr.h"
-#include "pvoc_synth.h"
 #include "datastructures/ola_f32.h"
 
 /* struct pvs_real_t's underlying implementation is an array of floats */
@@ -18,6 +21,12 @@ real_alloc(unsigned int length)
 
 static void
 real_free(struct pvs_real_t *s) { free(s); }
+
+static void
+real_memcpy(struct pvs_real_t *dst, const pvs_real_t *src, unsigned int N)
+{
+    memcpy(dst,src,sizeof(float)*N);
+}
 
 /* struct pvs_complex_t's underlying implementation is array of fftwf_complex */
 
@@ -70,66 +79,135 @@ fail:
     return NULL;
 }
 
+static void
+dft_window_scale(struct pvs_dft_window_scale_t *dws)
+{
+    /* Simply scale synthesis window by 1/N */
+    float scalar = 1./dws->window_length;
+    float *window = (float*)dws->synthesis_window;
+    unsigned int n;
+    for (n = 0; n < dws->window_length; n++) {
+        window[n] *= scalar;
+    }
+}
+
+/* perform forward DFT */
+static void dft_forward (struct pvs_dft_t * dft, const struct pvs_real_t * a,
+                     struct pvs_complex_t * b)
+{
+    kiss_fftr(dft->forward_dft,(const kiss_fft_scalar*)a,(kiss_fft_cpx*)b);
+}
+
+/* perform inverse DFT */
+static void dft_inverse (struct pvs_dft_t * dft,
+                     const struct pvs_complex_t * a,
+                     struct pvs_real_t * b)
+{
+    kiss_fftri(dft->inverse_dft,(const kiss_fft_cpx*)a,(kiss_fft_scalar*)b);
+}
+
+#define _ARRAY_MULTIPLY(a,b,t1,t2,l)\
+    t1 a_ = (t1)a;\
+    t2 b_ = (t2)b;\
+    while (l--) { *a_++ *= *b_++; }
+
+#define _ARRAY_DIVIDE(a,b,t1,t2,l)\
+    t1 a_ = (t1)a;\
+    t2 b_ = (t2)b;\
+    while (l--) { *a_++ /= *b_++; }
+
+/* multiply 2 complex arrays, result goes in first array (i.e., a *= b) */
+static void complex_complex_mult (struct pvs_complex_t * a,
+                              const struct pvs_complex_t * b,
+                              unsigned int length)
+{
+    _ARRAY_MULTIPLY(a,b,complex float*,const complex float*,length);
+}
+
+/* multiply complex and real arrays, result goes in first array (i.e., a *= b) */
+static void complex_real_mult (struct pvs_complex_t * a,
+                           const struct pvs_real_t * b,
+                           unsigned int length)
+{
+    _ARRAY_MULTIPLY(a,b,complex float*,const float*,length);
+}
+
+/* multiply 2 real arrays, result goes in first array (i.e., a *= b) */
+static void real_real_mult (struct pvs_real_t * a,
+                        const struct pvs_real_t * b, unsigned int length)
+{
+    _ARRAY_MULTIPLY(a,b,float*,const float*,length);
+}
+
+/* multiply 2 real arrays, result goes in new array (i.e., c = a * b) */
+static void real_real_cpymult (const struct pvs_real_t * a,
+                        const struct pvs_real_t * b,
+                        struct pvs_real_t * c,
+                        unsigned int length)
+{
+    const float *a_ = (const float*)a,
+                 b_ = (const float *)b;
+    float *c_ = (float*)c;
+    while (length--) {
+        *c_++ = *a_++ * *b_++;
+    }
+}
+
+/* divide 2 complex arrays, result goes in first array (i.e., a /= b) */
+static void complex_complex_div (pvs_complex_t * a, const pvs_complex_t * b,
+                             unsigned int length)
+{
+    _ARRAY_DIVIDE(a,b,complex float *, const complex float *,length);
+}
+
+/* put absolute value (modulus) of the complex values in an array. */
+static void complex_abs (const pvs_complex_t * src, pvs_real_t * dst,
+                     unsigned int length)
+{
+    const complex float *src_ = (const complex float*)src;
+    float *dst_ = (float *)dst;
+    while (length--) {
+        *dst_++ = cabs(*src++);
+    }
+}
+
 /* a table of functions implementing the required functionality */
 static struct pvs_func_table_t func_table =
 {
   .dstructs = {
-    /* Allocate array of reals */
-    struct pvs_real_t *(*real_alloc) (unsigned int length);
-    /* free array of reals */
-    void (*real_free) (struct pvs_real_t *);
-    /* Allocate array of complex */
-    struct pvs_complex_t (*complex_alloc) (unsigned int length);
-    /* free array of complex */
-    void (*complex_free) (struct pvs_complex_t *);
-    /* Allocate real overlap-and-add buffer */
-    struct pvs_ola_t *(*ola_alloc) (pvs_ola_init_t *);
-    /* Free real overlap-and-add buffer */
-    void (*ola_free) (struct pvs_ola_t *);
-    /* Sum in sum_in_length values into a pvs_ola_t */
-    void (*ola_sum_in) (struct pvs_ola_t *, const struct pvs_real_t *);
-    /*
-    Shift out shift_out_length values from a pvs_ola_t into a pvs_real_t.
-    This returns a pointer to contiguous memory holding hop_size real values and
-    advances the pvs_ola_t's internal pointer by hop_size.
-    */
-    const struct pvs_real_t *(*ola_shift_out) (struct pvs_ola_t *);
-    /* Allocate DFT auxiliary structure */
-    struct pvs_dft_t *(*dft_alloc) (pvs_dft_init_t *);
-    /* Free DFT auxiliary structure */
-    void (*dft_free) (pvs_dft_t *);
+    .real_alloc = real_alloc,
+    .real_free = real_free,
+    .real_memcpy = real_memcpy,
+    .complex_alloc = complex_alloc,
+    .complex_free = complex_free,
+    .dft_free = dft_free,
+    .dft_alloc = dft_alloc,
+    .dft_window_scale = dft_window_scale,
+    .ola_alloc = (struct pvs_ola_t *(*) (pvs_ola_init_t *))ola_f32_new,
+    .ola_free = (void (*) (struct pvs_ola_t *))ola_f32_free,
+    .ola_sum_in = (void (*) (struct pvs_ola_t *, const struct pvs_real_t *))ola_f32_sum_in,
+    .ola_shift_out = (const struct pvs_real_t *(*) (struct pvs_ola_t *))ola_f32_shift_out,
+    .dft_alloc = dft_alloc,
+    .dft_free = dft_free
   },
-  struct
-  {
-    /* multiply 2 complex arrays, result goes in first array (i.e., a *= b) */
-    void (*complex_complex_mult) (struct pvs_complex_t * a,
-                                  const struct pvs_complex_t * b,
-                                  unsigned int length);
-    /* multiply complex and real arrays, result goes in first array (i.e., a *= b) */
-    void (*complex_real_mult) (struct pvs_complex_t * a,
-                               const struct pvs_real_t * b,
-                               unsigned int length);
-    /* multiply 2 real arrays, result goes in first array (i.e., a *= b) */
-    void (*real_real_mult) (struct pvs_real_t * a,
-                            const struct pvs_real_t * b, unsigned int length);
-    /* multiply 2 real arrays, result goes in new array (i.e., c = a * b) */
-    void (*real_real_cpymult) (const struct pvs_real_t * a,
-                            const struct pvs_real_t * b,
-                            struct pvs_real_t * c,
-                            unsigned int length);
-    /* divide 2 complex arrays, result goes in first array (i.e., a /= b) */
-    void (*complex_complex_div) (pvs_complex_t * a, const pvs_complex_t * b,
-                                 unsigned int length);
-    /* put absolute value (modulus) of the complex values in an array. */
-    void (*complex_abs) (const pvs_complex_t * src, pvs_real_t * dst,
-                         unsigned int length);
-    /* perform forward DFT */
-    void (*dft_forward) (struct pvs_dft_t * dft, const struct pvs_real_t * a,
-                         struct pvs_complex_t * b);
-    /* perform inverse DFT */
-    void (*dft_inverse) (struct pvs_dft_t * dft,
-                         const struct pvs_complex_t * a,
-                         struct pvs_real_t * b);
+  .math = {
+    .complex_complex_mult = complex_complex_mult,
+    .complex_real_mult = complex_real_mult,
+    .real_real_mult = real_real_mult,
+    .real_real_cpymult = real_real_cpymult,
+    .complex_complex_div = complex_complex_div,
+    .complex_abs = complex_abs,
+    .dft_forward = dft_forward,
+    .dft_inverse = dft_inverse
   } math;
 };
 
+
+struct pvs_init_t
+pvs_f32_init_new (void)
+{
+    static struct pvs_init_t ret = {
+        .func_table = func_table;
+    };
+    return ret;
+}

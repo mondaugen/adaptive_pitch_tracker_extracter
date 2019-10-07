@@ -1,6 +1,9 @@
 
 struct pvs_t {
     struct pvs_init_t config;
+    /* This instant's copies of the analysis and synthesis windows */
+    struct pvs_real_t *analysis_window;
+    struct pvs_real_t *synthesis_window;
     /* A buffer that output frames are overlapped and added to. */
     struct pvs_ola_t *ola_buffer;
     /* The complex representation of the input at the current time */
@@ -48,7 +51,7 @@ pvs_process(pvs_t *pvs, int input_time)
     /* Extract frame and multiply by window */
     ftab->math.real_real_cpymult(
         f_input0.samples,
-        pvs->config.analysis_window,
+        pvs->analysis_window,
         pvs->r_workspace);
     if (pvs->z_outputH_init) {
         /* Perform DFT of current input frame */
@@ -62,7 +65,7 @@ pvs_process(pvs_t *pvs, int input_time)
         /* Extract frame and multiply by window */
         ftab->math.real_real_cpymult(
             f_inputH.samples,
-            pvs->config.analysis_window,
+            pvs->analysis_window,
             pvs->r_workspace);
         /* Perform DFT of input frame in the past */
         ftab->math.dft_forward(
@@ -108,7 +111,7 @@ pvs_process(pvs_t *pvs, int input_time)
     }
     /* Multiply output by synthesis window */
     ftab->math.real_real_mult( pvs->r_workspace,
-    pvs->config.synthesis_window,pvs->window_length);
+    pvs->synthesis_window,pvs->window_length);
     /* sum into overlap and add buffer */
     ftab->dstructs.ola_sum_in(pvs->ola_buffer,pvs->r_workspace);
     /* shift out samples from overlap and add buffer into output */
@@ -128,6 +131,8 @@ pvs_free(struct pvs_t *pvs)
     if (pvs->z_inputH) { ftab->dstructs.complex_free(pvs->z_inputH); }
     if (pvs->z_outputH) { ftab->dstructs.complex_free(pvs->z_outputH); }
     if (pvs->dft_aux) { ftab->dstructs.dft_free(pvs->dft_aux); }
+    if (pvs->analysis_window) { ftab->dstructs.real_free(pvs->analysis_window); }
+    if (pvs->synthesis_window) { ftab->dstructs.real_free(pvs->synthesis_window); }
     if (pvs->r_workspace) { ftab->dstructs.real_free(pvs->r_workspace); }
 }
 
@@ -159,7 +164,27 @@ pvs_new(pvs_init_t *init)
     ret->dft_aux = tab->dstructs.dft_alloc(&dft_init);
     if (!ret->dft_aux) { goto fail; }
     ret->r_workspace = tab->dstructs.real_alloc(W);
-    /* z_outputH_init is already 0 */
+    if (!ret->r_workspace) { goto fail; }
+    ret->analysis_window = tab->dstructs.real_alloc(W);
+    if (!ret->analysis_window) { goto fail; }
+    ret->synthesis_window = tab->dstructs.real_alloc(W);
+    if (!ret->synthesis_window) { goto fail; }
+    /* Copy analysis and synthesis windows */
+    tab->dstructs.real_memcpy(ret->analysis_window,init->analysis_window,W);
+    tab->dstructs.real_memcpy(ret->synthesis_window,init->synthesis_window,W);
+    /* We don't need the source of the windows any more, so to eliminate
+    confusion, we NULL them. */
+    ret->config.analysis_window = NULL;
+    ret->config.synthesis_window = NULL;
+    /* Scale analysis and synthesis windows */
+    struct pvs_dft_window_scale_t dft_window_scale = {
+        .dft = ret->dft_aux,
+        .analysis_window = ret->analysis_window,
+        .synthesis_window = ret->synthesis_window,
+        .window_length = W
+    };
+    tab->dstructs.dft_window_scale(&dft_window_scale);
+    return ret;
 fail:
     pvs_free(ret);
     return NULL;

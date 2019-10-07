@@ -30,6 +30,15 @@ struct pvs_dft_init_t
 /* DFT auxiliary stuff */
 struct pvs_dft_t;
 
+/* Window scale function argument */
+struct pvs_dft_window_scale_t {
+  struct pvs_dft_t *dft;
+  struct pvs_real_t *analysis_window;
+  struct pvs_real_t *synthesis_window;
+  /* Length of analysis and synthesis windows */
+  unsigned int window_length;
+};
+
 /* Overlap-and-add buffer initialization structure. The structure is designed to
 work with fixed summing-in and shifting-out lengths */
 struct pvs_ola_init_t
@@ -53,6 +62,8 @@ struct pvs_func_table_t
     struct pvs_real_t *(*real_alloc) (unsigned int length);
     /* free array of reals */
     void (*real_free) (struct pvs_real_t *);
+    /* Copy array of reals */
+    void (*real_memcpy)(struct pvs_real_t *, const struct pvs_real_t *, unsigned int);
     /* Allocate array of complex */
     struct pvs_complex_t (*complex_alloc) (unsigned int length);
     /* free array of complex */
@@ -69,10 +80,16 @@ struct pvs_func_table_t
     advances the pvs_ola_t's internal pointer by hop_size.
     */
     const struct pvs_real_t *(*ola_shift_out) (struct pvs_ola_t *);
-    /* Allocate DFT auxiliary structure */
-    struct pvs_dft_t *(*dft_alloc) (pvs_dft_init_t *);
+    /* Allocate and initialize DFT auxiliary structure */
+    struct pvs_dft_t *(*dft_alloc) (struct pvs_dft_init_t *);
     /* Free DFT auxiliary structure */
-    void (*dft_free) (*dft_free) (pvs_dft_t *);
+    void (*dft_free) (struct pvs_dft_t *);
+    /* A function that scales the analysis and / or synthesis windows so that
+    the forward followed by inverse transform of the windowed signal is not
+    scaled by any constant (for example, some implementations will omit the 1/N
+    on the inverse transform so that the composition of the forward and inverse
+    transforms produces the original sequence but divided by N) */
+    void (*dft_window_scale) (struct pvs_dft_window_scale_t *);
   } dstructs;
   struct
   {
@@ -110,6 +127,7 @@ struct pvs_func_table_t
 
 struct pvs_init_t
 {
+  /* The resulting pvs_t makes copies of the analysis and synthesis windows */ 
   /* The signal is localized in time by multiplying this window (assumed 0
      outside of this array of length window_length). */
   const pvs_real_t *analysis_window;
@@ -127,7 +145,7 @@ struct pvs_init_t
   /* Auxiliary structure for get_samples */
   void *get_samples_aux;
   /* Table of functions implementing functionality */
-  const struct pvs_func_table_t *func_table;
+  struct pvs_func_table_t * const func_table;
 };
 
 struct pvs_t;
