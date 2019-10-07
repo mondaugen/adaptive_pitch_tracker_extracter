@@ -2,7 +2,15 @@
 Overlap and add buffer for 32bit floats.
 */
 
+#include <stdlib.h>
 #include "ola_f32.h"
+
+struct ola_f32_t {
+    struct ola_f32_init_t config;
+    float *buffer;
+    unsigned int len_mask;
+    unsigned int offset;
+};
 
 /* Sum in sum_in_length values into a pvs_ola_t */
 void
@@ -33,20 +41,13 @@ chk_pow_2(unsigned int x)
 static int
 config_chk(struct ola_f32_init_t *config)
 {
-    if (*config) { return -1; }
+    if (!config) { return -1; }
     /* sum_in_length must be power of 2 */
     if (!chk_pow_2(config->sum_in_length)) { return -2; }
     /* the shift_out_length must be divisor of sum_in_length */
     if ((config->sum_in_length % config->shift_out_length) != 0) { return -3; }
     return 0;
 }
-
-struct ola_f32_t {
-    struct ola_f32_init_t config;
-    float *buffer;
-    unsigned int len_mask;
-    unsigned int offset;
-};
 
 void
 ola_f32_free(struct ola_f32_t *ola)
@@ -69,4 +70,7 @@ ola_f32_new(struct ola_f32_init_t *config)
     ret->len_mask = ret->config.sum_in_length - 1;
     /* offset is already 0 */
     return ret;
+fail:
+    ola_f32_free(ret);
+    return NULL;
 }

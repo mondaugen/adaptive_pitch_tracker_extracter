@@ -65,11 +65,11 @@ struct pvs_func_table_t
     /* Copy array of reals */
     void (*real_memcpy)(struct pvs_real_t *, const struct pvs_real_t *, unsigned int);
     /* Allocate array of complex */
-    struct pvs_complex_t (*complex_alloc) (unsigned int length);
+    struct pvs_complex_t *(*complex_alloc) (unsigned int length);
     /* free array of complex */
     void (*complex_free) (struct pvs_complex_t *);
     /* Allocate real overlap-and-add buffer */
-    struct pvs_ola_t *(*ola_alloc) (pvs_ola_init_t *);
+    struct pvs_ola_t *(*ola_alloc) (struct pvs_ola_init_t *);
     /* Free real overlap-and-add buffer */
     void (*ola_free) (struct pvs_ola_t *);
     /* Sum in sum_in_length values into a pvs_ola_t */
@@ -88,7 +88,7 @@ struct pvs_func_table_t
     the forward followed by inverse transform of the windowed signal is not
     scaled by any constant (for example, some implementations will omit the 1/N
     on the inverse transform so that the composition of the forward and inverse
-    transforms produces the original sequence but divided by N) */
+    transforms produces the original sequence but multiplied by N) */
     void (*dft_window_scale) (struct pvs_dft_window_scale_t *);
   } dstructs;
   struct
@@ -110,10 +110,11 @@ struct pvs_func_table_t
                             struct pvs_real_t * c,
                             unsigned int length);
     /* divide 2 complex arrays, result goes in first array (i.e., a /= b) */
-    void (*complex_complex_div) (pvs_complex_t * a, const pvs_complex_t * b,
+    void (*complex_complex_div) (struct pvs_complex_t * a,
+                                 const struct pvs_complex_t * b,
                                  unsigned int length);
     /* put absolute value (modulus) of the complex values in an array. */
-    void (*complex_abs) (const pvs_complex_t * src, pvs_real_t * dst,
+    void (*complex_abs) (const struct pvs_complex_t * src, struct pvs_real_t * dst,
                          unsigned int length);
     /* perform forward DFT */
     void (*dft_forward) (struct pvs_dft_t * dft, const struct pvs_real_t * a,
@@ -127,31 +128,33 @@ struct pvs_func_table_t
 
 struct pvs_init_t
 {
-  /* The resulting pvs_t makes copies of the analysis and synthesis windows */ 
-  /* The signal is localized in time by multiplying this window (assumed 0
-     outside of this array of length window_length). */
-  const pvs_real_t *analysis_window;
-  /* The output is multiplied by this synthesis window */
-  const pvs_real_t *synthesis_window;
-  /* Length of analysis and synthesis windows */
-  unsigned int window_length;
-  /* The number of samples between the beginnings of the 2 analysis windows */
-  unsigned int hop_size;
-  /* A function that is passed the auxilary data structure, and a
-     pvs_f32_sample_lookup_t structure, which then fills this with the number of
-     samples */
-  struct pvs_real_t *(*get_samples) (void *aux,
-                                     struct pvs_real_sample_lookup_t * info);
-  /* Auxiliary structure for get_samples */
-  void *get_samples_aux;
+    struct pvs_user_init_t {
+        /* The resulting pvs_t makes copies of the analysis and synthesis windows */ 
+        /* The signal is localized in time by multiplying this window (assumed 0
+           outside of this array of length window_length). */
+        const struct pvs_real_t *analysis_window;
+        /* The output is multiplied by this synthesis window */
+        const struct pvs_real_t *synthesis_window;
+        /* Length of analysis and synthesis windows */
+        unsigned int window_length;
+        /* The number of samples between the beginnings of the 2 analysis windows */
+        unsigned int hop_size;
+        /* A function that is passed the auxilary data structure, and a
+           pvs_f32_sample_lookup_t structure, which then fills this with the number of
+           samples */
+        void (*get_samples) (void *aux,
+                struct pvs_real_sample_lookup_t * info);
+        /* Auxiliary structure for get_samples */
+        void *get_samples_aux;
+    } user;
   /* Table of functions implementing functionality */
   struct pvs_func_table_t * const func_table;
 };
 
 struct pvs_t;
 
-void pvs_process(pvs_t *pvs, struct pvs_real_t *output, int input_time);
+const struct pvs_real_t * pvs_process(struct pvs_t *pvs, int input_time);
 void pvs_free(struct pvs_t *pvs);
-struct pvs_t * pvs_new(pvs_init_t *init);
+struct pvs_t * pvs_new(struct pvs_init_t *init);
 
 #endif /* PVOC_SYNTH_H */

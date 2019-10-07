@@ -5,11 +5,20 @@ distribution.
 */
 
 #include "pvoc_synth_f32/routines_linux_native.h"
+#include <complex.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "kiss_fftr.h"
 #include "datastructures/ola_f32.h"
+
+/* Implementation of ola's add */
+void ola_f32_add(float *a, const float *b, unsigned int length)
+{
+    while (length--) {
+        *a++ += *b++;
+    }
+}
 
 /* struct pvs_real_t's underlying implementation is an array of floats */
 
@@ -23,7 +32,7 @@ static void
 real_free(struct pvs_real_t *s) { free(s); }
 
 static void
-real_memcpy(struct pvs_real_t *dst, const pvs_real_t *src, unsigned int N)
+real_memcpy(struct pvs_real_t *dst, const struct pvs_real_t *src, unsigned int N)
 {
     memcpy(dst,src,sizeof(float)*N);
 }
@@ -36,14 +45,13 @@ static struct pvs_complex_t *
 complex_alloc(unsigned int length)
 {
     unsigned int N = length/2 + 1;
-    fftwf_complex *ret = fftwf_malloc(sizeof(fftwf_complex) * N)
-    if (!ret) { return ret; }
-    memset(ret,0,sizeof(fftwf_complex) * N);
-    return ret;
+    kiss_fft_cpx *ret = calloc(N,sizeof(kiss_fft_cpx));
+    if (!ret) { return NULL; }
+    return (struct pvs_complex_t *)ret;
 }
 
 void
-complex_free(struct pvs_complex_t *z) { fftwf_free((fftwf_complex*)z); }
+complex_free(struct pvs_complex_t *z) { free(z); }
 
 /*
 in the underlying implementation of struct pvs_dft_t we store the "plans" for
@@ -64,16 +72,16 @@ dft_free(struct pvs_dft_t *dft)
 }
 
 static struct pvs_dft_t *
-dft_alloc(pvs_dft_init_t *init)
+dft_alloc(struct pvs_dft_init_t *init)
 {
     if (!init) { return NULL; }
-    struct pvs_dft_t *ret = calloc(1,sizeof(struct pvs_dft_));
+    struct pvs_dft_t *ret = calloc(1,sizeof(struct pvs_dft_t));
     if (!ret) { goto fail; }
     ret->forward_dft = kiss_fftr_alloc(init->N,0,NULL,NULL);
     if (!ret->forward_dft) { goto fail; }
     ret->inverse_dft = kiss_fftr_alloc(init->N,1,NULL,NULL);
     if (!ret->inverse_dft) { goto fail; }
-    return ret
+    return ret;
 fail:
     dft_free(ret);
     return NULL;
@@ -129,6 +137,10 @@ static void complex_real_mult (struct pvs_complex_t * a,
                            const struct pvs_real_t * b,
                            unsigned int length)
 {
+    /* We use real-only DFT so adjust length accordingly. For this function, the
+    real part is always the magnitude spectrum, which will also have length/2 +
+    1 values because it is computed from a spectrum of a purely real signal. */
+    length = length/2 + 1;
     _ARRAY_MULTIPLY(a,b,complex float*,const float*,length);
 }
 
@@ -146,7 +158,7 @@ static void real_real_cpymult (const struct pvs_real_t * a,
                         unsigned int length)
 {
     const float *a_ = (const float*)a,
-                 b_ = (const float *)b;
+                *b_ = (const float *)b;
     float *c_ = (float*)c;
     while (length--) {
         *c_++ = *a_++ * *b_++;
@@ -154,20 +166,24 @@ static void real_real_cpymult (const struct pvs_real_t * a,
 }
 
 /* divide 2 complex arrays, result goes in first array (i.e., a /= b) */
-static void complex_complex_div (pvs_complex_t * a, const pvs_complex_t * b,
+static void complex_complex_div (struct pvs_complex_t * a, const struct pvs_complex_t * b,
                              unsigned int length)
 {
+    /* We use real-only DFT so adjust length accordingly */
+    length = length/2 + 1;
     _ARRAY_DIVIDE(a,b,complex float *, const complex float *,length);
 }
 
 /* put absolute value (modulus) of the complex values in an array. */
-static void complex_abs (const pvs_complex_t * src, pvs_real_t * dst,
+static void complex_abs (const struct pvs_complex_t * src, struct pvs_real_t * dst,
                      unsigned int length)
 {
     const complex float *src_ = (const complex float*)src;
     float *dst_ = (float *)dst;
+    /* We use real-only DFT so adjust length accordingly */
+    length = length/2 + 1;
     while (length--) {
-        *dst_++ = cabs(*src++);
+        *dst_++ = cabs(*src_++);
     }
 }
 
@@ -183,7 +199,7 @@ static struct pvs_func_table_t func_table =
     .dft_free = dft_free,
     .dft_alloc = dft_alloc,
     .dft_window_scale = dft_window_scale,
-    .ola_alloc = (struct pvs_ola_t *(*) (pvs_ola_init_t *))ola_f32_new,
+    .ola_alloc = (struct pvs_ola_t *(*) (struct pvs_ola_init_t *))ola_f32_new,
     .ola_free = (void (*) (struct pvs_ola_t *))ola_f32_free,
     .ola_sum_in = (void (*) (struct pvs_ola_t *, const struct pvs_real_t *))ola_f32_sum_in,
     .ola_shift_out = (const struct pvs_real_t *(*) (struct pvs_ola_t *))ola_f32_shift_out,
@@ -199,7 +215,7 @@ static struct pvs_func_table_t func_table =
     .complex_abs = complex_abs,
     .dft_forward = dft_forward,
     .dft_inverse = dft_inverse
-  } math;
+  }
 };
 
 
@@ -207,7 +223,7 @@ struct pvs_init_t
 pvs_f32_init_new (void)
 {
     static struct pvs_init_t ret = {
-        .func_table = func_table;
+        .func_table = &func_table
     };
     return ret;
 }

@@ -1,6 +1,8 @@
 #ifndef OLA_F32_H
 #define OLA_F32_H 
 
+struct ola_f32_t;
+
 struct ola_f32_init_t {
   /* This is usually equal to the window length of the transform */
   unsigned int sum_in_length;
