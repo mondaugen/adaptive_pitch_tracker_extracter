@@ -141,7 +141,14 @@ struct pvs_init_t
         unsigned int hop_size;
         /* A function that is passed the auxilary data structure, and a
            pvs_f32_sample_lookup_t structure, which then fills this with the number of
-           samples */
+           samples. 
+           NOTE: For some pathological signals (which are most likely not
+           encountered in practice) you can get a power spectrum where some bins
+           have exactly 0 magnitude. This is problematic for this algorithm,
+           which finds the quotient of 2 complex numbers. In practice this
+           shouldn't happen if a small amount of dither is added to the signal,
+           but it could happen. In that case, somewhere in the system a check
+           should be made for NaN, inf and the like. */
         void (*get_samples) (void *aux,
                 struct pvs_real_sample_lookup_t * info);
         /* Auxiliary structure for get_samples */

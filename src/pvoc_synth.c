@@ -99,7 +99,8 @@ pvs_process(struct pvs_t *pvs, int input_time)
         /* Find their quotient */
         ftab->math.complex_complex_div(pvs->z_input0,pvs->z_inputH,pvs->config.window_length);
         /* Multiply last output spectrum by this quotient */
-        ftab->math.complex_complex_mult(pvs->z_outputH,pvs->z_input0,pvs->config.window_length);
+        ftab->math.complex_complex_mult(
+            pvs->z_outputH,pvs->z_input0,pvs->config.window_length);
         /* Inverse fourier transform this output */
         ftab->math.dft_inverse(
             pvs->dft_aux,

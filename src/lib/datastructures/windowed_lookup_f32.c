@@ -5,6 +5,7 @@ may request out of bounds data.
 
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include "windowed_lookup_f32.h"
 
 struct windowed_lookup_f32_t {
@@ -22,6 +23,8 @@ static int init_arg_chk(struct windowed_lookup_f32_init_t *wli)
     if (!wli->signal) { return -1; }
     if (wli->window_length < 0) { return -2; }
     if (wli->signal_length < 0) { return -3; }
+    if (wli->window_length > INT_MAX) { return -4; }
+    if (wli->signal_length > INT_MAX) { return -5; }
     return 0;
 }
 
@@ -82,13 +85,13 @@ struct windowed_lookup_f32_access_t windowed_lookup_f32_access (
     struct windowed_lookup_f32_t *wlu, int index)
 {
     const float *signal_section;
-    unsigned int W = wlu->config.window_length,
-                 signal_length = wlu->config.signal_length;
+    int W = wlu->config.window_length,
+            signal_length = wlu->config.signal_length;
     if (index < -W) { index = -W; }
     if (index > signal_length) { index = signal_length; }
     if (index < 0) { signal_section = wlu->signal_start + (index + W); }
     else if (index >= (signal_length - W)) {
-        signal_section = wlu->signal_start + (W - (signal_length - index));
+        signal_section = wlu->signal_end + (W - (signal_length - index));
     } else {
         signal_section = wlu->config.signal + index;
     }

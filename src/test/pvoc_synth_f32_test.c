@@ -24,8 +24,43 @@ gen_scaled_random (float *dest, unsigned int dest_length, void *aux)
 {
     float scale = *(float*)aux;
     while (dest_length--) {
-        *dest++ = random()/(float)RAND_MAX*scale;
+        *dest++ = (2.*random()/(float)RAND_MAX-1.)*scale;
     }
+}
+
+static int
+get_samples_test (void)
+{
+    const int window_length = 4;
+    float signal[] = {1,2,3,4,5,6,7,8},
+          fill = 0;
+    struct windowed_lookup_f32_init_t wli = {
+        .window_length = window_length,
+        .signal = signal,
+        .signal_length = sizeof(signal)/sizeof(float),
+        .out_of_bounds_gen = gen_scaled_random,
+        .aux = &fill
+    };
+    struct windowed_lookup_f32_t *wl = windowed_lookup_f32_new(&wli);
+    if (!wl) { goto fail; }
+#define WINDOWED_ACCESS(N)\
+    {\
+    struct windowed_lookup_f32_access_t wla = windowed_lookup_f32_access(wl, N);\
+    const float *samples = wla.signal_section;\
+    int n;\
+    for (n = 0; n < window_length; n++) {\
+        printf("%f ", samples[n]);\
+    }\
+    printf("\n");\
+    }
+    WINDOWED_ACCESS(0);
+    WINDOWED_ACCESS(2);
+    WINDOWED_ACCESS(-2);
+    WINDOWED_ACCESS(wli.signal_length-2);
+#undef WINDOWED_ACCESS
+    return 0;
+fail:
+    return -1;
 }
 
 /* See if the phase vocoder can sucessfully reproduce the input signal */
@@ -35,10 +70,10 @@ chk_identity (void)
     const unsigned int signal_length = 8,
                        window_length = 4,
                        hop_size = 2;
-    const float analysis_window[] = {0,0.5,1.,0.5},
+    const float analysis_window[] = {1,1,1,1}, //{0,0.5,1.,0.5},
         /* Includes the scaling for resynthesis */
         //  synthesis_window[] = {0.25,0.25,0.25,0.25}, 
-          synthesis_window[] = {0,0.5,1,0.5}, 
+          synthesis_window[] = {1,1,1,1}, //{0,0.5,1,0.5}, 
         signal[] = {1,2,3,4,5,6,7,8};
         float fill = 1e-6,
             res[signal_length];
@@ -78,12 +113,7 @@ fail:
 int main (void)
 {
     int ret;
-    printf("chk_identity\n");
-    if ((ret = chk_identity())) {
-        printf("failed");
-    } else {
-        printf("succeeded");
-    }
-    printf("\n");
+    ret = get_samples_test();
+    ret = chk_identity();
     return ret;
 }
