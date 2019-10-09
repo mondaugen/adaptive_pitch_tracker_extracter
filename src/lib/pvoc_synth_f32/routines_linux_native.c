@@ -12,6 +12,7 @@ distribution.
 #include "kiss_fftr.h"
 #include "datastructures/ola_f32.h"
 
+
 /* Implementation of ola's add */
 void ola_f32_add(float *a, const float *b, unsigned int length)
 {
@@ -37,7 +38,8 @@ real_memcpy(struct pvs_real_t *dst, const struct pvs_real_t *src, unsigned int N
     memcpy(dst,src,sizeof(float)*N);
 }
 
-/* struct pvs_complex_t's underlying implementation is array of fftwf_complex */
+/* We use real-only DFT and so we adjust length accordingly, which is length/2 +
+1 complex floats. */
 
 /* The transform we will use is a transform of purely real values, so for a
 transform of length N, we need only store N/2 + 1 complex values. */
@@ -129,6 +131,7 @@ static void complex_complex_mult (struct pvs_complex_t * a,
                               const struct pvs_complex_t * b,
                               unsigned int length)
 {
+    length = length/2 + 1;
     _ARRAY_MULTIPLY(a,b,complex float*,const complex float*,length);
 }
 
@@ -137,9 +140,9 @@ static void complex_real_mult (struct pvs_complex_t * a,
                            const struct pvs_real_t * b,
                            unsigned int length)
 {
-    /* We use real-only DFT so adjust length accordingly. For this function, the
-    real part is always the magnitude spectrum, which will also have length/2 +
-    1 values because it is computed from a spectrum of a purely real signal. */
+    /* For this function, the real part is always the magnitude spectrum, which
+    will also have length/2 + 1 values because it is computed from a spectrum of
+    a purely real signal. */
     length = length/2 + 1;
     _ARRAY_MULTIPLY(a,b,complex float*,const float*,length);
 }
@@ -187,6 +190,17 @@ static void complex_abs (const struct pvs_complex_t * src, struct pvs_real_t * d
     }
 }
 
+static void 
+complex_add_float_const(struct pvs_complex_t *dst, float c, unsigned int length)
+{
+    float *dst_ = (float *)dst;
+    /* We use real-only DFT so adjust length accordingly */
+    length = length/2 + 1;
+    while (length--) {
+        *dst_++ += c;
+    }
+}
+    
 /* a table of functions implementing the required functionality */
 static struct pvs_func_table_t func_table =
 {
@@ -213,6 +227,7 @@ static struct pvs_func_table_t func_table =
     .real_real_cpymult = real_real_cpymult,
     .complex_complex_div = complex_complex_div,
     .complex_abs = complex_abs,
+    .complex_add_float_const = complex_add_float_const,
     .dft_forward = dft_forward,
     .dft_inverse = dft_inverse
   }

@@ -34,12 +34,35 @@ gen_hann_window_f32(float *dest, unsigned int dest_length)
     }
 }
 
+static void
+gen_boxcar_window_f32(float *dest, unsigned int dest_length)
+{
+    unsigned int n;
+    for (n = 0; n < dest_length; n++) {
+        dest[n] = 1.;
+    }
+}
+
+static int
+gen_window_f32(const char *type, float *dest, unsigned int dest_length, void *aux)
+{
+    if (!strcmp(type,"hann")) {
+        gen_hann_window_f32(dest,dest_length);
+    } else if (!strcmp(type,"boxcar")) {
+        gen_boxcar_window_f32(dest,dest_length);
+    } else {
+        return -1;
+    }
+    return 0;
+}
+
+
 static float
 get_window_energy(float *win, unsigned int win_len)
 {
     float ret = 0;
     while (win_len--) {
-        ret *= *win * *win;
+        ret += *win * *win;
         win++;
     }
     return ret;
@@ -78,7 +101,7 @@ signal_stretcher_f32_new(struct signal_stretcher_f32_init *ssf32i)
         .signal = ssf32i->signal,
         .signal_length = ssf32i->signal_length,
         .out_of_bounds_gen = gen_scaled_random,
-        .aux = &ret->fill
+        .aux = &ret->config.fill
     };
     ret->wl = windowed_lookup_f32_new(&wli);
     if (!ret->wl) { goto fail; }
@@ -87,10 +110,10 @@ signal_stretcher_f32_new(struct signal_stretcher_f32_init *ssf32i)
     if (!ret->synthesis_window) { goto fail; }
     ret->analysis_window = calloc(ssf32i->window_length,sizeof(float));
     if (!ret->analysis_window) { goto fail; }
-    /* Only hann supported */
-    if (strcmp(ssf32i->window_type,"hann")) { goto fail; }
-    gen_hann_window_f32(ret->analysis_window,ssf32i->window_length);
-    gen_hann_window_f32(ret->synthesis_window,ssf32i->window_length);
+    if (gen_window_f32(ssf32i->window_type,
+        ret->analysis_window,ssf32i->window_length,NULL)) { goto fail; }
+    if (gen_window_f32(ssf32i->window_type,
+        ret->synthesis_window,ssf32i->window_length,NULL)) { goto fail; }
     scale_window(ret->synthesis_window,
         ssf32i->window_length,
         1./get_window_energy(ret->analysis_window,ssf32i->window_length));
@@ -127,8 +150,8 @@ signal_stretcher_f32_process(
         const float *cur_frame = (const float*)pvs_process(
             ss->pvs,
             analysis_points[n_a]);
-        memcpy(output,cur_frame,ss.config.hop_size*sizeof(float));
-        output += ss.config.hop_size;
+        memcpy(output,cur_frame,ss->config.hop_size*sizeof(float));
+        output += ss->config.hop_size;
     }
     return 0;
 }

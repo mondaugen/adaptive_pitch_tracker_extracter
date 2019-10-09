@@ -116,6 +116,13 @@ struct pvs_func_table_t
     /* put absolute value (modulus) of the complex values in an array. */
     void (*complex_abs) (const struct pvs_complex_t * src, struct pvs_real_t * dst,
                          unsigned int length);
+    /* TODO if we always add the same constant, we should initialize this
+    constant at the beginning and pass a pointer to it to this function because
+    underlying implementations might not use floats and would have to convert
+    every time */
+    /* compute *dst += c */
+    void (*complex_add_float_const)(struct pvs_complex_t *dst, float c,
+                         unsigned int length);
     /* perform forward DFT */
     void (*dft_forward) (struct pvs_dft_t * dft, const struct pvs_real_t * a,
                          struct pvs_complex_t * b);

@@ -1,6 +1,8 @@
 #ifndef SIGNAL_STRETCHER_F32_H
 #define SIGNAL_STRETCHER_F32_H 
 
+struct signal_stretcher_f32;
+
 struct signal_stretcher_f32_init {
     float *signal;
     unsigned int signal_length;

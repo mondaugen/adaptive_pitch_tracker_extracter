@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include "pvoc_synth.h"
 
+#define PVOC_SMALL_CONST 1e-6
+
 struct pvs_t {
     struct pvs_user_init_t config;
     const struct pvs_func_table_t *func_table;
@@ -96,8 +98,13 @@ pvs_process(struct pvs_t *pvs, int input_time)
         ftab->math.complex_real_mult(pvs->z_inputH,
                                    pvs->r_workspace,
                                    pvs->config.window_length);
+        /* Add small number to avoid divide by 0 */
+        ftab->math.complex_add_float_const(pvs->z_inputH,
+            PVOC_SMALL_CONST,pvs->config.window_length);
+        /* TODO See what these are before finding their quotient */
         /* Find their quotient */
-        ftab->math.complex_complex_div(pvs->z_input0,pvs->z_inputH,pvs->config.window_length);
+        ftab->math.complex_complex_div(pvs->z_input0,
+            pvs->z_inputH,pvs->config.window_length);
         /* Multiply last output spectrum by this quotient */
         ftab->math.complex_complex_mult(
             pvs->z_outputH,pvs->z_input0,pvs->config.window_length);
