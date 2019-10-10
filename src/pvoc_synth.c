@@ -99,8 +99,8 @@ pvs_process(struct pvs_t *pvs, int input_time)
                                    pvs->r_workspace,
                                    pvs->config.window_length);
         /* Add small number to avoid divide by 0 */
-        //ftab->math.complex_add_float_const(pvs->z_inputH,
-        //    PVOC_SMALL_CONST,pvs->config.window_length);
+        ftab->math.complex_add_float_const(pvs->z_inputH,
+            PVOC_SMALL_CONST,pvs->config.window_length);
         /* TODO See what these are before finding their quotient */
         /* Find their quotient */
         ftab->math.complex_complex_div(pvs->z_input0,
