@@ -53,7 +53,6 @@ pvs_process(struct pvs_t *pvs, int input_time)
                      .n_samples = pvs->config.window_length };
     /* Get current input */
     pvs->config.get_samples(pvs->config.get_samples_aux,&f_input0);
-    if (!f_input0.samples) { return NULL; }
     /* Extract frame and multiply by window */
     ftab->math.real_real_cpymult(
         f_input0.samples,
@@ -68,7 +67,6 @@ pvs_process(struct pvs_t *pvs, int input_time)
             pvs->z_input0);
         /* Get past input */
         pvs->config.get_samples(pvs->config.get_samples_aux,&f_inputH);
-        if (!f_inputH.samples) { return NULL; }
         /* Extract frame and multiply by window */
         ftab->math.real_real_cpymult(
             f_inputH.samples,
