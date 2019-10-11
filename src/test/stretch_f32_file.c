@@ -86,7 +86,7 @@ int main (void)
     /* To lengthen a file, we specify analysis points that are closer together
     than the hop size and to shorten, the opposite */
     calc_stretched_ret = calculate_stretched_analysis_points(
-        input_file_length,
+        input_file_length/sizeof(float),
         hop_size,
         stretch);
     if (!calc_stretched_ret) { ret = 7; goto fail; }
