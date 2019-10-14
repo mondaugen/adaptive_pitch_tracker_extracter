@@ -57,15 +57,18 @@ gen_window_f32(const char *type, float *dest, unsigned int dest_length, void *au
 }
 
 
+/* compute the equivalent noise bandwidth of the window */
 static float
-get_window_energy(float *win, unsigned int win_len)
+get_enbw(float *win, unsigned int win_len)
 {
-    float ret = 0;
+    float num = 0, den = 0, N = win_len;
     while (win_len--) {
-        ret += *win * *win;
+        num += *win * *win;
+        den += *win;
         win++;
     }
-    return ret;
+    den = den*den;
+    return num/den*N;
 }
 
 static float
@@ -116,7 +119,7 @@ signal_stretcher_f32_new(struct signal_stretcher_f32_init *ssf32i)
         ret->synthesis_window,ssf32i->window_length,NULL)) { goto fail; }
     scale_window(ret->synthesis_window,
         ssf32i->window_length,
-        1./get_window_energy(ret->analysis_window,ssf32i->window_length));
+        1./get_enbw(ret->analysis_window,ssf32i->window_length));
     struct pvs_init_t pvs_init = pvs_f32_init_new();
     pvs_init.user = (struct pvs_user_init_t) {
         .analysis_window = (struct pvs_real_t*) ret->analysis_window,

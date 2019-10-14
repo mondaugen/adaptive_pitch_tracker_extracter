@@ -35,4 +35,4 @@ src/test/bin/pvoc_synth_ftable_tests_f32 : src/test/pvoc_synth_ftable_tests_f32.
                                    src/lib/datastructures/windowed_lookup_f32.c \
                                    src/lib/pvoc_synth_f32/routines_linux_native.c \
                                    src/pvoc_synth.c
-	$(CC) -g -Isrc/lib/kissfft -Isrc/lib/kissfft/tools -Isrc -Isrc/lib $^ -o $@ -lm
+	$(CC) -g -Isrc/test -Isrc/lib/kissfft -Isrc/lib/kissfft/tools -Isrc -Isrc/lib $^ -o $@ -lm

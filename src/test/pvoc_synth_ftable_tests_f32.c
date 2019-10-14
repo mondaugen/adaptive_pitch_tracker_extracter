@@ -2,25 +2,9 @@
 #include "pvoc_synth_f32/routines_linux_native.h"
 #include <stdio.h>
 #include <complex.h>
+#include "test_common.h"
 
 /* Test the functions in the func table on f32 and z64 data. */
-
-#define PRINT_ANY(x)\
-    printf(_Generic( (x), int : "%d", float : "%f"),x)
-
-#define PRINT_ALL(a_,n) \
-    ({ __auto_type a__ = (a_);\
-       __auto_type n__ = (n);\
-       while (n__--) { PRINT_ANY(*a__++); printf(" "); };\
-       printf("\n"); })
-
-#define CHK_EQ(a_,b_,n) \
-    ({ __auto_type a__ = (a_);\
-       __auto_type b__ = (b_);\
-       __auto_type n__ = (n);\
-       int eq__ = 1 ;\
-       while (n__--) { eq__ &= (*a__++ == *b__++); };\
-       eq__; })
 
 int main (void)
 {

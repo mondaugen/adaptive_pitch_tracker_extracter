@@ -215,8 +215,8 @@ static struct pvs_func_table_t func_table =
     .dft_window_scale = dft_window_scale,
     .ola_alloc = (struct pvs_ola_t *(*) (struct pvs_ola_init_t *))ola_f32_new,
     .ola_free = (void (*) (struct pvs_ola_t *))ola_f32_free,
-    .ola_sum_in = (void (*) (struct pvs_ola_t *, const struct pvs_real_t *))ola_f32_sum_in,
-    .ola_shift_out = (const struct pvs_real_t *(*) (struct pvs_ola_t *))ola_f32_shift_out,
+    .ola_sum_in_and_shift_out = (const struct pvs_real_t * (*) (
+        struct pvs_ola_t *, const struct pvs_real_t *))ola_f32_sum_in_and_shift_out,
     .dft_alloc = dft_alloc,
     .dft_free = dft_free
   },
@@ -227,7 +227,6 @@ static struct pvs_func_table_t func_table =
     .real_real_cpymult = real_real_cpymult,
     .complex_complex_div = complex_complex_div,
     .complex_abs = complex_abs,
-    .complex_add_float_const = complex_add_float_const,
     .dft_forward = dft_forward,
     .dft_inverse = dft_inverse
   }

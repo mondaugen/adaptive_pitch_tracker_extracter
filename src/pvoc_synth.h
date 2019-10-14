@@ -72,14 +72,11 @@ struct pvs_func_table_t
     struct pvs_ola_t *(*ola_alloc) (struct pvs_ola_init_t *);
     /* Free real overlap-and-add buffer */
     void (*ola_free) (struct pvs_ola_t *);
-    /* Sum in sum_in_length values into a pvs_ola_t */
-    void (*ola_sum_in) (struct pvs_ola_t *, const struct pvs_real_t *);
-    /*
-    Shift out shift_out_length values from a pvs_ola_t into a pvs_real_t.
-    This returns a pointer to contiguous memory holding hop_size real values and
-    advances the pvs_ola_t's internal pointer by hop_size.
-    */
-    const struct pvs_real_t *(*ola_shift_out) (struct pvs_ola_t *);
+    /* Sum in sum_in_length values into a pvs_ola_t and shift out
+    shift_out_length values from a pvs_ola_t into a pvs_real_t.  This returns a
+    pointer to contiguous memory holding hop_size real values and advances the
+    pvs_ola_t's internal pointer by hop_size.  */
+    const struct pvs_real_t * (*ola_sum_in_and_shift_out) (struct pvs_ola_t *, const struct pvs_real_t *);
     /* Allocate and initialize DFT auxiliary structure */
     struct pvs_dft_t *(*dft_alloc) (struct pvs_dft_init_t *);
     /* Free DFT auxiliary structure */
@@ -115,13 +112,6 @@ struct pvs_func_table_t
                                  unsigned int length);
     /* put absolute value (modulus) of the complex values in an array. */
     void (*complex_abs) (const struct pvs_complex_t * src, struct pvs_real_t * dst,
-                         unsigned int length);
-    /* TODO if we always add the same constant, we should initialize this
-    constant at the beginning and pass a pointer to it to this function because
-    underlying implementations might not use floats and would have to convert
-    every time */
-    /* compute *dst += c */
-    void (*complex_add_float_const)(struct pvs_complex_t *dst, float c,
                          unsigned int length);
     /* perform forward DFT */
     void (*dft_forward) (struct pvs_dft_t * dft, const struct pvs_real_t * a,
