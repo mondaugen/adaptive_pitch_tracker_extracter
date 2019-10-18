@@ -37,42 +37,36 @@ X_LIM=common.get_env('X_LIM',conv=eval,default=(0,2))
 
 x=np.fromfile(INPUT)
 
-filter_co_hz=2000
-filter_order=16
-filter_ripple=3
-#b,a=signal.cheby1(filter_order,filter_ripple,filter_co_hz,btype='highpass',fs=SAMPLE_RATE)
-#filter_coeffs=(b,a)
-
-#fig_mag_resp,ax_mag_resp=plt.subplots(1,1)
-#w,h=signal.freqz(*filter_coeffs)
-#ax_mag_resp.plot(w/(2*np.pi)*SAMPLE_RATE,20*np.log10(np.abs(h)))
-
-#x_filtered=signal.lfilter(*filter_coeffs,x)
-
 fig_signals,ax_signals=plt.subplots(5,1)
 t=np.arange(len(x))/SAMPLE_RATE
 ax_signals[0].plot(t,x)
 ax_signals[0].set_title('original signal')
 spec_flux=spectral_flux(x,H,W,window_type=WINDOW_TYPE)
-t_spec_flux=(np.arange(len(spec_flux))*H+W/2)/SAMPLE_RATE
+n_spec_flux=(np.arange(len(spec_flux))*H+W/2).astype('int')
+t_spec_flux=n_spec_flux/SAMPLE_RATE
 if NORMALIZE:
+    # normalize the spectral flux by a local average
+    # the normalization is only applied if the instantaneous amplitude is
+    # greater than THRESH_NORMALIZE
     th_norm_a=np.power(10,THRESH_NORMALIZE/20)
-    inst_amp=np.abs(x)
+    inst_amp=np.abs(x[n_spec_flux])
     _a=ALPHA_NORMALIZE
-    smooth_inst_amp_gain_scalar=1./(_a*(1+(1-_a)/(1+_a)))
-    smooth_inst_amp_fc=([smooth_inst_amp_gain_scalar*_a],[1,-(1-_a)])
-    smoothed_inst_amp=signal.lfilter(*smooth_inst_amp_fc,inst_amp)
-    norm_scalars=np.ones(smoothed_inst_amp.shape)
-    norm_scalars[smoothed_inst_amp>th_norm_a]=1/smoothed_inst_amp[smoothed_inst_amp>th_norm_a]
-    x*=norm_scalars
-    ax_signals[4].plot(t,np.abs(x))
-    ax_signals[4].set_title('locally normalized signal')
+    smooth_spec_flux_gain_scalar=1./(_a*(1+(1-_a)/(1+_a)))
+    smooth_spec_flux_fc=([smooth_spec_flux_gain_scalar*_a],[1,-(1-_a)])
+    smoothed_spec_flux=signal.lfilter(*smooth_spec_flux_fc,spec_flux)
+    norm_scalars=np.zeros(smoothed_spec_flux.shape)
+    inst_amp_th_mask=inst_amp>th_norm_a
+    norm_scalars[inst_amp_th_mask]=1/smoothed_spec_flux[inst_amp_th_mask]
+    spec_flux*=norm_scalars
+    ax_signals[4].plot(t_spec_flux,np.abs(spec_flux))
+    ax_signals[4].set_title('abs locally normalized spectral flux')
 _a=ALPHA
 smooth_flux_gain_scalar=1./(_a*(1+(1-_a)/(1+_a)))
 smooth_filter_coeffs=([smooth_flux_gain_scalar*ALPHA],[1,-(1-ALPHA)])
 spec_flux=signal.lfilter(*smooth_filter_coeffs,spec_flux)
 ax_signals[3].plot(t_spec_flux,spec_flux)
 ax_signals[3].set_title('smoothed spectral flux')
+ax_signals[3].set_ylim(0,1)
 spec_flux_diff=spec_flux[1:]-spec_flux[:-1]
 attacks=spec_flux_diff.copy()
 decay=spec_flux_diff.copy()

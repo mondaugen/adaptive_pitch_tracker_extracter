@@ -39,7 +39,7 @@ ax_mag_resp.plot(w/(2*np.pi)*SAMPLE_RATE,20*np.log10(np.abs(h)))
 
 x_filtered=signal.lfilter(*filter_coeffs,x)
 
-fig_signals,ax_signals=plt.subplots(4,1)
+fig_signals,ax_signals=plt.subplots(5,1)
 t=np.arange(len(x))/SAMPLE_RATE
 ax_signals[0].plot(t,x)
 spec_flux=spectral_flux(x,H,W,window_type=WINDOW_TYPE)
@@ -47,7 +47,10 @@ t_spec_flux=(np.arange(len(spec_flux))*H+W/2)/SAMPLE_RATE
 smooth_filter_coeffs=([ALPHA],[1,-(1-ALPHA)])
 spec_flux=signal.lfilter(*smooth_filter_coeffs,spec_flux)
 ax_signals[3].plot(t_spec_flux,spec_flux)
+ax_signals[3].set_title('spec flux')
 spec_flux_diff=spec_flux[1:]-spec_flux[:-1]
+ax_signals[4].plot(t_spec_flux[1:],spec_flux_diff)
+ax_signals[4].set_title('spec flux diff')
 attacks=spec_flux_diff.copy()
 decay=spec_flux_diff.copy()
 attacks[attacks<0]=0
@@ -58,4 +61,5 @@ ax_signals[2].plot(t_spec_flux[1:],decay)
 for ax in ax_signals:
     ax.set_xlim(0,2)
 
+plt.tight_layout()
 plt.show()

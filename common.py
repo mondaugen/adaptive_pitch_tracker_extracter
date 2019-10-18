@@ -1,5 +1,6 @@
 import numpy as np
 from os import environ
+from numpy.lib.stride_tricks import as_strided
 
 def normalize(x):
     x-=np.mean(x)
@@ -14,8 +15,9 @@ def frame(x,hop_size,window_size):
     left-multiplied to perform a transform.
     """
     n_hops=(len(x)-window_size)//hop_size
-    n=np.add.outer(np.arange(window_size),np.arange(n_hops)*hop_size)
-    ret=x[n]
+    ret = as_strided(x, shape=(window_size, n_hops),
+                          strides=(x.itemsize, hop_size * x.itemsize),
+                          writeable=False)
     return ret
 
 def get_env(name,default=None,conv=None,check_if_none=False):
