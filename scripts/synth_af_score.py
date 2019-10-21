@@ -23,7 +23,9 @@ def score_extract_unique_filenames(scorefile):
     filenames=set()
     with open(scorefile,'r') as f:
         for line in f.readlines():
-            filenames.add(shlex.split(line)[0])
+            cmds=shlex.split(line)
+            if len(cmds) > 0:
+                filenames.add(cmds[0])
     return filenames
 
 def load_files_into_arrays(files,sample_file_directory=None,dtype=np.float64):
@@ -43,7 +45,9 @@ def score_extract_maximum_timestamp(scorefile):
     timestamps=list()
     with open(scorefile,'r') as f:
         for line in f.readlines():
-            timestamps.append(float(shlex.split(line)[1]))
+            cmds=shlex.split(line)
+            if len(cmds) > 1:
+                timestamps.append(float(cmds[1]))
     return max(timestamps)
 
 def run_procs_on_array(x,procs_str,fundisp):
@@ -91,10 +95,11 @@ def render_score_to_array(scorefile,sample_rate,sample_file_directory=None):
     y=np.zeros(len_output)
     with open(scorefile,'r') as f:
         for line in f.readlines():
-            filename,ts,proc=extract_score_fields(line)
-            x=run_procs_on_array(sound_segs[filename],proc,fundisp)
-            ts_samps=ts_to_ts_samps(ts,sample_rate)
-            y[ts_samps:ts_samps+len(x)]+=x
+            if len(line.strip()) > 0:
+                filename,ts,proc=extract_score_fields(line)
+                x=run_procs_on_array(sound_segs[filename],proc,fundisp)
+                ts_samps=ts_to_ts_samps(ts,sample_rate)
+                y[ts_samps:ts_samps+len(x)]+=x
     return y
 
 if __name__ == '__main__':
