@@ -36,42 +36,65 @@ def a_to_r(a):
 # From test/attack_estimation_studies/tri_freq_response.py it seems sinc^2 is
 # its own autocorrelation, so we use this for the filter design number of poles
 P=common.get_env('P',default=2,conv=int)
-# number of zeros
-Q=common.get_env('Q',default=2,conv=int)
+acc_mult=common.get_env('acc_mult',default=1,conv=int)
 
-# length of autocorrelation sequence we need
-N=common.next_pow_2(2*(max(P,Q)+1))
+def fit_allpole_triangular_lowpass(
+    # number of poles
+    P,
+    # length multiplier (because a longer autocorrelation sequence might give a
+    # better fit, but it seems like actually not)
+    acc_mult=1):
 
-# autocorrelation, assumed indices [0,N/2] are the points [0,N/2] and
-# [N/2+1,N-1] are [-N/2,-1]
-r=0.5*np.power(periodic_sinc(N,0.5),2)
+    # It seems the feedforward coefficients other than the first one often get
+    # forced to 0, so we just use an allpole model
+    Q=0
 
-# build autocorrelation matrix
-# get indices
-k=np.arange(1,P+1)
-k_l=np.add.outer(k,-1*np.arange(1,P+1))
-# wrap so they are in [0,N)
-while np.any(k_l < 0):
-    k_l[k_l < 0] += N
-R=r[k_l]
-r_x=r[k][:,None]
+    # length of autocorrelation sequence we need
+    N=common.next_pow_2(acc_mult*2*(max(P,Q)+1))
 
-# compute feedback coefficients
-a=np.linalg.solve(R,-r_x)
+    # autocorrelation, assumed indices [0,N/2] are the points [0,N/2] and
+    # [N/2+1,N-1] are [-N/2,-1]
+    r=0.5*np.power(periodic_sinc(N,0.5),2)
 
-# compute feedforward coefficients
-# in this case r is equivalent to x
-n=np.arange(0,Q+1)
-n_k=np.add.outer(n,-k)
-while np.any(n_k < 0):
-    n_k[n_k < 0] += N
-X=r[n_k]
-x=r[n]
-b=x[:,None]+X@a
+    # build autocorrelation matrix
+    # get indices
+    k=np.arange(1,P+1)
+    k_l=np.add.outer(k,-1*np.arange(1,P+1))
+    # wrap so they are in [0,N)
+    while np.any(k_l < 0):
+        k_l[k_l < 0] += N
+    R=r[k_l]
+    r_x=r[k][:,None]
 
-a0=a[0]
-a=a/a0
-b=b/a0
+    # compute feedback coefficients
+    a=np.linalg.solve(R,-r_x)
+
+    # compute feedforward coefficients
+    # in this case r is equivalent to x
+    n=np.arange(0,Q+1)
+    n_k=np.add.outer(n,-k)
+    while np.any(n_k < 0):
+        n_k[n_k < 0] += N
+    X=r[n_k]
+    x=r[n]
+    b=x[:,None]+X@a
+
+    a0=a[0]
+    a=a/a0
+    b=b/a0
+    return b,a
+
+def fit_allpole_triangular_highpass(
+    # number of poles
+    P,
+    # length multiplier (because a longer autocorrelation sequence might give a
+    # better fit)
+    acc_mult=1):
+    b,a=fit_allpole_triangular_lowpass(P,acc_mult=acc_mult)
+    a*=np.power(-1,np.arange(len(a)))[:,None]
+    return b,a
+
+b,a=fit_allpole_triangular_lowpass(P,acc_mult=acc_mult)
 
 print('a')
 print(a)
@@ -94,7 +117,7 @@ w,h=signal.freqz(b,a)
 plt.plot(w,np.abs(h),label='low-pass')
 
 # show high-pass configuration
-a*=np.power(-1,np.arange(len(a)))[:,None]
+b,a=fit_allpole_triangular_highpass(P,acc_mult=acc_mult)
 w,h=signal.freqz(b,a)
 plt.plot(w,np.abs(h),label='high-pass')
 plt.legend()
