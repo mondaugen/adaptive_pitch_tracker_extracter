@@ -1,6 +1,7 @@
 #ifndef COMMON_H
 #define COMMON_H 
 
+#include <stdlib.h>
 #include <stdio.h>
 
 #define PRINT_ANY(x)\
@@ -27,6 +28,16 @@ get_file_length(
     fseek(f,0,SEEK_END);
     long ret = ftell(f);
     rewind(f);
+    return ret;
+}
+
+static inline const char *
+getenv_default(
+    const char *env_name,
+    const char *default_value)
+{
+    const char *ret = getenv(env_name);
+    if (!ret) { return default_value; }
     return ret;
 }
 

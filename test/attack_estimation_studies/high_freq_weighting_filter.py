@@ -85,6 +85,8 @@ r=a_to_r(a)
 print('r')
 print(r)
 # to check if a_to_r is correct
+# the reflection coefficients should be: [.5, .2, -.5]
+# see p. 237 of Statistical Signal Processing and Modeling by Monson
 print(a_to_r(np.array([1,.5,-0.1,-0.5])))
 
 # show frequency response
