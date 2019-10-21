@@ -31,3 +31,9 @@ def get_env(name,default=None,conv=None,check_if_none=False):
     if conv is not None:
         return conv(ret)
     return ret
+
+def next_pow_2(n):
+    x = 1
+    while x < n:
+        x = x << 1
+    return x

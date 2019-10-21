@@ -14,7 +14,4 @@ test/test_score.txt
 
 Here's an example render command line:
 
-PYTHONPATH=~/Documents/development/adaptive_pitch_tracker_extracter OUTPUT=/tmp/render.f64 SCORE_FILE=~/Documents/development/adaptive_pitch_tracker_extracter/test/test_score.txt python3 ~/Documents/development/adaptive_pitch_tracker_extracter/scripts/synth_af_score.py
-
-it assumes you are in the directory so that you needn't specify the path before
-the filenames (see the test_score.txt file).
+SAMPLE_FILE_DIRECTORY=/path/to/result/of/mums_conv_fmt PYTHONPATH=. OUTPUT=/tmp/render.f64 SCORE_FILE=~/Documents/development/adaptive_pitch_tracker_extracter/test/test_score.txt python3 scripts/synth_af_score.py
