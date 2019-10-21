@@ -20,4 +20,14 @@
        while (n__--) { eq__ &= (*a__++ == *b__++); };\
        eq__; })
 
+static inline long
+get_file_length(
+    FILE *f)
+{
+    fseek(f,0,SEEK_END);
+    long ret = ftell(f);
+    rewind(f);
+    return ret;
+}
+
 #endif /* COMMON_H */

@@ -36,3 +36,6 @@ src/test/bin/pvoc_synth_ftable_tests_f32 : src/test/pvoc_synth_ftable_tests_f32.
                                    src/lib/pvoc_synth_f32/routines_linux_native.c \
                                    src/pvoc_synth.c
 	$(CC) -g -Isrc/test -Isrc/lib/kissfft -Isrc/lib/kissfft/tools -Isrc -Isrc/lib $^ -o $@ -lm
+
+src/test/bin/iir_lattice_filter : src/test/iir_lattice_filter.c
+	$(CC) -g -Isrc/test $^ -o $@
