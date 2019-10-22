@@ -94,32 +94,34 @@ def fit_allpole_triangular_highpass(
     a*=np.power(-1,np.arange(len(a)))[:,None]
     return b,a
 
-b,a=fit_allpole_triangular_lowpass(P,acc_mult=acc_mult)
+if __name__ == '__main__':
 
-print('a')
-print(a)
-if np.any(np.abs(a)>1):
-    print('unstable')
-else:
-    print('stable')
-print('b')
-print(b)
-r=a_to_r(a)
-print('r')
-print(r)
-# to check if a_to_r is correct
-# the reflection coefficients should be: [.5, .2, -.5]
-# see p. 237 of Statistical Signal Processing and Modeling by Monson
-print(a_to_r(np.array([1,.5,-0.1,-0.5])))
+    b,a=fit_allpole_triangular_lowpass(P,acc_mult=acc_mult)
 
-# show frequency response
-w,h=signal.freqz(b,a)
-plt.plot(w,np.abs(h),label='low-pass')
+    print('a')
+    print(a)
+    if np.any(np.abs(a)>1):
+        print('unstable')
+    else:
+        print('stable')
+    print('b')
+    print(b)
+    r=a_to_r(a)
+    print('r')
+    print(r)
+    # to check if a_to_r is correct
+    # the reflection coefficients should be: [.5, .2, -.5]
+    # see p. 237 of Statistical Signal Processing and Modeling by Monson
+    print(a_to_r(np.array([1,.5,-0.1,-0.5])))
 
-# show high-pass configuration
-b,a=fit_allpole_triangular_highpass(P,acc_mult=acc_mult)
-w,h=signal.freqz(b,a)
-plt.plot(w,np.abs(h),label='high-pass')
-plt.legend()
+    # show frequency response
+    w,h=signal.freqz(b,a)
+    plt.plot(w,np.abs(h),label='low-pass')
 
-plt.show()
+    # show high-pass configuration
+    b,a=fit_allpole_triangular_highpass(P,acc_mult=acc_mult)
+    w,h=signal.freqz(b,a)
+    plt.plot(w,np.abs(h),label='high-pass')
+    plt.legend()
+
+    plt.show()
