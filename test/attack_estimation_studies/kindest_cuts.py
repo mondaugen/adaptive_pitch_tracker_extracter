@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 
 SAMPLE_RATE=common.get_env('SAMPLE_RATE',conv=float,default=16e3)
 INPUT=common.get_env('INPUT',check_if_none=True)
+OUTPUT=common.get_env('OUTPUT',default='/tmp/cut-%d.f64')
 
 
 # window type for the spectral flux
@@ -79,6 +80,30 @@ for ax in axs:
     ax.set_xlim(*X_LIM)
 
 # now cut out the sections
+# sd_maxs are the indices of the peaks in the spectral flux function
+# sd_mins_filtered are the indices of the closest local minimum just before the peaks
+# if the first sd_maxs is greater than the first sd_mins_filtered, we put 0 as
+# the first minimum. This is not great but usually we can catch the first
+# minimum using one_sided_max='left'
+if sd_maxs[0] > sd_mins_filtered[0]:
+    sd_mins_filtered=np.concatenate(([0],sd_mins_filtered))
+# if the last sd_maxs is greater than the last sd_mins_filtered, we add the end
+# of the file as the last sd_mins_filtered index
+if sd_maxs[-1] > sd_mins_filtered[-1]:
+    sd_mins_filtered=np.concatenate((sd_mins_filtered,[len(x)-1]))
+# now we combine all the indices
+attack_points=np.sort(np.concatenate((sd_maxs,sd_mins_filtered)))
+# convert to input time
+attack_points=attack_points*H_SF
+# If there is an even number of indices, there is an error
+if (len(attack_points) % 2) == 0:
+    raise Exception("There can't be an even number of attack_points")
+
+# now cut out the samples by taking every 3 points
+for k,n in enumerate(range(0,len(attack_points)-2,2)):
+    s,m,e=attack_points[n:n+3]
+    y=x[s:e+1]
+    y.tofile(OUTPUT % (k,))
 
 plt.tight_layout()
 plt.show()
