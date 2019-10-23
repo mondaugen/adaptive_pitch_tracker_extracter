@@ -1,5 +1,6 @@
 # Tools for windowing signals, or getting parts of signals.
 import numpy as np
+from scipy import signal
 from math import ceil
 
 def last_slice_index(s):
@@ -57,5 +58,22 @@ class signal_windower:
                 ret=np.concatenate((ret,rh_vals))
             return ret[slice(slice_start,slice_stop,key.step)]
 
-                
-            
+class taper_window_applier:
+    """ Makes it easy to apply a window to the beginning or end of a signal """
+    def __init__(self,window_type='hann',table_length=4096):
+        self.window=signal.get_window(window_type,table_length)
+        self.table_length=table_length
+    def get_taper(self,N,where='beginning'):
+        """
+        Get a taper function of length N, which will be values going from 0 to
+        the middle value of the window.
+        if where is 'beginning', we fade in, if 'end' we fade out.
+        if where is unrecognized, we use 'beginning'
+        """
+        r=np.interp(
+            np.linspace(0,self.table_length//2,N),
+            np.arange(self.table_length//2+1),
+            self.window[:self.table_length//2+1])
+        if where == 'end':
+            return r[::-1]
+        return r

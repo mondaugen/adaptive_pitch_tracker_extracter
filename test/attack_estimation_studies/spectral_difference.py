@@ -80,6 +80,12 @@ def discount_local_max(x,rate):
             filtered_maxs.append(n_max)
     return (np.array(filtered_maxs),thresh)
 
+def discount_local_max_rate_calc(n,bottom=0.01):
+    """ Find the rate that reaches bottom in n steps """
+    if n <= 0:
+        raise ValueError
+    return np.power(bottom,1/n)
+
 def index_mask(n,mask):
     """ Return the n where mask is also true """
     mask=mask.astype('int')

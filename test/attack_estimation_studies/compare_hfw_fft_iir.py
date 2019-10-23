@@ -51,7 +51,7 @@ y_iir_smooth_avg=spectral_difference.iir_avg(np.abs(y_iir),A_SMOOTH)
 y_iir=spectral_difference.local_rms(y_iir,H,W)
 t_y_iir=np.arange(len(y_iir))*H/SAMPLE_RATE
 y_iir_maxs=spectral_difference.filtered_local_max(y_iir,H_LMAX,W_LMAX,A_LMAX)
-y_iir_maxs_inv=spectral_difference.filtered_local_max(-y_iir,H_LMAX,W_LMAX,1)
+y_iir_maxs_inv=spectral_difference.filtered_local_max(-y_iir,H_LMAX,W_LMAX,A_LMAX)
 # When looking for max in smooth average, we use same total window size as when looking in RMS
 y_iir_smooth_avg_maxs=spectral_difference.filtered_local_max(
     y_iir_smooth_avg,H_ASLMAX,W_ASLMAX,A_ASLMAX)

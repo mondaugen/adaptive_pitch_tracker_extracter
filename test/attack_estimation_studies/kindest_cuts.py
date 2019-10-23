@@ -10,11 +10,12 @@ import spectral_difference
 import subprocess
 import high_freq_weighting_filter
 import matplotlib.pyplot as plt
+import window_tools
 
 SAMPLE_RATE=common.get_env('SAMPLE_RATE',conv=float,default=16e3)
 INPUT=common.get_env('INPUT',check_if_none=True)
 OUTPUT=common.get_env('OUTPUT',default='/tmp/cut-%d.f64')
-
+OUTPUT_SUMMARY=common.get_env('OUTPUT_SUMMARY',default='/tmp/cut_summary.txt')
 
 # window type for the spectral flux
 WINDOW_TYPE_SF=common.get_env('WINDOW_TYPE_SF',default='hann')
@@ -85,25 +86,76 @@ for ax in axs:
 # if the first sd_maxs is greater than the first sd_mins_filtered, we put 0 as
 # the first minimum. This is not great but usually we can catch the first
 # minimum using one_sided_max='left'
-if sd_maxs[0] > sd_mins_filtered[0]:
+if np.min(sd_maxs) < np.min(sd_mins_filtered):
+    print("Adding extra sd_mins_filtered to beginning.")
     sd_mins_filtered=np.concatenate(([0],sd_mins_filtered))
 # if the last sd_maxs is greater than the last sd_mins_filtered, we add the end
 # of the file as the last sd_mins_filtered index
-if sd_maxs[-1] > sd_mins_filtered[-1]:
+if np.max(sd_maxs) > np.max(sd_mins_filtered):
+    print("Adding extra sd_mins_filtered to end.")
     sd_mins_filtered=np.concatenate((sd_mins_filtered,[len(x)-1]))
 # now we combine all the indices
 attack_points=np.sort(np.concatenate((sd_maxs,sd_mins_filtered)))
+# check to see if there are any adjacent minima or maxima
+sd_mins_mask=np.zeros(np.max(attack_points)+1)
+sd_mins_mask[sd_mins_filtered]=1
+sd_maxs_mask=np.zeros(np.max(attack_points)+1)
+sd_maxs_mask[sd_maxs]=1
+mask_accum=np.cumsum(sd_maxs_mask)-np.cumsum(sd_mins_mask)
+print(np.where((mask_accum>0)|(mask_accum<-1))[0])
 # convert to input time
-attack_points=attack_points*H_SF
+attack_points_sf=attack_points*H_SF
 # If there is an even number of indices, there is an error
-if (len(attack_points) % 2) == 0:
-    raise Exception("There can't be an even number of attack_points")
+if (len(attack_points_sf) % 2) == 0:
+    print("WARNING: There are an even number of attack_points.")
 
-# now cut out the samples by taking every 3 points
-for k,n in enumerate(range(0,len(attack_points)-2,2)):
-    s,m,e=attack_points[n:n+3]
-    y=x[s:e+1]
-    y.tofile(OUTPUT % (k,))
+# a thing to help taper the samples
+twa=window_tools.taper_window_applier()
+# also make a summary file
+with open(OUTPUT_SUMMARY,'w') as f:
+    # now cut out the samples by taking every 3 points
+    for k,n in enumerate(range(0,len(attack_points_sf)-2,2)):
+        s,m,e=attack_points_sf[n:n+3]
+        if ((e-s) > 1e5) or ((e-s) < W_SF):
+            continue
+        # this is a hack to get an inverse ramp
+        start_taper=1-twa.get_taper(m-s,where='end')
+        end_taper_len=min(e-m,100)
+        end_taper=twa.get_taper(end_taper_len,where='end')
+        y=x[s:e]
+        y[:m-s]*=start_taper
+        y[-end_taper_len:]*=end_taper
+        y.tofile(OUTPUT % (k,))
+        f.write((OUTPUT % (k,)) + (" length=%d attack=%d\n" % (e-s,m-s)))
+
+# plot the cut ranges on the graph
+sd_mins_filtered_s=np.sort(((sd_mins_filtered+1)*H_SF+W_SF*0.5)/SAMPLE_RATE)
+heights=[0.1,-0.1]
+h_n=0
+# compensate for spectral flux windowing when converting to seconds
+attack_points_s=((attack_points+1)*H_SF+W_SF*0.5)/SAMPLE_RATE
+for n in range(0,len(attack_points_s)-2,2):
+    l,c,r=attack_points_s[n:n+3]
+    axs[0].plot([l,l,r,r],[0,heights[h_n],heights[h_n],0],'k')
+    axs[0].plot([c],[heights[h_n]],'.r')
+    h_n = 1 - h_n
+
+plot_local_x_max=False
+
+if plot_local_x_max:
+
+    # create an envelope using the discounted local max of the signal
+    x_max_rate=spectral_difference.discount_local_max_rate_calc(SAMPLE_RATE*0.1)
+    x_maxs,x_max_thresh=spectral_difference.discount_local_max(x,x_max_rate)
+    x_maxs_sd_attacks=(sd_maxs+2)*H_SF+W_SF//2
+    x_maxs_interp=np.interp(x_t,x_t[x_maxs],x[x_maxs])
+    axs[2].plot(x_t,x_maxs_interp)
+    axs[2].set_title('Envelope using local max')
+    # where are the local maxima as given by the spectral flux on this function?
+    axs[2].plot(x_t[x_maxs_sd_attacks],x_maxs_interp[x_maxs_sd_attacks],'.r')
+
+else:
+    axs[2].plot(np.arange(len(mask_accum))/SAMPLE_RATE,mask_accum)
 
 plt.tight_layout()
 plt.show()
