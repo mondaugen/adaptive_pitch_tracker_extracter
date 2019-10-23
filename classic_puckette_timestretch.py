@@ -24,8 +24,16 @@ def time_stretch_arb_times(
     y_len=H*(len(t)-1)+W
     y=np.zeros(y_len)
     t0=t[0]+t_shift
-    y[:W]=x[t0:t0+W]*w
-    Y_last=np.fft.fft(y[:W])
+    win_1=np.zeros_like(w)
+    s=np.zeros_like(y)
+    # TODO: Why is the beginning so difficult?
+    for h in np.arange(0,W,H):
+        #win_1[:W-h]+=w[h:]
+        _Y=np.fft.fft(np.concatenate((np.zeros(h),x[t0:t0+W-h]*w[h:])))
+        if h == 0:
+            Y_last=_Y.copy()
+        y[:W-h]+=np.real(np.fft.ifft(Y_last))[h:]*w[h:]
+        s[:W-h]+=np.power(w[h:],2)
 
     h=H
     for t_ in t[1:]:
@@ -34,7 +42,9 @@ def time_stretch_arb_times(
         X_H=np.fft.fft(x[t_-H:t_-H+W]*w)
         Y_last=X0*np.abs(X_H)/X_H*Y_last/np.abs(Y_last)
         y[h:h+W]+=np.real(np.fft.ifft(Y_last))*w
+        s[h:h+W]+=np.power(w,2)
         h+=H
+    y/=s
 
     return y
         
