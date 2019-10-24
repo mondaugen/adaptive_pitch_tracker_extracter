@@ -38,6 +38,13 @@ real_memcpy(struct pvs_real_t *dst, const struct pvs_real_t *src, unsigned int N
     memcpy(dst,src,sizeof(float)*N);
 }
 
+static struct pvs_real_t *
+real_offset(struct pvs_real_t *s, unsigned int length)
+{
+    float *f = (float*)s;
+    return (struct pvs_real_t *)(f+length);
+}
+
 /* We use real-only DFT and so we adjust length accordingly, which is length/2 +
 1 complex floats. */
 
@@ -168,6 +175,38 @@ static void real_real_cpymult (const struct pvs_real_t * a,
     }
 }
 
+static void real_real_add_product (const struct pvs_real_t * a,
+                        const struct pvs_real_t * b,
+                        struct pvs_real_t * c,
+                        unsigned int length)
+{
+    const float *a_ = (const float*)a,
+                *b_ = (const float *)b;
+    float *c_ = (float*)c;
+    while (length--) {
+        *c_++ += *a_++ * *b_++;
+    }
+}
+
+static void real_reciprocal(struct pvs_real_t *a, unsigned int length)
+{
+    float *a_ = (float*)a;
+    while (length--) {
+        *a_ = 1. / *a_;
+        a_++;
+    }
+}
+
+static int real_contains_zero(const struct pvs_real_t *a, unsigned int length)
+{
+    float *a_ = (float*)a;
+    while (length--) {
+        if (*a_++ == 0.) { return 1; }
+    }
+    return 0;
+}
+    
+
 /* divide 2 complex arrays, result goes in first array (i.e., a /= b) */
 static void complex_complex_div (struct pvs_complex_t * a, const struct pvs_complex_t * b,
                              unsigned int length)
@@ -208,6 +247,7 @@ static struct pvs_func_table_t func_table =
     .real_alloc = real_alloc,
     .real_free = real_free,
     .real_memcpy = real_memcpy,
+    .real_offset = real_offset,
     .complex_alloc = complex_alloc,
     .complex_free = complex_free,
     .dft_free = dft_free,
@@ -215,7 +255,7 @@ static struct pvs_func_table_t func_table =
     .dft_window_scale = dft_window_scale,
     .ola_alloc = (struct pvs_ola_t *(*) (struct pvs_ola_init_t *))ola_f32_new,
     .ola_free = (void (*) (struct pvs_ola_t *))ola_f32_free,
-    .ola_sum_in_and_shift_out = (const struct pvs_real_t * (*) (
+    .ola_sum_in_and_shift_out = (struct pvs_real_t * (*) (
         struct pvs_ola_t *, const struct pvs_real_t *))ola_f32_sum_in_and_shift_out,
     .dft_alloc = dft_alloc,
     .dft_free = dft_free
@@ -225,6 +265,9 @@ static struct pvs_func_table_t func_table =
     .complex_real_mult = complex_real_mult,
     .real_real_mult = real_real_mult,
     .real_real_cpymult = real_real_cpymult,
+    .real_real_add_product = real_real_add_product,
+    .real_reciprocal = real_reciprocal,
+    .real_contains_zero = real_contains_zero,
     .complex_complex_div = complex_complex_div,
     .complex_abs = complex_abs,
     .dft_forward = dft_forward,

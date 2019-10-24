@@ -117,9 +117,11 @@ signal_stretcher_f32_new(struct signal_stretcher_f32_init *ssf32i)
         ret->analysis_window,ssf32i->window_length,NULL)) { goto fail; }
     if (gen_window_f32(ssf32i->window_type,
         ret->synthesis_window,ssf32i->window_length,NULL)) { goto fail; }
-    scale_window(ret->synthesis_window,
-        ssf32i->window_length,
-        1./get_enbw(ret->analysis_window,ssf32i->window_length));
+    /* scale_window is not necessary (nor will it work) because the pvoc divides
+    the influence of the windows out of the output */
+//    scale_window(ret->synthesis_window,
+//        ssf32i->window_length,
+//        1./get_enbw(ret->analysis_window,ssf32i->window_length));
     struct pvs_init_t pvs_init = pvs_f32_init_new();
     pvs_init.user = (struct pvs_user_init_t) {
         .analysis_window = (struct pvs_real_t*) ret->analysis_window,

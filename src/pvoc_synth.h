@@ -58,12 +58,18 @@ struct pvs_func_table_t
 {
   struct
   {
+    /* NOTE: The allocation functions must return zeroed memory (e.g., by using calloc)*/
     /* Allocate array of reals */
     struct pvs_real_t *(*real_alloc) (unsigned int length);
     /* free array of reals */
     void (*real_free) (struct pvs_real_t *);
     /* Copy array of reals */
     void (*real_memcpy)(struct pvs_real_t *, const struct pvs_real_t *, unsigned int);
+    /*
+    Get a pointer to an array but starting at offset (similar to x[offset:]
+    in Python)
+    */
+    struct pvs_real_t *(*real_offset) (struct pvs_real_t *r, unsigned int offset);
     /* Allocate array of complex */
     struct pvs_complex_t *(*complex_alloc) (unsigned int length);
     /* free array of complex */
@@ -76,7 +82,7 @@ struct pvs_func_table_t
     shift_out_length values from a pvs_ola_t into a pvs_real_t.  This returns a
     pointer to contiguous memory holding hop_size real values and advances the
     pvs_ola_t's internal pointer by hop_size.  */
-    const struct pvs_real_t * (*ola_sum_in_and_shift_out) (struct pvs_ola_t *, const struct pvs_real_t *);
+    struct pvs_real_t * (*ola_sum_in_and_shift_out) (struct pvs_ola_t *, const struct pvs_real_t *);
     /* Allocate and initialize DFT auxiliary structure */
     struct pvs_dft_t *(*dft_alloc) (struct pvs_dft_init_t *);
     /* Free DFT auxiliary structure */
@@ -106,6 +112,15 @@ struct pvs_func_table_t
                             const struct pvs_real_t * b,
                             struct pvs_real_t * c,
                             unsigned int length);
+    /* multiply 2 real arrays, summing into other array */
+    void (*real_real_add_product) (const struct pvs_real_t * a,
+                            const struct pvs_real_t * b,
+                            struct pvs_real_t * c,
+                            unsigned int length);
+    /* replace an array with its reciprocal (i.e. a = 1/a) */
+    void (*real_reciprocal) (struct pvs_real_t * a, unsigned int length);
+    /* returns non-zero if the array contains 0, 0 otherwise */
+    int (*real_contains_zero) (const struct pvs_real_t *a, unsigned int length);
     /* divide 2 complex arrays, result goes in first array (i.e., a /= b) */
     void (*complex_complex_div) (struct pvs_complex_t * a,
                                  const struct pvs_complex_t * b,

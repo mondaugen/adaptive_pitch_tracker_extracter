@@ -16,7 +16,7 @@ Define this so the ola knows how to add. should compute a[n] += b[n] for n in
 [0,length)
 */
 void ola_f32_add(float *a, const float *b, unsigned int length);
-const float * ola_f32_sum_in_and_shift_out(struct ola_f32_t *ola, const float *input);
+float * ola_f32_sum_in_and_shift_out(struct ola_f32_t *ola, const float *input);
 void ola_f32_free(struct ola_f32_t *ola);
 struct ola_f32_t * ola_f32_new(struct ola_f32_init_t *config);
 

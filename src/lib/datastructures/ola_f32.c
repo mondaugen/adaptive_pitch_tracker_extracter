@@ -21,7 +21,7 @@ frame (the frame into which no more additions will occur). If this frame is not
 used before the next call to ola_f32_sum_in_and_shift_out, it will be set to 0
 the next call to ola_f32_sum_in_and_shift_out.
 */
-const float *
+float *
 ola_f32_sum_in_and_shift_out(struct ola_f32_t *ola, const float *input)
 {
     /* Zero last frame */
@@ -45,7 +45,7 @@ ola_f32_sum_in_and_shift_out(struct ola_f32_t *ola, const float *input)
     /* ola_f32_add should not fail, but just do nothing, with length of 0 */
     ola_f32_add(ola->buffer, input + sum_len_0, sum_len_1);
     /* Return start of the most recently finished region */
-    const float *ret = ola->buffer + ola->offset;
+    float *ret = ola->buffer + ola->offset;
     ola->offset = (ola->offset + ola->config.shift_out_length) & ola->len_mask;
     return ret;
 }

@@ -2,6 +2,7 @@
 #include "pvoc_synth.h"
 
 #define PVOC_SMALL_CONST 1e-6
+#define MIN(x,y) ((x)<(y)?(x):(y))
 
 struct pvs_t {
     struct pvs_user_init_t config;
@@ -21,6 +22,8 @@ struct pvs_t {
     struct pvs_dft_t *dft_aux;
     /* Aux processing space, has size config.window_length */
     struct pvs_real_t *r_workspace;
+    /* Space to store output scaling. Has size config.hop_size */
+    struct pvs_real_t *output_scaling;
     /* If 0, z_outputH contains garbage because we haven't processed any frames.
     In that case, simply set z_outputH to z_input0 and output z_outputH as if it
     had been computed normally */
@@ -122,8 +125,10 @@ pvs_process(struct pvs_t *pvs, int input_time)
     pvs->synthesis_window,pvs->config.window_length);
     /* sum into overlap and add buffer shift out samples from overlap and add
     buffer into output */
-    const struct pvs_real_t *ret = ftab->dstructs.ola_sum_in_and_shift_out(
+    struct pvs_real_t *ret = ftab->dstructs.ola_sum_in_and_shift_out(
         pvs->ola_buffer,pvs->r_workspace);
+    /* divide out influence from the windows */
+    ftab->math.real_real_mult(ret,pvs->output_scaling,pvs->config.hop_size);
     return ret;
 }
 
@@ -142,6 +147,7 @@ pvs_free(struct pvs_t *pvs)
     if (pvs->analysis_window) { ftab->dstructs.real_free(pvs->analysis_window); }
     if (pvs->synthesis_window) { ftab->dstructs.real_free(pvs->synthesis_window); }
     if (pvs->r_workspace) { ftab->dstructs.real_free(pvs->r_workspace); }
+    if (pvs->output_scaling) { ftab->dstructs.real_free(pvs->output_scaling); }
 }
 
 struct pvs_t *
@@ -156,7 +162,7 @@ pvs_new(struct pvs_init_t *init)
     ret->config = init->user;
     ret->func_table = init->func_table;
     const struct pvs_func_table_t *ftab = ret->func_table;
-    unsigned int W = ret->config.window_length;
+    unsigned int W = ret->config.window_length, H = ret->config.hop_size;
     struct pvs_ola_init_t ola_init = {
       .sum_in_length = ret->config.window_length,
       .shift_out_length = ret->config.hop_size
@@ -178,6 +184,8 @@ pvs_new(struct pvs_init_t *init)
     if (!ret->analysis_window) { goto fail; }
     ret->synthesis_window = ftab->dstructs.real_alloc(W);
     if (!ret->synthesis_window) { goto fail; }
+    ret->output_scaling = ftab->dstructs.real_alloc(H);
+    if (!ret->output_scaling) { goto fail; }
     /* Copy analysis and synthesis windows */
     ftab->dstructs.real_memcpy(ret->analysis_window,init->user.analysis_window,W);
     ftab->dstructs.real_memcpy(ret->synthesis_window,init->user.synthesis_window,W);
@@ -185,6 +193,21 @@ pvs_new(struct pvs_init_t *init)
     confusion, we NULL them. */
     ret->config.analysis_window = NULL;
     ret->config.synthesis_window = NULL;
+    /* Determine the output scaling before scaling the windows (because we still
+    want to cancel out scaling introduced by the DFT */
+    unsigned int h;
+    for (h = 0; h < W; h += H) {
+        struct pvs_real_t *a_win_section = ftab->dstructs.real_offset(
+                            ret->analysis_window,h),
+                          *s_win_section = ftab->dstructs.real_offset(
+                            ret->synthesis_window,h);
+        ftab->math.real_real_add_product(
+            a_win_section,s_win_section,ret->output_scaling,MIN(H,(W-h)));
+    }
+    /* Make sure the output_scaling doesn't contain zero or else its reciprocal
+    will be bad */
+    if (ftab->math.real_contains_zero(ret->output_scaling,H)) { goto fail; }
+    ftab->math.real_reciprocal(ret->output_scaling,H);
     /* Scale analysis and synthesis windows */
     struct pvs_dft_window_scale_t dft_window_scale = {
         .dft = ret->dft_aux,
