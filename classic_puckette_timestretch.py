@@ -1,6 +1,24 @@
+# Time stretch by estimated phase advancement using "ghost" windows.
+
 import numpy as np
 from scipy import signal
-# Time stretch by estimated phase advancement using "ghost" windows.
+import common 
+
+def prepare_init_window(w_x_sw,H):
+    """
+    The first window is the product of the analysis window and the synthesis
+    window, overlapped and added so that the initial frames (before the first
+    frame) can just be added in without needing to do the whole overlap-and-add
+    routine
+    """
+    W=len(w_x_sw)
+    v=np.zeros_like(w_x_sw)
+    for h in range(0,W,H):
+        v[:W-h] += w_x_sw[h:]
+    return v
+
+def tsat_oob_fill_func_default(N):
+    return np.random.standard_normal(N)*1e-8
 
 def time_stretch_arb_times(
     x, # signal to time stretch
@@ -8,52 +26,48 @@ def time_stretch_arb_times(
     H, # hop size
     W, # window size
     window_type='hann',
-    synth_window_type=None):
+    synth_window_type=None,
+    oob_fill_func=tsat_oob_fill_func_default):
+
     if synth_window_type is None:
         synth_window_type=window_type
 
-    # check to see that all the times are valid
-    # a valid time t is H <= t < len(x)
-    # the first time can be 0 < t len(x) because it is just copied verbatim
-    if not (np.all(t[1:] <= (len(x)-W))):
-        raise IndexError('Some non-initial t greater than last index minus window length')
-    if not ((t[0] >= 0) and (t[0] < (len(x)-W))):
-        raise IndexError('Initial t not >= 0, or greater than last index minus window length')
-    # pad beginning of signal with a hop size worth of 0s
-    #x=np.concatenate((np.zeros(H,dtype=x.dtype),x))
-    x=np.concatenate((np.random.standard_normal(H).astype(x.dtype)*1e-8,x))
-    t_shift=H 
+    min_t=np.min(t)
+    max_t=np.max(t)
+
+    # pad signal so that all t's are valid
+    # beginning of x is considered to be time 0
+    t_off=-min(min_t,0)+H
+    x=np.concatenate((
+        oob_fill_func(t_off).astype(x.dtype),
+        x,
+        oob_fill_func(max(max_t + W - len(x),0)).astype(x.dtype)))
+
     # get analysis window
     w=signal.get_window(window_type,W)
     # get synthesis window
     sw=signal.get_window(synth_window_type,W)
     y_len=H*(len(t)-1)+W
     y=np.zeros(y_len)
-    t0=t[0]+t_shift
-    win_1=np.zeros_like(w)
+    # Offset the times by the number of samples padded to the beginning of x
+    t += t_off
     # calculate dividing out window, even for hops that aren't multiple of window size
-    w_=np.concatenate((w,np.zeros(H-(W%H))))
-    sw_=np.concatenate((sw,np.zeros(H-(W%H))))
-    #win_div=np.sum(np.power(w,2).reshape((W//H,H)),axis=0)
-    win_div=np.sum((w_*sw_).reshape((len(w_)//H,H)),axis=0)
-    print('win_div:')
-    print(win_div)
-    # TODO: Why is the beginning so difficult?
-    for h in np.arange(0,W,H):
-        #win_1[:W-h]+=w[h:]
-        _Y=np.fft.fft(np.concatenate((np.zeros(h),x[t0:t0+W-h]*w[h:])))
-        if h == 0:
-            Y_last=_Y.copy()
-        y[:W-h]+=np.real(np.fft.ifft(Y_last))[h:]*sw[h:]
-    y[:H]/=win_div
+    win_div=1/common.ola_shorten(w*sw,H)
+    # calculate initial window so we don't need to do extra ola's to fill the initial buffer
+    init_win=prepare_init_window(w*sw,H)
+    # sum in "fake" inital overlap-and-add frames
+    y[:W]=init_win*x[t[0]:t[0]+W]
+    # store initial Y_last
+    Y_last=np.fft.fft(x[t[0]:t[0]+W]*w)
+    y[:H]*=win_div
     h=H
     for t_ in t[1:]:
-        t_=t_+t_shift
+        t_=t_
         X0=np.fft.fft(x[t_:t_+W]*w)
         X_H=np.fft.fft(x[t_-H:t_-H+W]*w)
         Y_last=X0*np.abs(X_H)/X_H*Y_last/np.abs(Y_last)
         y[h:h+W]+=np.real(np.fft.ifft(Y_last))*sw
-        y[h:h+H]/=win_div
+        y[h:h+H]*=win_div
         h+=H
 
     return y
