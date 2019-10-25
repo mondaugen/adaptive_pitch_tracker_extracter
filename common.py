@@ -20,6 +20,19 @@ def frame(x,hop_size,window_size):
                           writeable=False)
     return ret
 
+def ola_shorten(x,H):
+    """
+    Make a signal of length H by taking consecutive sections of x of length H
+    and summing them into an output of length H. If there exists a section that
+    would exceed the end of x, the values outside of x are taken to be 0.
+    """
+    W=len(x)
+    x_ext=np.concatenate((x,np.zeros(H-W%H)))
+    r=np.zeros(H)
+    for h in np.arange(0,len(x),H):
+        r+=x_ext[h:h+H]
+    return r
+
 def get_env(name,default=None,conv=None,check_if_none=False):
     try:
         ret=environ[name]
