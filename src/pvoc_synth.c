@@ -10,6 +10,7 @@ struct pvs_t {
     /* This instant's copies of the analysis and synthesis windows */
     struct pvs_real_t *analysis_window;
     struct pvs_real_t *synthesis_window;
+    struct pvs_real_t *init_window;
     /* A buffer that output frames are overlapped and added to. */
     struct pvs_ola_t *ola_buffer;
     /* The complex representation of the input at the current time */
@@ -110,24 +111,31 @@ pvs_process(struct pvs_t *pvs, int input_time)
             pvs->dft_aux,
             pvs->z_outputH,
             pvs->r_workspace);
+        /* Multiply output by synthesis window */
+        ftab->math.real_real_mult( pvs->r_workspace,
+        pvs->synthesis_window,pvs->config.window_length);
     } else {
         /* Perform DFT of current input frame but put directly in past output frame*/
         ftab->math.dft_forward(
             pvs->dft_aux,
             pvs->r_workspace,
             pvs->z_outputH);
-        /* multiply by synthesis window, no need to inverse
-        transform because we did no processing */
+        /*
+        Now sum in the first (unwindowed) input frame multiplied by the
+        "init_window", which will simulate past inputs having been overlapped and added.
+        */
+        ftab->math.real_real_cpymult(
+            f_input0.samples,
+            pvs->init_window,
+            pvs->r_workspace,
+            pvs->config.window_length);
         pvs->z_outputH_init = 1;
     }
-    /* Multiply output by synthesis window */
-    ftab->math.real_real_mult( pvs->r_workspace,
-    pvs->synthesis_window,pvs->config.window_length);
     /* sum into overlap and add buffer shift out samples from overlap and add
     buffer into output */
     struct pvs_real_t *ret = ftab->dstructs.ola_sum_in_and_shift_out(
         pvs->ola_buffer,pvs->r_workspace);
-    /* divide out influence from the windows */
+    /* divide-out influence from the windows */
     ftab->math.real_real_mult(ret,pvs->output_scaling,pvs->config.hop_size);
     return ret;
 }
@@ -146,6 +154,7 @@ pvs_free(struct pvs_t *pvs)
     if (pvs->dft_aux) { ftab->dstructs.dft_free(pvs->dft_aux); }
     if (pvs->analysis_window) { ftab->dstructs.real_free(pvs->analysis_window); }
     if (pvs->synthesis_window) { ftab->dstructs.real_free(pvs->synthesis_window); }
+    if (pvs->init_window) { ftab->dstructs.real_free(pvs->init_window); }
     if (pvs->r_workspace) { ftab->dstructs.real_free(pvs->r_workspace); }
     if (pvs->output_scaling) { ftab->dstructs.real_free(pvs->output_scaling); }
 }
@@ -184,15 +193,20 @@ pvs_new(struct pvs_init_t *init)
     if (!ret->analysis_window) { goto fail; }
     ret->synthesis_window = ftab->dstructs.real_alloc(W);
     if (!ret->synthesis_window) { goto fail; }
+    ret->init_window = ftab->dstructs.real_alloc(W);
+    if (!ret->init_window) { goto fail; }
     ret->output_scaling = ftab->dstructs.real_alloc(H);
     if (!ret->output_scaling) { goto fail; }
+
     /* Copy analysis and synthesis windows */
     ftab->dstructs.real_memcpy(ret->analysis_window,init->user.analysis_window,W);
     ftab->dstructs.real_memcpy(ret->synthesis_window,init->user.synthesis_window,W);
+
     /* We don't need the source of the windows any more, so to eliminate
     confusion, we NULL them. */
     ret->config.analysis_window = NULL;
     ret->config.synthesis_window = NULL;
+
     /* Determine the output scaling before scaling the windows (because we still
     want to cancel out scaling introduced by the DFT */
     unsigned int h;
@@ -204,6 +218,17 @@ pvs_new(struct pvs_init_t *init)
         ftab->math.real_real_add_product(
             a_win_section,s_win_section,ret->output_scaling,MIN(H,(W-h)));
     }
+
+    /* Determine the initial window to simulate past overlaps and adds */
+    for (h = 0; h < W; h += H) {
+        struct pvs_real_t *a_win_section = ftab->dstructs.real_offset(
+                            ret->analysis_window,h),
+                          *s_win_section = ftab->dstructs.real_offset(
+                            ret->synthesis_window,h);
+        ftab->math.real_real_add_product(
+            a_win_section,s_win_section,ret->init_window,W-h);
+    }
+
     /* Make sure the output_scaling doesn't contain zero or else its reciprocal
     will be bad */
     if (ftab->math.real_contains_zero(ret->output_scaling,H)) { goto fail; }
@@ -216,6 +241,7 @@ pvs_new(struct pvs_init_t *init)
         .window_length = W
     };
     ftab->dstructs.dft_window_scale(&dft_window_scale);
+
     return ret;
 fail:
     pvs_free(ret);
