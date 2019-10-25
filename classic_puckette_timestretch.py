@@ -27,7 +27,10 @@ def time_stretch_arb_times(
     W, # window size
     window_type='hann',
     synth_window_type=None,
-    oob_fill_func=tsat_oob_fill_func_default):
+    oob_fill_func=tsat_oob_fill_func_default,
+    # if an analysis time is in reset_times, the synthesis frame is taken
+    # directly from it and not by summing the phase from the last frame.
+    reset_times=[]):
 
     if synth_window_type is None:
         synth_window_type=window_type
@@ -62,11 +65,14 @@ def time_stretch_arb_times(
     y[:H]*=win_div
     h=H
     for t_ in t[1:]:
-        t_=t_
         X0=np.fft.fft(x[t_:t_+W]*w)
-        X_H=np.fft.fft(x[t_-H:t_-H+W]*w)
-        Y_last=X0*np.abs(X_H)/X_H*Y_last/np.abs(Y_last)
-        y[h:h+W]+=np.real(np.fft.ifft(Y_last))*sw
+        if t_-t_off in reset_times:
+            Y_last = X0
+            y[h:h+W]+=x[t_:t_+W]*w*sw
+        else:
+            X_H=np.fft.fft(x[t_-H:t_-H+W]*w)
+            Y_last=X0*np.abs(X_H)/X_H*Y_last/np.abs(Y_last)
+            y[h:h+W]+=np.real(np.fft.ifft(Y_last))*sw
         y[h:h+H]*=win_div
         h+=H
 
