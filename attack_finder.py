@@ -2,6 +2,7 @@ import librosa
 import numpy as np
 from scipy import signal
 import common
+import spectral_difference
 
 def find_attacks(
 x,
@@ -133,3 +134,57 @@ def attack_region_estimation(x,H,W,alpha,thresh,window_type='boxcar'):
     spec_flux_diff=spec_flux[1:]-spec_flux[:-1]
     attacks=np.array(spec_flux_diff>thresh,dtype='float')
     return (t_spec_flux[1:],attacks)
+
+def attacks_from_spectral_diff(
+    # the signal whose attacks to estimate
+    x,
+    # hop size
+    H=256,
+    # window size
+    W=1024,
+    # window type 
+    window_type='hann',
+    # smoothing factor s. 0 < s <= 1
+    # 1 means no smoothing, 0 would mean totally rejecting new values
+    smoothing=1,
+    # max filter discount rate, the time in samples until it reaches 1% of the
+    # maximum
+    lmax_filt_rate=16000,
+    # the threshold in dB for the noise gate
+    ng_th=-60):
+    """ Returns pairs that are an estimation of the attack start and end times """
+
+    # calculate the max filter rate
+    # number of hops in the LMAX_FILT_RATE
+    lmfr_n_H=lmax_filt_rate/H
+    if lmfr_n_H <= 0:
+        lmfr_n_H=1
+    # what number to this power is .01 ?
+    lmfr=np.power(.01,1/lmfr_n_H)
+
+    sd=spectral_difference.spectral_diff(x,H,W,window_type)
+    sd=spectral_difference.iir_avg(sd,smoothing)
+    sd_maxs,sd_max_thresh=spectral_difference.discount_local_max(sd,lmfr)
+    # set one_sided_max to 'left' so that the first point to become non-zero is
+    # included as a local minimum
+    sd_mins=spectral_difference.local_max(-sd,one_sided_max='left')
+    sd_mins_filtered=spectral_difference.closest_index_after(sd_maxs,sd_mins,reverse=True)
+
+    x_rms=spectral_difference.local_rms(x,H,W)
+    sd_gate=(x_rms>np.power(10,ng_th/20)).astype(x.dtype)
+    #sd_gate_t=np.arange(len(sd_gate))*H_SF/SAMPLE_RATE
+    sd_maxs=spectral_difference.index_mask(sd_maxs,sd_gate)
+
+    # add one hop to compensate for the differencing operation
+    sd_maxs+=1
+    sd_mins_filtered+=1
+    
+    # multiply by hop size because we want the indices in samples not hops
+    sd_maxs*=H
+    sd_mins_filtered*=H
+
+    # compensate for window by offseting the maxima by half a window
+    sd_maxs += W//2
+    sd_mins_filtered += W//2
+
+    return spectral_difference.up_down_match(sd_mins_filtered,sd_maxs)
