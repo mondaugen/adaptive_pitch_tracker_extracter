@@ -13,6 +13,7 @@ General assumputions:
 """
 
 from functools import reduce
+import numpy as np
 
 class io_time_pair:
     def __init__(self,in_time,out_time):
@@ -203,3 +204,72 @@ def in_locked_frames(
         in_frames.append(lock_input_frame_start_time)
         n_in_frame += 1
     return in_frames
+
+def get_contained_attack_times(attack_times, start, end):
+    return attack_times[np.where((attack_times >= start)&(attack_times<end))[0]]
+
+def contains_atime(attack_times, start, end):
+    return len(get_contained_attack_times(attack_times,start,end)) > 0
+
+class attack_avoider:
+    def __init__(self,
+        # Some data structure containing points in time that we want to preserve. It
+        # shouldn't contain time points closer than awin_len, otherwise this
+        # algorithm won't be able put a window in a place not containing one of
+        # those time points.
+        attack_times,
+        # this is the time we want to put the analysis window, which might get
+        # a number such that analysis_time + awin_start gives the start time of the window
+        awin_start,
+        # a number such that analysis_time + awin_start + awin_len gives the first
+        # sample just after the end of a window
+        awin_len,
+        # a synthesis hop size
+        H):
+        self.attack_times = attack_times
+        self.awin_start = awin_start
+        self.awin_len = awin_len
+        self.H = H
+        self.last_contained_atime = -1
+        self.last_output_time = -1
+        self.safe = True
+    def adjust(self, analysis_time):
+        """ Adjust this analysis_time so it doesn't land on an attack.  Returns
+        a tuple (adjusted_time,reset) where adjusted_time is the time adjusted
+        if it would smear an attack and reset is a boolean which is true if the
+        returned time is the first frame containing an attack. This boolean can
+        be used to know when a time stretching algorithm should reset the phase
+        of the output (to avoid catastrophic smearing). """
+        contained_atime = get_contained_attack_times(
+            self.attack_times,
+            analysis_time + self.awin_start,
+            analysis_time + self.awin_start + self.awin_len)
+        # initially we propose the analysis_time but check to see if it would
+        # smear the preserved attack time
+        ret = analysis_time
+        reset=False
+        if len(contained_atime) > 0:
+            contained_atime = contained_atime[0]
+            if contained_atime == self.last_contained_atime:
+                # If contained_atime is the same as last time, output a window a
+                # normal hop size's distance from the last output (if the
+                # analysis window isn't already safe)
+                ret = self.last_output_time
+                if not self.safe:
+                    ret += self.H
+            else:
+                # use the new contained atime and store it
+                self.last_contained_atime = contained_atime
+                ret = analysis_time
+                reset=True
+        self.last_output_time = ret
+        if contains_atime(
+            self.attack_times,
+            self.last_output_time + self.awin_start,
+            self.last_output_time + self.awin_start + self.awin_len):
+            # we are not in a safe position
+            self.safe = False
+        else:
+            self.safe = True
+        return (ret,reset)
+
