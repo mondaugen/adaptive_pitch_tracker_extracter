@@ -77,3 +77,35 @@ class taper_window_applier:
         if where == 'end':
             return r[::-1]
         return r
+
+def windowed_lookup_default_fill(W):
+    return np.random.standard_normal(W)*1e-6
+
+class windowed_lookup:
+    """
+    A port of windowed_lookup_f32.c
+    """
+    def __init__(self,
+        # signal to look up from
+        x,
+        # maximum size of window used for lookup
+        W,
+        # function used to fill out of bounds values
+        fill_func=windowed_lookup_default_fill):
+        self.W=W
+        self.x=x
+        self.len_x=len(x)
+        self.signal_start=np.concatenate((fill_func(W).astype(x.dtype),x[:W]))
+        self.signal_end=np.concatenate((x[-W:],fill_func(W).astype(x.dtype)))
+    def access(self,index):
+        if index < -self.W:
+            index = self.W
+        if index > self.len_x:
+            index = self.len_x
+        if index < 0:
+            ret = self.signal_start[self.W+index:2*self.W+index]
+        elif index > (self.len_x - self.W):
+            ret = self.signal_end[self.W-(self.len_x-index):2*self.W-(self.len_x-index)]
+        else:
+            ret = self.x[index:index+self.W]
+        return ret

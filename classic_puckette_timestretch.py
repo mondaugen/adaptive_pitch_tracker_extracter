@@ -77,3 +77,106 @@ def time_stretch_arb_times(
         h+=H
 
     return y
+
+class ola:
+    """
+    A port of ola_f32.c
+    """
+    def _config_chk(sum_in_length,shift_out_length):
+        ret = True
+        ret &= sum_in_length >= 1
+        ret &= shift_out_length <= sum_in_length
+        ret &= (common.next_pow_2(shift_out_length + sum_in_length) % shift_out_length) == 0
+        if not ret:
+            raise ValueError
+    def __init__(self,
+        # This is usually equal to the window length of the transform
+        sum_in_length,
+        # This is usually equal to the hop size or equivalently the audio
+        # processing block size. This must be a power of 2.
+        shift_out_length,
+        dtype=np.float64):
+        ola._config_chk(sum_in_length,shift_out_length)
+        self.sum_in_length = sum_in_length
+        self.shift_out_length = shift_out_length
+        self.buffer_length = common.next_pow_2(shift_out_length + sum_in_length)
+        self.buffer=np.zeros(self.buffer_length,dtype=dtype)
+        self.len_mask=self.buffer_length-1
+        self.offset = 0
+    def sum_in_and_shift_out(self,x_in):
+        zero_start_0 = (self.offset - self.shift_out_length) & self.len_mask
+        if zero_start_0 > self.offset:
+            zero_len_0 = self.buffer_length - zero_start_0 
+        else:
+            zero_len_0 = self.shift_out_length
+        zero_len_1 = self.shift_out_length - zero_len_0
+        self.buffer[zero_start_0:zero_start_0+zero_len_0] = 0
+        self.buffer[:zero_len_1] = 0
+        if ((self.offset + self.sum_in_length) & self.len_mask) < self.offset:
+            sum_len_0 = self.buffer_length - self.offset
+        else:
+            sum_len_0 = self.sum_in_length
+        sum_len_1 = self.sum_in_length - sum_len_0
+        self.buffer[self.offset:self.offset+sum_len_0] += x_in[:sum_len_0]
+        self.buffer[:sum_len_1] += x_in[sum_len_0:sum_len_0+sum_len_1]
+        ret = self.buffer[self.offset:self.offset+self.shift_out_length]
+        self.offset = (self.offset + self.shift_out_length) & self.len_mask
+        return ret
+
+class pvoc_synth:
+    """
+    A port of pvoc_synth.c
+    """
+
+    def _chk_args(window_length,hop_size):
+        if (window_length < 1) or (hop_size < 1):
+            raise ValueError
+
+    def __init__(self,
+        analysis_window,
+        synthesis_window,
+        window_length,
+        hop_size,
+        # function accepting input_time and length and returning that many
+        # samples
+        get_samples):
+        pvoc_synth._chk_args(window_length,hop_size)
+        self.analysis_window = analysis_window
+        self.synthesis_window = synthesis_window
+        self.window_length = window_length
+        self.hop_size = hop_size
+        self.get_samples = get_samples
+        self.ola_buffer = ola(window_length,hop_size)
+        self.z_outputH = None
+        self.output_scaling = common.ola_shorten(
+            self.analysis_window*self.synthesis_window,
+            self.hop_size)
+        if np.any(self.output_scaling == 0):
+            raise ValueError
+        self.output_scaling = 1./self.output_scaling
+        self.init_window = np.zeros(self.window_length,dtype=self.analysis_window.dtype)
+        for h in np.arange(0,self.window_length,self.hop_size):
+            a_win_section = self.analysis_window[h:]
+            s_win_section = self.synthesis_window[h:]
+            self.init_window[:self.window_length-h] += a_win_section*s_win_section
+
+    def process(self,input_time,reset):
+        f_input0 = self.get_samples(input_time,self.window_length)
+        r_workspace=f_input0*self.analysis_window
+        if self.z_outputH is not None:
+            z_input0 = np.fft.rfft(r_workspace)
+            if reset:
+                self.z_outputH = z_input0
+                r_workspace *= self.synthesis_window
+            else:
+                f_inputH = self.get_samples(input_time-self.hop_size,self.window_length)
+                r_workspace=f_inputH*self.analysis_window
+                z_inputH = np.fft.rfft(r_workspace)
+                self.z_outputH *= z_input0*np.abs(z_inputH)/(z_inputH*np.abs(self.z_outputH))
+                r_workspace = np.fft.irfft(self.z_outputH)*self.synthesis_window
+        else:
+            self.z_outputH=np.fft.rfft(r_workspace)
+            r_workspace=f_input0*self.init_window
+        ret = self.ola_buffer.sum_in_and_shift_out(r_workspace)
+        ret *= self.output_scaling
+        return ret
