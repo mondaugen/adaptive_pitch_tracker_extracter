@@ -12,9 +12,9 @@ class ringbuffer:
         self.head_index = 0
         self.tail_index = 0
     def contents_size(self):
-        return (self.tail_idx - self.head_idx) & self.size_mask
+        return (self.tail_index - self.head_index) & self.buf_size_mask
     def available_capacity(self):
-        return (self.head_idx - 1 - self.tail_idx) & self.size_mask
+        return (self.head_index - 1 - self.tail_index) & self.buf_size_mask
     def advance_head(self,n):
         """
         Advance the head of the ring buffer. This effectively discards the first n
@@ -24,25 +24,25 @@ class ringbuffer:
         """
         if self.contents_size() < n:
             raise ValueError
-        self.head_idx = (self.head_idx + n) & self.size_mask
-    def push_copy(self,data):
+        self.head_index = (self.head_index + n) & self.buf_size_mask
+    def push_copy(self,buffer):
         """
-        Put the n values in data at the end of the ring buffer and advance the tail
+        Put the n values in buffer at the end of the ring buffer and advance the tail
         index. If there's not enough capacity available, raises ValueError.
         """
-        n=len(data)
+        n=len(buffer)
         if self.available_capacity() < n:
             raise ValueError
-        first_region_size = min(self.size - self.tail_idx,n)
+        first_region_size = min(self.buffer_size - self.tail_index,n)
         second_region_size = n - first_region_size
-        self.buffer[self.tail_idx:self.tail_idx+first_region_size] = data[:first_region_size]
-        self.buffer[:second_region_size] = data[first_region_size:]
-        self.tail_idx = (self.tail_idx + n) & self.size_mask
-    def shift_in(self,data):
+        self.buffer[self.tail_index:self.tail_index+first_region_size] = buffer[:first_region_size]
+        self.buffer[:second_region_size] = buffer[first_region_size:]
+        self.tail_index = (self.tail_index + n) & self.buf_size_mask
+    def shift_in(self,buffer):
         """ Advance the head n values and then push n values in """
-        n=len(data)
+        n=len(buffer)
         self.advance_head(n)
-        self.push_copy(data)
+        self.push_copy(buffer)
     def get_region(self,start,length):
         """
         Start must be in [0,rngbuf_contents_size(rb)-1]
@@ -54,10 +54,10 @@ class ringbuffer:
             raise IndexError
         if length > (contents_size-start):
             raise ValueError
-        start_idx = (start + self.head_idx) & self.size_mask
+        start_index = (start + self.head_index) & self.buf_size_mask
         ret=np.zeros(length,dtype=self.buffer.dtype)
-        first_region_size = min(self.size - start_idx,length)
+        first_region_size = min(self.buffer_size - start_index,length)
         second_region_size = length - first_region_size
-        ret[:first_region_size]=self.data[start_idx:start_idx+first_region_size]
-        ret[first_region_size:]=self.data[:second_region_size]
+        ret[:first_region_size]=self.buffer[start_index:start_index+first_region_size]
+        ret[first_region_size:]=self.buffer[:second_region_size]
         return ret
