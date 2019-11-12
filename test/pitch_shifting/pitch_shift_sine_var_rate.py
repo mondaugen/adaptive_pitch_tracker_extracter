@@ -7,7 +7,7 @@ import window_tools
 from classic_puckette_timestretch import pvoc_synth
 import matplotlib.pyplot as plt
 
-from_file=True
+from_file=False
 
 W=1024
 H=256
@@ -24,6 +24,7 @@ else:
     # chirp frequency
     f0=0.01
     x=signal.chirp(n,f0,N,f0)
+x+=np.random.standard_normal(N)*1e-6
 # stretch factor
 S=1.
 # shift factors
@@ -47,7 +48,7 @@ y=np.zeros_like(x)
 for h in range(0,N,H):
     y[h:h+H]=ps.process(p[h:h+H])
 
-fig,axs=plt.subplots(2,1)
+fig,axs=plt.subplots(2,1,sharex=True,sharey=True)
 
 axs[0].plot(n,x)
 axs[0].set_title('original')

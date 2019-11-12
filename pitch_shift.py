@@ -44,8 +44,8 @@ class pitch_shifter:
         # in the range [0,N-1], and so naturally needs some extra points outside
         # of this range in order to do non-trivial interpolation. E.g., for
         # cubic Lagrange interpolation, you will [-1,N,N+1] or N+3 points.
-        # This is used to comput the size of the ringbuffer.
-        # must return an integer
+        # This is used to compute the size of the ringbuffer and must return an
+        # integer.
         get_interpolator_n_points=default_get_interpolator_n_points,
         dtype=np.float64):
 

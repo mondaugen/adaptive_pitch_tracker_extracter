@@ -40,16 +40,18 @@ class rel_del_line:
         access_fun.warnings = 0
         if time < (self.time_zero_ago - self.length):
             # adjust time, give warning
+            old_time=time
             time = self.time_zero_ago  - self.length + 1
             access_fun.warnings |= TIME_ADJUSTED
             if self.print_warnings:
-                print("TIME_ADJUSTED")
+                print("TIME_ADJUSTED, was %d, now %d" % (old_time,time))
         if time > (self.time_zero_ago - length):
             # adjust length, give warning
+            old_length=length
             length = self.time_zero_ago - time
             access_fun.warnings |= LEN_ADJUSTED
             if self.print_warnings:
-                print("LEN_ADJUSTED")
+                print("LEN_ADJUSTED, was %d, now %d" % (old_length,length))
         look_up_time = time - self.time_zero_ago
         region = self.rb.get_region(self.rb.contents_size() + look_up_time, length)
         access_fun.values = region
