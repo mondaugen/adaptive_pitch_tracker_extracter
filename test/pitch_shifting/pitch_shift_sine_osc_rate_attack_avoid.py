@@ -7,9 +7,11 @@ import window_tools
 from classic_puckette_timestretch import pvoc_synth
 import matplotlib.pyplot as plt
 import rel_del_line
+from time_map_tstretch import attack_avoider
 
-REAL_TIME=True
-from_file=True
+REAL_TIME=False
+from_file=False
+adjust_for_attacks=True
 
 W=1024
 H=256
@@ -23,10 +25,13 @@ if from_file:
     x+=np.random.standard_normal(N)*1e-8
 else:
     N=500*H
+    attack_times=np.array([100*H+10,200*H-10,300*H-20])
     n=np.arange(N)
     # chirp frequency
     f0=0.01
     x=signal.chirp(n,f0,N,f0)
+    x[attack_times]=1
+av=attack_avoider(attack_times,-H,H+W,H)
 # stretch factor
 S=1.
 # shift factors
@@ -34,10 +39,6 @@ min_P=1.5
 max_P=.5
 P_osc_freq=0.00001
 p=signal.chirp(n,P_osc_freq,N,P_osc_freq)
-#p_=signal.chirp(n,P_osc_freq,N,P_osc_freq)
-#p=np.zeros_like(p_)
-#p[p_ > 0] = max_P
-#p[p_ <= 0] = min_P
 
 p=0.5*(p+1)
 p*=(max_P-min_P)
@@ -65,7 +66,12 @@ else:
     def wl_access(t,l):
         return wl.access(t)
     def ts_access(t,n):
-        return pv.process(int(np.round(t)),False)
+        if adjust_for_attacks:
+            atime,reset=av.adjust(int(np.round(t)))
+        else:
+            atime=int(np.round(t))
+            reset=False
+        return pv.process(atime,reset)
 
 pv=pvoc_synth(
     signal.get_window('hann',W),
