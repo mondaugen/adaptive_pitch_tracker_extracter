@@ -2,7 +2,8 @@
 
 IIR Lattice Filter
 
-The notation used here is consistent with the notation in "Statistical Signal Processing and Modeling" by Monson. See chapter 6.
+The notation used here is consistent with the notation in "Statistical Signal
+Processing and Modeling" by Monson Hayes. See chapter 6.
 
 For users:
 The structure implemented has input values entering on the left side of the
@@ -69,14 +70,17 @@ iir_lattice_filter_f32_process(
     struct iir_lattice_filter_f32_proc *p)
 {
     float *out = p->out, *e_m, *e_p, *e_m_z1, *tmp;
-    const float *in = p->in, *R;
-    unsigned int N = p->N, P;
+    const float *in = p->in, *R, *p_R = p->R;
+    unsigned int N = p->N, P, p_R_inc = 0;
+    if (p->opts & iir_lattice_filter_f32_VARYING_R) {
+        p_R_inc = l->P;
+    }
     while (N--) {
         P = l->P;
         e_p = l->e_p + P;
         *e_p = *in * p->b0;
         e_p--;
-        R = p->R + P - 1;
+        R = p_R + P - 1;
         e_m_z1 = l->e_m_z1 + P - 1;
         while (P--) {
             *e_p = *(e_p+1) - *R * *e_m_z1;
@@ -89,7 +93,7 @@ iir_lattice_filter_f32_process(
         *out = *e_p;
         e_m = l->e_m;
         *e_m = *e_p;
-        R = p->R;
+        R = p_R;
         P = l->P;
         while (P--) {
             *(e_m + 1) = *e_m_z1 + *R * *e_p;
@@ -104,5 +108,6 @@ iir_lattice_filter_f32_process(
         l->e_m_z1 = tmp;
         in++;
         out++;
+        p_R += p_R_inc;
     }
 }

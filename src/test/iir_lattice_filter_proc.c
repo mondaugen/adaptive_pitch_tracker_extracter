@@ -38,7 +38,8 @@ int main (void)
         .out = out,
         .N = buf_size,
         .R = R,
-        .b0 = b0
+        .b0 = b0,
+        .opts = iir_lattice_filter_f32_NONE
     };
     iirl = iir_lattice_filter_f32_new(&iirli);
     if (!iirl) { ret = 1; goto fail; }
