@@ -43,3 +43,7 @@ src/test/bin/iir_lattice_filter : src/test/iir_lattice_filter.c
 src/test/bin/iir_lattice_filter_proc : src/test/iir_lattice_filter_proc.c \
                                        src/lib/iir_lattice_filter_f32/routines_linux_native.c
 	$(CC) -g -Isrc -Isrc/test $^ -o $@
+
+src/test/bin/lattice_filter_proc : src/test/lattice_filter_proc.c \
+                                       src/lib/lattice_filter_f32/routines_linux_native.c
+	$(CC) -g -Isrc -Isrc/test $^ -o $@
