@@ -47,3 +47,22 @@ def b_A_to_c(b,A):
     for k in np.arange(q)[::-1]:
         c[k]=b[k]-np.sum(c[k+1:q+1]*np.conj(np.diag(A,-k)[1:]))
     return c
+
+def c_A_to_b(c,A):
+    """ Convert 'C coefficients' to feedforward coefficients. """
+    b=np.zeros_like(c)
+    q=len(b)-1
+    for k in np.arange(q+1):
+        b[k]=np.sum(c[k:q+1]*np.conj(np.diag(A,-k)))
+    return b
+
+def c_r_to_b_a(c,r):
+    A=r_to_A(r)
+    b=c_A_to_b(c,A)
+    return (b,A[-1,:])
+
+def b_a_to_r_c(b,a):
+    r=a_to_r(a)
+    A=r_to_A(r)
+    c=b_A_to_c(b,A)
+    return (r,c)
