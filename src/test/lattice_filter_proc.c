@@ -101,11 +101,9 @@ int main (void)
     };
     latticef = lattice_filter_f32_new(&latticefi);
     if (!latticef) { ret = gen_err_msg("Error instantiating lattice filter"); goto fail; }
-    while (!feof(f_in)) {
-        fread(in,sizeof(float),in_length,f_in);
-        lattice_filter_f32_process(latticef,&latticep);
-        fwrite(out,sizeof(float),in_length,f_out);
-    }
+    fread(in,sizeof(float),in_length,f_in);
+    lattice_filter_f32_process(latticef,&latticep);
+    fwrite(out,sizeof(float),in_length,f_out);
 fail:
     lattice_filter_f32_free(latticef);
     if (in) { free(in); }
