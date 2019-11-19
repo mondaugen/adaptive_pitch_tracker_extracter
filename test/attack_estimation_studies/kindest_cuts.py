@@ -25,6 +25,12 @@ H_SF=common.get_env('H_SF',conv=int,default=256)
 W_SF=common.get_env('W_SF',conv=int,default=1024)
 # smoothing factor (0-1) for SF
 SMOOTH_SF=common.get_env('SMOOTH_SF',conv=float,default=1)
+SF_THRESH=common.get_env('SF_THRESH',conv=float,default=0.01)
+MAX_SEG_LEN=common.get_env('MAX_SEG_LEN',conv=float,default=float('inf'))
+# If not None, Instead of using the most recent local minimum in the spectral
+# flux before an attack point as the start time, simply subtract
+# FORCE_START_TIME from the attack time to get the start time
+FORCE_START_TIME=common.get_env('FORCE_START_TIME',conv=int,default=None)
 # max filter discount rate, the time in seconds until it reaches 1% of the
 # maximum
 LMAX_FILT_RATE=common.get_env('LMAX_FILT_RATE',conv=float,default=1)
@@ -51,7 +57,7 @@ X_LIM=common.get_env('X_LIM',conv=eval,default=(0,x_t[-1]))
 
 sd=spectral_difference.spectral_diff(x,H_SF,W_SF,WINDOW_TYPE_SF)
 sd=spectral_difference.iir_avg(sd,SMOOTH_SF)
-sd_maxs,sd_max_thresh=spectral_difference.discount_local_max(sd,lmfr)
+sd_maxs,sd_max_thresh=spectral_difference.discount_local_max(sd,lmfr,min_thresh=SF_THRESH)
 # set one_sided_max to 'left' so that the first point to become non-zero is
 # included as a local minimum
 sd_mins=spectral_difference.local_max(-sd,one_sided_max='left')
@@ -116,7 +122,9 @@ with open(OUTPUT_SUMMARY,'w') as f:
     # now cut out the samples by taking every 3 points
     for k,n in enumerate(range(0,len(attack_points_sf)-2,2)):
         s,m,e=attack_points_sf[n:n+3]
-        if ((e-s) > 1e5) or ((e-s) < W_SF):
+        if FORCE_START_TIME is not None:
+            s=m-FORCE_START_TIME
+        if ((e-s) > MAX_SEG_LEN) or ((e-s) < W_SF):
             continue
         # this is a hack to get an inverse ramp
         start_taper=1-twa.get_taper(m-s,where='end')
