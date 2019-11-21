@@ -2,6 +2,7 @@ import numpy as np
 from os import environ
 from numpy.lib.stride_tricks import as_strided
 import uuid
+import matplotlib.pyplot as plt
 
 def normalize(x):
     x-=np.mean(x)
@@ -55,3 +56,16 @@ def next_pow_2(n):
 def mktemp(template='/tmp/%s%s',suf=''):
     """ Make a temporary file. Not secure. """
     return template % (str(uuid.uuid4()),suf)
+
+def logic_plot(x,y,ax=None,**kwargs):
+    len_x_=len(x)*2-1
+    x_=np.zeros(len_x_,dtype=x.dtype)
+    y_=np.zeros(len_x_,dtype=y.dtype)
+    x_[::2]=x
+    x_[1::2]=x[1:]
+    y_[::2]=y
+    y_[1::2]=y[:-1]
+    if ax is None:
+        plt.plot(x_,y_,**kwargs)
+    else:
+        ax.plot(x_,y_,**kwargs)
