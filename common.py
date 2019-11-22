@@ -69,3 +69,11 @@ def logic_plot(x,y,ax=None,**kwargs):
         plt.plot(x_,y_,**kwargs)
     else:
         ax.plot(x_,y_,**kwargs)
+
+def region_plot(start,end,height=1,level=0,ax=None,**kwargs):
+    x=[start,start+0.5,end-0.5,end]
+    y=[level,level+height,level+height,level]
+    if ax is None:
+        plt.plot(x,y,**kwargs)
+    else:
+        ax.plot(x,y,**kwargs)
