@@ -79,7 +79,6 @@ fixed_heap_new(struct fixed_heap_init *init)
     ret->item_size = init->item_size;
     ret->cmp = init->cmp;
     ret->cmp_aux = init->cmp_aux;
-    ret->sup_item = init->sup_item;
     return ret;
 fail:
     fixed_heap_free(ret);

@@ -8,7 +8,6 @@ struct fixed_heap {
     unsigned int item_size;
     int (*cmp)(void *item1, void *item2, void *cmp_aux);
     void *cmp_aux;
-    void *sup_item;
 };
 
 struct fixed_heap_init {
@@ -20,13 +19,6 @@ struct fixed_heap_init {
     */
     int (*cmp)(void *item1, void *item2, void *cmp_aux);
     void *cmp_aux;
-    /*
-    An item that if placed at the top of the heap, fill float
-    all the way down to the bottom.
-    Note that the implementation doesn't copy this item, only stores a pointer
-    to it, so sup_item should not point to dynamically allocated memory.
-    */
-    void *sup_item;
 };
 
 void fixed_heap_free(struct fixed_heap *h);
