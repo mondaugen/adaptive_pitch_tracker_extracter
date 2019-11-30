@@ -76,26 +76,10 @@ class pitch_shifter:
         self.time_at_block_start=0
         self.pos_at_block_start=0
 
-    def process(self,rate_sig):
-        """
-        rate_sig is an array of B values representing the time-increment. These
-        values will be restricted between self.ps_min and self.ps_max. These
-        values are accumulated to give the signal
-        pos_signal=[self.pos_at_block_start,
-        self.pos_at_block_start+rate_sig[0],
-        ...,
-        self.pos_at_block_start+sum(rate_sig)].
-        The values pos_signal[:B] are used to look up values (using
-        interpolation) and self.time_at_block_start is set to pos_signal[B].
-        """
-        # restrict rate signal
-        rate_sig[rate_sig>self.ps_max] = self.ps_max
-        rate_sig[rate_sig<self.ps_min] = self.ps_min
+    def process_pos_sig(self,pos_signal):
 
-        # calculate the position signal by accumulating the rate signal
-        pos_signal=np.zeros(self.B+1,dtype=self.dtype)
-        np.cumsum(rate_sig,out=pos_signal[1:])
-        pos_signal += self.pos_at_block_start
+        B=len(pos_signal)-1
+
         first_required_idx,last_required_idx=self.get_interpolator_range(
             pos_signal[0],pos_signal[-2])
 
@@ -116,7 +100,7 @@ class pitch_shifter:
         # linear interpolation giving the look up times from the signal indices
         fetch_time_interpolator=interpolate.interp1d(
             [pos_signal[0],pos_signal[-1]],
-            [self.time_at_block_start,self.time_at_block_start+self.B],
+            [self.time_at_block_start,self.time_at_block_start+B],
             fill_value='extrapolate')
 
         # fetch the required values
@@ -133,6 +117,37 @@ class pitch_shifter:
             np.arange(first_required_idx,last_required_idx+1,1),
             self.sig_rb.get_region(0,last_required_idx-first_required_idx+1))
         y=signal_interpolator(pos_signal[:-1])
-        self.time_at_block_start += self.B
+        self.time_at_block_start += B
         self.pos_at_block_start = pos_signal[-1]
         return y
+
+    def process(self,rate_sig):
+        """
+        rate_sig is an array of B values representing the time-increment. These
+        values will be restricted between self.ps_min and self.ps_max. These
+        values are accumulated to give the signal
+        pos_signal=[self.pos_at_block_start,
+        self.pos_at_block_start+rate_sig[0],
+        ...,
+        self.pos_at_block_start+sum(rate_sig)].
+        The values pos_signal[:B] are used to look up values (using
+        interpolation) and self.time_at_block_start is set to pos_signal[B].
+        It is confusing, but here the rate_sig and the accumulated pos_signal
+        represent the pitch shift amount, which will be counteracted by time
+        stretching at an inverse rate.
+        """
+
+        # B is length of rate_sig
+        B=len(rate_sig)
+
+        # restrict rate signal
+        rate_sig[rate_sig>self.ps_max] = self.ps_max
+        rate_sig[rate_sig<self.ps_min] = self.ps_min
+
+        # calculate the position signal by accumulating the rate signal
+        pos_signal=np.zeros(B+1,dtype=self.dtype)
+        np.cumsum(rate_sig,out=pos_signal[1:])
+        pos_signal += self.pos_at_block_start
+
+        return self.process_pos_sig(pos_signal)
+
