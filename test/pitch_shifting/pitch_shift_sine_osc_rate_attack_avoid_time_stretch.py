@@ -9,10 +9,12 @@ import matplotlib.pyplot as plt
 import rel_del_line
 from time_map_tstretch import attack_avoider
 import attack_finder
+import common
 
 REAL_TIME=False
 from_file=True
 adjust_for_attacks=True
+SR=common.get_env('SR',default=16000,conv=int)
 
 W=1024
 H=256
@@ -24,7 +26,7 @@ if from_file:
     x=x[:N]
     n=np.arange(N)
     x+=np.random.standard_normal(N)*1e-8
-    attack_time_pairs=attack_finder.attacks_from_spectral_diff(x)
+    attack_time_pairs=attack_finder.attacks_from_spectral_diff(x,lmax_filt_rate=SR)
     attack_times=np.array([b for a,b in attack_time_pairs])
 else:
     N=500*H
