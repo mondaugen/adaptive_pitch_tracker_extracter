@@ -4,8 +4,9 @@ from numpy.lib.stride_tricks import as_strided
 import uuid
 import matplotlib.pyplot as plt
 
-def normalize(x):
-    x-=np.mean(x)
+def normalize(x,subtract_mean=True):
+    if subtract_mean:
+        x-=np.mean(x)
     x/=np.max(np.abs(x))
     return x
 
