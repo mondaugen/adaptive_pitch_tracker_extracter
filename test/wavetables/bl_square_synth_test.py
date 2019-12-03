@@ -1,4 +1,4 @@
-import bl_square
+from wavetables import bl_square_synth
 from scipy import signal
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,12 +9,12 @@ SR=16000
 N=1000000
 n=np.arange(N)
 B=1024
-blss=bl_square.bl_square_synth(max_f=0.25,N=8192,D=0.5)
+blss=bl_square_synth(max_f=0.25,N=4096,D=0.5)
 print(blss.min_f)
-fm0=.25/SR
-fm1=.25/SR
-f0=blss.min_f*4
-f1=blss.min_f*4
+fm0=1000.125/SR
+fm1=1.125/SR
+f0=blss.min_f*1
+f1=blss.min_f*200
 f=signal.chirp(n,fm0,N,fm1)
 f+=1
 f*=0.5

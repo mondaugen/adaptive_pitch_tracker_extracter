@@ -1,29 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import common
-
-class region_segmenter:
-    def __init__(self,N_blk):
-        self.region=dict(
-            start=0,
-            length=0,
-            reset=0)
-        self.N_blk=N_blk
-    def region_segmenter_update(self,note_start,note_end,note_state):
-        note_state_trunc=np.concatenate(([0],note_state[:self.N_blk],[0]))
-        aug_note_trans=np.diff(note_state_trunc)
-        aug_note_start=np.zeros_like(aug_note_trans)
-        aug_note_start[aug_note_trans>0]=1
-        aug_note_start[:self.N_blk]+=note_start[:self.N_blk]
-        aug_note_start[aug_note_start>1]=1
-        aug_note_end=np.zeros_like(aug_note_trans)
-        aug_note_end[aug_note_trans<0]=-1
-        aug_note_end[:self.N_blk]-=note_end[:self.N_blk]
-        aug_note_end[aug_note_end<-1]=-1
-        regions=[]
-        for s,e in zip(np.where(aug_note_start>0)[0],np.where(aug_note_end<0)[0]):
-            regions.append((s,e))
-        return (aug_note_trans,aug_note_start,aug_note_end,regions)
+from envelopes import region_segmenter
 
 N=129
 N_blk=16
