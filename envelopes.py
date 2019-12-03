@@ -12,6 +12,33 @@ def gate_to_ramp(g):
     cs-=cs_dec
     return cs
 
+class diff_filt:
+    def __init__(self):
+        self.b=np.array([1,-1])
+        self.a=np.array([1])
+        self.zi=np.array([0])
+    def proc(self,x):
+        y,self.zi=signal.lfilter(b,a,zi=self.zi)
+        return y
+
+class zero_non_zero_diff_filt:
+    def __init__(self):
+        self.df=diff_filt()
+    def proc(self,x):
+        y=self.df.proc(x)
+        y[y>0]=1
+        y[y<=0]=0
+        return y
+
+class non_zero_zero_diff_filt:
+    def __init__(self):
+        self.df=diff_filt()
+    def proc(self,x):
+        y=self.df.proc(x)
+        y[y<0]=-1
+        y[y>=0]=0
+        return -1*y
+
 class gate_to_adsr:
 
     Z=0
@@ -68,18 +95,22 @@ class gate_to_adsr:
         self.release_zi =  np.array([0],dtype='float')
         self.state=gate_to_adsr.Z
 
-    def gate_to_adsr_seq(self,gate):
-        ret=np.zeros(len(gate),dtype='int')
+    def gate_to_adsr_seq_start_end_active(self,gate):
+        adsr_states=np.zeros(len(gate),dtype='int')
+        start=np.zeros(len(gate))
+        end=np.zeros(len(gate))
+        active=np.zeros(len(gate))
         for n,g in enumerate(gate):
             if g == 1:
                 if (self.state == gate_to_adsr.Z):
                     self.state = gate_to_adsr.A
                     self.attack_n = 0
+                    start[n]=1
             if g == 0:
                 if (self.state != gate_to_adsr.Z) and (self.state != gate_to_adsr.R):
                     self.state = gate_to_adsr.R
                     self.release_n = 0
-            ret[n]=self.state
+            adsr_states[n]=self.state
             if self.state == gate_to_adsr.A:
                 self.attack_n += 1
                 if self.attack_n >= self.attack_time:
@@ -93,7 +124,17 @@ class gate_to_adsr:
                 self.release_n += 1
                 if self.release_n >= self.release_time:
                     self.state = gate_to_adsr.Z
-        return ret
+                    end[n]=1
+        return (adsr_states,start,end,active)
+
+    def gate_to_adsr_seq(self,gate):
+        adsr_states=self.gate_to_adsr_seq_start_end_active(gate)[0]
+        return adsr_states
+
+    def gate_to_adsr_env_start_end_active(self,gate):
+        adsr_states,start,end,active=self.gate_to_adsr_seq_start_end_active(gate)
+        adsr_env=self.adsr_seq_to_env(adsr_states)
+        return (adsr_env,start,end,active)
 
 class region_segmenter:
     def __init__(self,N_blk):

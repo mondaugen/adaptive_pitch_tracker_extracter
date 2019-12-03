@@ -37,4 +37,3 @@ class chirp:
         y[self.x>=0]=self.x_max
         y[self.x<0]=self.x_min
         return y
-
