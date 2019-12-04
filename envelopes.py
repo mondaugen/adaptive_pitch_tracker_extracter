@@ -52,10 +52,12 @@ class gate_to_adsr:
         d=(adsr==gate_to_adsr.D).astype('float')
         s=(adsr==gate_to_adsr.S).astype('float')
         r=(adsr==gate_to_adsr.R).astype('float')
-        a_ramp=gate_to_ramp(a) / self.attack_time
-        d_trig=np.concatenate((np.diff(d),[0]))
+        a_ramp=(self.gate_to_ramp(a) / self.attack_time)*a
+        a_ramp=np.interp(a_ramp,self.attack_table_points,self.attack_table)
+        d_trig=np.diff(np.concatenate(([self.last_d],d)))
+        self.last_d=d[-1]
         d_trig[d_trig<0]=0
-        d_imp=d_trig*(a_ramp-self.sustain_level)
+        d_imp=d_trig*(1-self.sustain_level)
         d_sig,self.decay_zi=signal.lfilter(
             [1],
             [1,-self.decay_coeff],
@@ -71,17 +73,25 @@ class gate_to_adsr:
             [1,-self.release_coeff],
             r_imp,zi=self.release_zi)
         r_sig*=r
-        return ads+r_sig
+        ret=dict(
+            a_ramp=a_ramp,
+            d_sig=d_sig,
+            s_sig=s_sig,
+            r_sig=r_sig,
+            adsr=ads+r_sig)
+        return ret
 
     def __init__(self,
         attack_time,
         decay_time,
         sustain_level,
         release_time,
-        decay_min_dB=-60):
+        decay_min_dB=-60,
+        attack_table_N=4096):
         assert(attack_time>0)
         assert(decay_time>0)
         assert(release_time>0)
+        assert(attack_table_N>1)
         self.attack_time = attack_time
         self.attack_n = 0
         self.decay_time = decay_time
@@ -94,7 +104,22 @@ class gate_to_adsr:
         self.release_coeff = np.power(np.power(10,decay_min_dB/20),1./release_time)
         self.release_zi =  np.array([0],dtype='float')
         self.state=gate_to_adsr.Z
+        self.last_g=0
+        self.gtor_cs=0
+        self.last_d=0
+        self.attack_table=1-0.5*(1+np.cos(np.arange(attack_table_N)/attack_table_N*np.pi))
+        self.attack_table_points=np.arange(attack_table_N)/attack_table_N
 
+    def gate_to_ramp(self,g):
+        # for this to work, g has to be 0 or 1
+        dec=np.concatenate(([self.last_g],np.diff(g)))
+        dec[dec>0]=0
+        ret=np.zeros_like(g)
+        for n,g_ in enumerate(g):
+            ret[n] = self.gtor_cs
+            self.gtor_cs = g_ + self.gtor_cs * (1 + dec[n])
+        return ret
+            
     def gate_to_adsr_seq_start_end_active(self,gate):
         adsr_states=np.zeros(len(gate),dtype='int')
         start=np.zeros(len(gate))
@@ -111,6 +136,8 @@ class gate_to_adsr:
                     self.state = gate_to_adsr.R
                     self.release_n = 0
             adsr_states[n]=self.state
+            if self.state != gate_to_adsr.Z:
+                active[n]=1
             if self.state == gate_to_adsr.A:
                 self.attack_n += 1
                 if self.attack_n >= self.attack_time:
@@ -134,7 +161,7 @@ class gate_to_adsr:
     def gate_to_adsr_env_start_end_active(self,gate):
         adsr_states,start,end,active=self.gate_to_adsr_seq_start_end_active(gate)
         adsr_env=self.adsr_seq_to_env(adsr_states)
-        return (adsr_env,start,end,active)
+        return (adsr_env,start,end,active,adsr_states)
 
 class region_segmenter:
     def __init__(self,N_blk):
