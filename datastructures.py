@@ -9,6 +9,7 @@ class ringbuffer:
         self.buffer_size = common.next_pow_2(length+1)
         self.buffer = np.zeros(self.buffer_size,dtype=dtype)
         self.buf_size_mask = self.buffer_size - 1
+        # TODO: This could be done with a reset function
         self.head_index = 0
         self.tail_index = 0
     def contents_size(self):

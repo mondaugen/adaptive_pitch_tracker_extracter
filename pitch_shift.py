@@ -80,6 +80,8 @@ class pitch_shifter:
 
         B=len(pos_signal)-1
 
+        # TODO: This pos_signal is the one formed by summing the rate_sig only
+        # (not after multiplying by the time_stretch signal)
         first_required_idx,last_required_idx=self.get_interpolator_range(
             pos_signal[0],pos_signal[-2])
 
@@ -89,6 +91,11 @@ class pitch_shifter:
             n_discard = first_required_idx - self.sig_rb_min_idx
             self.sig_rb.advance_head(n_discard)
         else:
+            # TODO: If want to forget about past processes and start
+            # synthesizing a new signal immediately, we could also reset sig_rb
+            # somehow, make pos_signal start at the point we want to start
+            # synthesizing at and force this reset by setting
+            # self.sig_rb_idcs_valid to False
             fetch_start_idx = first_required_idx
             # start here so the accumlated value is correct (see the while loop below)
             self.sig_rb_max_idx = fetch_start_idx - 1
@@ -99,6 +106,9 @@ class pitch_shifter:
 
         # linear interpolation giving the look up times from the signal indices
         fetch_time_interpolator=interpolate.interp1d(
+            # TODO: To incorporate an additional phase shift I think you form a
+            # different pos_signal by multiplying the rate_sig by the
+            # time_stretch signal and then summing to get the pos signal
             [pos_signal[0],pos_signal[-1]],
             [self.time_at_block_start,self.time_at_block_start+B],
             fill_value='extrapolate')
