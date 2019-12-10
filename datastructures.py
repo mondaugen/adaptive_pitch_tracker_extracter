@@ -5,13 +5,15 @@ class ringbuffer:
     """
     A port of ringbuffer.c
     """
+    def reset(self):
+        """ Set head_index and tail_index to 0 making the ringbuffer empty. """
+        self.head_index = 0
+        self.tail_index = 0
     def __init__(self,length,dtype=np.float64):
         self.buffer_size = common.next_pow_2(length+1)
         self.buffer = np.zeros(self.buffer_size,dtype=dtype)
         self.buf_size_mask = self.buffer_size - 1
-        # TODO: This could be done with a reset function
-        self.head_index = 0
-        self.tail_index = 0
+        self.reset()
     def contents_size(self):
         return (self.tail_index - self.head_index) & self.buf_size_mask
     def available_capacity(self):

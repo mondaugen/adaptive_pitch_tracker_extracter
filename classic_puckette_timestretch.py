@@ -103,7 +103,8 @@ class ola:
         self.buffer=np.zeros(self.buffer_length,dtype=dtype)
         self.len_mask=self.buffer_length-1
         self.offset = 0
-    def sum_in_and_shift_out(self,x_in):
+    def sum_in_and_shift_out(self,x_in,overwrite=False):
+        """ overwrite forces overwrite, without summing """
         zero_start_0 = (self.offset - self.shift_out_length) & self.len_mask
         if zero_start_0 > self.offset:
             zero_len_0 = self.buffer_length - zero_start_0 
@@ -117,8 +118,12 @@ class ola:
         else:
             sum_len_0 = self.sum_in_length
         sum_len_1 = self.sum_in_length - sum_len_0
-        self.buffer[self.offset:self.offset+sum_len_0] += x_in[:sum_len_0]
-        self.buffer[:sum_len_1] += x_in[sum_len_0:sum_len_0+sum_len_1]
+        if overwrite:
+            self.buffer[self.offset:self.offset+sum_len_0] = x_in[:sum_len_0]
+            self.buffer[:sum_len_1] = x_in[sum_len_0:sum_len_0+sum_len_1]
+        else:
+            self.buffer[self.offset:self.offset+sum_len_0] += x_in[:sum_len_0]
+            self.buffer[:sum_len_1] += x_in[sum_len_0:sum_len_0+sum_len_1]
         ret = self.buffer[self.offset:self.offset+self.shift_out_length]
         self.offset = (self.offset + self.shift_out_length) & self.len_mask
         return ret
@@ -128,26 +133,36 @@ class pvoc_synth:
     A port of pvoc_synth.c
     """
 
-    def _chk_args(window_length,hop_size):
+    def _chk_args(analysis_window,synthesis_window,window_length,hop_size):
         if (window_length < 1) or (hop_size < 1):
             raise ValueError
+        if ((len(analysis_window) != window_length) or
+                (len(synthesis_window) != window_length)):
+            raise ValueError
+
+    def reset_past_output(self):
+        """
+        Call this to force directly using the input multiplied by the
+        init_window. This would be done when you want to simulate a first call
+        to process.
+        """
+        self.z_outputH=None
 
     def __init__(self,
         analysis_window,
         synthesis_window,
         window_length,
         hop_size,
-        # function accepting input_time and length and returning that many
-        # samples
+        # function accepting input_time returning window_length samples
         get_samples):
-        pvoc_synth._chk_args(window_length,hop_size)
+        pvoc_synth._chk_args(analysis_window,synthesis_window,window_length,hop_size)
         self.analysis_window = analysis_window
         self.synthesis_window = synthesis_window
         self.window_length = window_length
         self.hop_size = hop_size
         self.get_samples = get_samples
         self.ola_buffer = ola(window_length,hop_size)
-        self.z_outputH = None
+        self.reset_past_output()
         self.output_scaling = common.ola_shorten(
             self.analysis_window*self.synthesis_window,
             self.hop_size)
@@ -161,7 +176,7 @@ class pvoc_synth:
             self.init_window[:self.window_length-h] += a_win_section*s_win_section
 
     def process(self,input_time,reset):
-        f_input0 = self.get_samples(input_time,self.window_length)
+        f_input0 = self.get_samples(input_time)
         r_workspace=f_input0*self.analysis_window
         if self.z_outputH is not None:
             z_input0 = np.fft.rfft(r_workspace)
@@ -169,14 +184,16 @@ class pvoc_synth:
                 self.z_outputH = z_input0
                 r_workspace *= self.synthesis_window
             else:
-                f_inputH = self.get_samples(input_time-self.hop_size,self.window_length)
+                f_inputH = self.get_samples(input_time-self.hop_size)
                 r_workspace=f_inputH*self.analysis_window
                 z_inputH = np.fft.rfft(r_workspace)
                 self.z_outputH *= z_input0*np.abs(z_inputH)/(z_inputH*np.abs(self.z_outputH))
                 r_workspace = np.fft.irfft(self.z_outputH)*self.synthesis_window
+            self.ola_overwrite=False
         else:
             self.z_outputH=np.fft.rfft(r_workspace)
             r_workspace=f_input0*self.init_window
-        ret = self.ola_buffer.sum_in_and_shift_out(r_workspace)
+            self.ola_overwrite=True
+        ret = self.ola_buffer.sum_in_and_shift_out(r_workspace,self.ola_overwrite)
         ret *= self.output_scaling
         return ret

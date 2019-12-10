@@ -273,3 +273,21 @@ class attack_avoider:
             self.safe = True
         return (ret,reset)
 
+class attack_avoid_access:
+    """
+    Many routines need a way to get samples at a particular time. This callable
+    object (like a function) provides n samples requested at a time t. This
+    adjusts the requested times to keep attacks from getting "smeared" if an
+    attack_avoider is registered with it.
+    """
+    def __init__(self,
+        # a function accepting a time t and a flag r that when true indicates
+        # that a reset should be performed. r will be true when the time passed
+        # is the first of a series of adjusted times
+        get_samples,
+        av):
+        self.av=av
+        self.get_samples=get_samples
+    def __call__(self,t,n):
+        atime,reset=self.av.adjust(int(np.round(t)))
+        return self.get_samples(atime,reset)

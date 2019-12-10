@@ -22,8 +22,8 @@ def default_get_interpolator_n_points(N):
 
 class pitch_shifter:
     def __init__(self,
-        # a function or callable object that takes a time and a number of
-        # samples and returns values looked up at that time.
+        # a function or callable object that takes a time in samples and returns
+        # B samples looked up at that time.
         get_samples,
         # the minimum pitch shift factor (simply used to limit the rate signal)
         ps_min=0.25,
@@ -76,14 +76,17 @@ class pitch_shifter:
         self.time_at_block_start=0
         self.pos_at_block_start=0
 
-    def process_pos_sig(self,pos_signal):
+    def set_pos_at_block_start(self,pos):
+        self.pos_at_block_start=pos
+        self.time_at_block_start=pos
+        self.sig_rb_idcs_valid=False
 
-        B=len(pos_signal)-1
+    def process_pos_sig(self,ps_pos_sig,ts_pos_sig):
 
-        # TODO: This pos_signal is the one formed by summing the rate_sig only
-        # (not after multiplying by the time_stretch signal)
+        B=len(ps_pos_sig)-1
+
         first_required_idx,last_required_idx=self.get_interpolator_range(
-            pos_signal[0],pos_signal[-2])
+            ps_pos_sig[0],ps_pos_sig[-2])
 
         if self.sig_rb_idcs_valid:
             fetch_start_idx = self.sig_rb_max_idx + 1
@@ -91,11 +94,7 @@ class pitch_shifter:
             n_discard = first_required_idx - self.sig_rb_min_idx
             self.sig_rb.advance_head(n_discard)
         else:
-            # TODO: If want to forget about past processes and start
-            # synthesizing a new signal immediately, we could also reset sig_rb
-            # somehow, make pos_signal start at the point we want to start
-            # synthesizing at and force this reset by setting
-            # self.sig_rb_idcs_valid to False
+            self.sig_rb.reset()
             fetch_start_idx = first_required_idx
             # start here so the accumlated value is correct (see the while loop below)
             self.sig_rb_max_idx = fetch_start_idx - 1
@@ -106,17 +105,14 @@ class pitch_shifter:
 
         # linear interpolation giving the look up times from the signal indices
         fetch_time_interpolator=interpolate.interp1d(
-            # TODO: To incorporate an additional phase shift I think you form a
-            # different pos_signal by multiplying the rate_sig by the
-            # time_stretch signal and then summing to get the pos signal
-            [pos_signal[0],pos_signal[-1]],
-            [self.time_at_block_start,self.time_at_block_start+B],
+            [ps_pos_sig[0],ps_pos_sig[-1]],
+            [ts_pos_sig[0],ts_pos_sig[-1]],
             fill_value='extrapolate')
 
         # fetch the required values
         while fetch_start_idx <= last_required_idx:
             fetch_time = fetch_time_interpolator(fetch_start_idx)
-            x=self.get_samples(fetch_time,self.B)
+            x=self.get_samples(fetch_time)
             self.sig_rb.push_copy(x)
             fetch_start_idx += self.B
             self.sig_rb_max_idx += self.B
@@ -126,38 +122,49 @@ class pitch_shifter:
         signal_interpolator=self.get_interpolator(
             np.arange(first_required_idx,last_required_idx+1,1),
             self.sig_rb.get_region(0,last_required_idx-first_required_idx+1))
-        y=signal_interpolator(pos_signal[:-1])
-        self.time_at_block_start += B
-        self.pos_at_block_start = pos_signal[-1]
+        y=signal_interpolator(ps_pos_sig[:-1])
+        self.time_at_block_start = ts_pos_sig[-1]
+        self.pos_at_block_start = ps_pos_sig[-1]
         return y
 
-    def process(self,rate_sig):
+    def process(self,ps_rate_sig,ts_rate_sig=None):
         """
-        rate_sig is an array of B values representing the time-increment. These
-        values will be restricted between self.ps_min and self.ps_max. These
-        values are accumulated to give the signal
-        pos_signal=[self.pos_at_block_start,
-        self.pos_at_block_start+rate_sig[0],
+        ps_rate_sig is an array of B values representing the time-increment for
+        time-stretching. These values will be restricted between self.ps_min and
+        self.ps_max. These values are accumulated to give the signal
+        ps_pos_sig=[self.pos_at_block_start,
+        self.pos_at_block_start+ps_rate_sig[0],
         ...,
-        self.pos_at_block_start+sum(rate_sig)].
-        The values pos_signal[:B] are used to look up values (using
-        interpolation) and self.time_at_block_start is set to pos_signal[B].
-        It is confusing, but here the rate_sig and the accumulated pos_signal
+        self.pos_at_block_start+sum(ps_rate_sig)].
+        The values ps_pos_sig[:B] are used to look up values (using
+        interpolation) and self.time_at_block_start is set to ps_pos_sig[B].
+        It is confusing, but here the ps_rate_sig and the accumulated ps_pos_sig
         represent the pitch shift amount, which will be counteracted by time
         stretching at an inverse rate.
         """
 
-        # B is length of rate_sig
-        B=len(rate_sig)
+        if ts_rate_sig is None:
+            ts_rate_sig=np.zeros_like(ps_rate_sig)
+            ts_rate_sig[:]=1
+
+        # B is length of ps_rate_sig
+        B=len(ps_rate_sig)
 
         # restrict rate signal
-        rate_sig[rate_sig>self.ps_max] = self.ps_max
-        rate_sig[rate_sig<self.ps_min] = self.ps_min
+        ps_rate_sig[ps_rate_sig>self.ps_max] = self.ps_max
+        ps_rate_sig[ps_rate_sig<self.ps_min] = self.ps_min
 
         # calculate the position signal by accumulating the rate signal
-        pos_signal=np.zeros(B+1,dtype=self.dtype)
-        np.cumsum(rate_sig,out=pos_signal[1:])
-        pos_signal += self.pos_at_block_start
+        # This ps_pos_sig is the one formed by summing the ps_rate_sig only
+        # (not after multiplying by the time_stretch signal)
+        ps_pos_sig=np.zeros(B+1,dtype=self.dtype)
+        np.cumsum(ps_rate_sig,out=ps_pos_sig[1:])
 
-        return self.process_pos_sig(pos_signal)
+        ts_pos_sig=np.zeros(B+1,dtype=self.dtype)
+        np.cumsum(ts_rate_sig,out=ts_pos_sig[1:])
+
+        ps_pos_sig += self.pos_at_block_start
+        ts_pos_sig += self.time_at_block_start
+
+        return self.process_pos_sig(ps_pos_sig,ts_pos_sig)
 

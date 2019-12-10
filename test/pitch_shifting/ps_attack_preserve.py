@@ -31,7 +31,7 @@ pv=pvoc_synth(
     signal.get_window('hann',W),
     W,
     H,
-    lambda t,l: wl.access(t))
+    lambda t: wl.access(t))
 
 h_y=0
 for h in output_times:
