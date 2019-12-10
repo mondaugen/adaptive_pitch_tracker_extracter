@@ -14,7 +14,9 @@ N=N0+N1
 f0=500/16000
 f1=600/16000
 ps0=0.5
+ts0=1/3
 ps1=2
+ts1=-3
 x=np.concatenate((
     signal.chirp(np.arange(W),f0,W,f0),
     np.zeros(N0-W),
@@ -35,11 +37,11 @@ pv=pvoc_synth(
 ps=pitch_shift.pitch_shifter(lambda t: pv.process(int(np.round(t)),False))
 y=np.zeros(N)
 for n in np.arange(0,N0-W,H):
-    y[n:n+H]=ps.process(np.ones(H)*ps0,np.ones(H)*ps0)
+    y[n:n+H]=ps.process(np.ones(H)*ps0,np.ones(H)*ts0)
 pv.reset_past_output()
 ps.set_pos_at_block_start(N0)
 for n in np.arange(N0,N-H,H):
-    y[n:n+H]=ps.process(np.ones(H)*ps1,np.ones(H)*ps1)
+    y[n:n+H]=ps.process(np.ones(H)*ps1,np.ones(H)*ts1)
 
 x.tofile('/tmp/in.f64')
 y.tofile('/tmp/out.f64')

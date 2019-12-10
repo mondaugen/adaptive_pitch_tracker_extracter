@@ -102,7 +102,7 @@ class gate_to_adsr:
         self.release_time = release_time
         self.release_n = 0
         self.release_coeff = np.power(np.power(10,decay_min_dB/20),1./release_time)
-        self.release_zi =  np.array([0],dtype='float')
+        self.release_zi = np.array([0],dtype='float')
         self.state=gate_to_adsr.Z
         self.last_g=0
         self.gtor_cs=0
@@ -143,11 +143,11 @@ class gate_to_adsr:
                 if self.attack_n >= self.attack_time:
                     self.state = gate_to_adsr.D
                     self.decay_n = 0
-            elif self.state == gate_to_adsr.D:
+            if self.state == gate_to_adsr.D:
                 self.decay_n += 1
                 if self.decay_n >= self.decay_time:
                     self.state = gate_to_adsr.S
-            elif self.state == gate_to_adsr.R:
+            if self.state == gate_to_adsr.R:
                 self.release_n += 1
                 if self.release_n >= self.release_time:
                     self.state = gate_to_adsr.Z
