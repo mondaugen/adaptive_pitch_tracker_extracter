@@ -218,15 +218,16 @@ class attack_avoider:
         # algorithm won't be able put a window in a place not containing one of
         # those time points.
         attack_times,
-        # this is the time we want to put the analysis window, which might get
-        # a number such that analysis_time + awin_start gives the start time of the window
+        # This is the time we want to put the analysis window. A possible/recommended
+        # value for this is a number such that analysis_time + awin_start gives
+        # the start time of the window, but other values might end up sounding better.
         awin_start,
-        # a number such that analysis_time + awin_start + awin_len gives the first
-        # sample just after the end of a window
+        # A number such that analysis_time + awin_start + awin_len gives the first
+        # sample just after the end of a window.
         awin_len,
         # a synthesis hop size
         H):
-        self.attack_times = attack_times
+        self.attack_times = np.array(attack_times)
         self.awin_start = awin_start
         self.awin_len = awin_len
         self.H = H
@@ -288,6 +289,6 @@ class attack_avoid_access:
         av):
         self.av=av
         self.get_samples=get_samples
-    def __call__(self,t,n):
+    def __call__(self,t):
         atime,reset=self.av.adjust(int(np.round(t)))
         return self.get_samples(atime,reset)
