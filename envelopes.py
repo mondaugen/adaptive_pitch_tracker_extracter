@@ -186,3 +186,66 @@ class region_segmenter:
             regions.append((s,e))
         return (aug_note_trans,aug_note_start,aug_note_end,regions)
 
+class gate_to_time_advance:
+    """
+    This ensures that a sound will be played through while a gate is held high.
+    Of course to do it exactly would require clairvoyance, but our technique
+    acheives this in the limited of the duration that a gate is held high. This
+    outputs a position between 0 and 1 which can then be scaled according to the
+    length of what is being played.
+    During the attack portion, the position is advanced at a constant rate equal
+    to a desired amount of time that is to be covered during the attack portion,
+    divided by the number of time steps (samples) that comprise the attack
+    portion. Decay is fixed at having a length of 1, which will make it not
+    present in the ADSR state signal. During the "sustain" portion, the position
+    is updated as t[n] = a * (1 - R - t[n-1]), where 0 <= a < 1 and R is the
+    length of the release portion. a is effectively how fast we advance time
+    during the sustain portion, so that we get very close, but never reach 1 -
+    R. Then during the release portion we advance at (1 - t[*])/R_L where R_L is
+    the number of time steps in the release portion and t[*] is the time we got
+    to during the sustain portion.
+    """
+    def __init__(self,
+        attack_time,
+        release_time,
+        attack_total_time_advance,
+        sustain_rate,
+        release_total_time_advance):
+        self.adsr=gate_to_adsr(
+            attack_time,
+            1,
+            1,
+            release_time)
+        self.attack_total_time_advance=attack_total_time_advance
+        self.attack_rate = self.attack_total_time_advance / self.adsr.attack_time
+        self.sustain_rate=sustain_rate
+        self.release_total_time_advance=release_total_time_advance
+        self.release_update=0
+        self.sustain_update_const=self.sustain_rate*(1-self.release_total_time_advance)
+        self.sustain_update_coef=(1-self.sustain_rate)
+        self.release_rate = 1./self.adsr.release_time
+        self.last_state=gate_to_adsr.Z
+        self.t=0
+        self.t_prime=0
+    def adsr_seq_to_time_sequence(self,adsr):
+        ret=np.zeros_like(adsr,dtype='float')
+        for n,state in enumerate(adsr):
+            if (self.last_state != gate_to_adsr.A) and (state == gate_to_adsr.A):
+                self.t=0
+            if (self.last_state != gate_to_adsr.R) and (state == gate_to_adsr.R):
+                self.t_prime=self.t
+                self.release_update=(1 - self.t_prime) * self.release_rate
+            ret[n]=self.t
+            if state == gate_to_adsr.A:
+                self.t += self.attack_rate
+            if state == gate_to_adsr.S:
+                self.t = self.sustain_update_const + self.sustain_update_coef * self.t
+            if state == gate_to_adsr.R:
+                self.t = self.release_update + self.t
+            self.last_state=state
+        return ret
+    def gate_to_time_sequence(self,gate):
+        adsr_states=self.adsr.gate_to_adsr_seq(gate)
+        ret = self.adsr_seq_to_time_sequence(adsr_states)
+        return ret
+
