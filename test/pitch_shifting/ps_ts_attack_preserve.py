@@ -89,9 +89,17 @@ for n_ in range(0,N_out,H):
                 ps.set_pos_at_block_start(pos_sig[n_+s])
             y[n_+s:n_+e]=ps.process(ps_sig[n_+s:n_+e],ts_sig[n_+s:n_+e])*en['adsr'][s:e]
 
+plt.figure()
 plt.plot(t,x,label='input')
 plt.plot(t,y+2,label='output')
 plt.legend(loc='upper right')
+
+fig,axs=plt.subplots(1,2)
+axs[0].specgram(x,NFFT=W,Fs=SR,noverlap=W-H)
+axs[0].set_title('original')
+axs[1].specgram(y,NFFT=W,Fs=SR,noverlap=W-H)
+axs[1].set_title('transformed')
+
 x.tofile('/tmp/x.f64')
 y.tofile('/tmp/y.f64')
 if show_plot:
