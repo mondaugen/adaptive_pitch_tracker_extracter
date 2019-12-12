@@ -4,7 +4,7 @@ use_table.bin : use_table.c table.h table.o
 	cc -c $<
 	cc $(filter %.o, $^) $(patsubst %.x,%.o,$<) -o $@
 
-table.o : table.f32
+table.o : table.f32 create_obj_file.sh
 	bash create_obj_file.sh
 
 table.h : generate.py
