@@ -47,40 +47,6 @@ class gate_to_adsr:
     S=3
     R=4
 
-    def adsr_seq_to_env(self,adsr):
-        a=(adsr==gate_to_adsr.A).astype('float')
-        d=(adsr==gate_to_adsr.D).astype('float')
-        s=(adsr==gate_to_adsr.S).astype('float')
-        r=(adsr==gate_to_adsr.R).astype('float')
-        a_ramp=(self.gate_to_ramp(a) / self.attack_time)*a
-        a_ramp=np.interp(a_ramp,self.attack_table_points,self.attack_table)
-        d_trig=np.diff(np.concatenate(([self.last_d],d)))
-        self.last_d=d[-1]
-        d_trig[d_trig<0]=0
-        d_imp=d_trig*(1-self.sustain_level)
-        d_sig,self.decay_zi=signal.lfilter(
-            [1],
-            [1,-self.decay_coeff],
-            d_imp,zi=self.decay_zi)
-        d_sig*=d
-        s_sig=(self.sustain_level*(d+s))
-        ads=a_ramp+d_sig+s_sig
-        r_trig=np.concatenate((np.diff(r),[0]))
-        r_trig[r_trig<0]=0
-        r_imp=r_trig*ads
-        r_sig,self.release_zi=signal.lfilter(
-            [1],
-            [1,-self.release_coeff],
-            r_imp,zi=self.release_zi)
-        r_sig*=r
-        ret=dict(
-            a_ramp=a_ramp,
-            d_sig=d_sig,
-            s_sig=s_sig,
-            r_sig=r_sig,
-            adsr=ads+r_sig)
-        return ret
-
     def __init__(self,
         attack_time,
         decay_time,
@@ -107,8 +73,44 @@ class gate_to_adsr:
         self.last_g=0
         self.gtor_cs=0
         self.last_d=0
+        self.last_r=0
         self.attack_table=1-0.5*(1+np.cos(np.arange(attack_table_N)/attack_table_N*np.pi))
         self.attack_table_points=np.arange(attack_table_N)/attack_table_N
+
+    def adsr_seq_to_env(self,adsr):
+        a=(adsr==gate_to_adsr.A).astype('float')
+        d=(adsr==gate_to_adsr.D).astype('float')
+        s=(adsr==gate_to_adsr.S).astype('float')
+        r=(adsr==gate_to_adsr.R).astype('float')
+        a_ramp=(self.gate_to_ramp(a) / self.attack_time)*a
+        a_ramp=np.interp(a_ramp,self.attack_table_points,self.attack_table)
+        d_trig=np.diff(np.concatenate(([self.last_d],d)))
+        self.last_d=d[-1]
+        d_trig[d_trig<0]=0
+        d_imp=d_trig*(1-self.sustain_level)
+        d_sig,self.decay_zi=signal.lfilter(
+            [1],
+            [1,-self.decay_coeff],
+            d_imp,zi=self.decay_zi)
+        d_sig*=d
+        s_sig=(self.sustain_level*(d+s))
+        ads=a_ramp+d_sig+s_sig
+        r_trig=np.diff(np.concatenate(([self.last_r],r)))
+        self.last_r=r[-1]
+        r_trig[r_trig<0]=0
+        r_imp=r_trig*ads
+        r_sig,self.release_zi=signal.lfilter(
+            [1],
+            [1,-self.release_coeff],
+            r_imp,zi=self.release_zi)
+        r_sig*=r
+        ret=dict(
+            a_ramp=a_ramp,
+            d_sig=d_sig,
+            s_sig=s_sig,
+            r_sig=r_sig,
+            adsr=ads+r_sig)
+        return ret
 
     def gate_to_ramp(self,g):
         # for this to work, g has to be 0 or 1

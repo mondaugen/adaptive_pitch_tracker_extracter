@@ -1,29 +1,251 @@
 #include "envelopes.h"
 #include "envelopes_attack_table.h"
+#include <stdlib.h>
+#include <math.h>
 
-enum adsr_state {
-    /* outputing 0s */
-    adsr_state_Z,
-    /* attack state */
-    adsr_state_A,
-    /* decay state */
-    adsr_state_D,
-    /* sustain state */
-    adsr_state_S,
-    /* release state */
-    adsr_state_R
-};
+#undef MAX
+#define MAX(a,b) ((a)>(b)?(a):(b))
 
 const struct adsr_init adsr_init_default {
     .decay_min_dB = -60
 };
 
-/* all duration values in samples */
 struct adsr {
-    int attack_duration;
-    int decay_duration;
+    /* all duration values in samples and must be >= 1 */
+    unsigned int attack_duration;
+    unsigned int decay_duration;
     float sustain_level;
-    int release_duration;
+    unsigned int release_duration;
     float decay_min_A;
+    /* attack count */
+    unsigned int attack_n;
+    /* decay count */
+    unsigned int decay_n;
+    /* decay coefficient, calculated from decay_min_A and decay_duration */
+    float decay_coeff;
+    /* last decay feedback value */
+    float decay_yn_1;
+    /* release count */
+    unsigned int release_n;
+    /* release coefficient, calculated from decay_min_A and release_duration */
+    float release_coeff;
+    /* last release feedback value */
+    float release_yn_1;
+    /* last adsr state */
+    enum adsr_state last_adsr_state;
+    /* last gate value */
+    float last_gate;
+    /* last gate_to_ramp sum */
+    float gtor_cs;
+    /* last decay state value (0 or 1) */
+    float last_decay_state;
+    /* last release state value (0 or 1) */
+    float last_release_state;
 };
 
+const struct adsr adsr_default = {
+    .attack_duration = 1,
+    .decay_duration = 1,
+    .sustain_level = 1,
+    .release_duration = 1,
+    .decay_min_A = 1e-5,
+    .attack_n = 0,
+    .decay_n = 0,
+    .decay_yn_1 = 0,
+    .release_n = 0,
+    .release_yn_1 = 0,
+    .last_adsr_state = adsr_state_Z,
+    .last_gate = 0,
+    .gtor_cs = 0,
+    .last_decay_state = 0,
+};
+
+void
+adsr_free(struct adsr *a)
+{
+    free(a);
+}
+
+struct adsr *
+adsr_new(struct adsr_init *init)
+{
+    struct adsr *ret = calloc(1,sizeof(struct adsr));
+    if (!ret) { goto fail; }
+    *ret = adsr_default;
+    ret->decay_min_A = pow(10,init->decay_min_dB/20.);
+fail:
+    if (ret) { adsr_free(ret); }
+    return NULL;
+}
+
+void
+adsr_gate_to_adsr_seq_start_end_active(
+    struct adsr *self,
+    struct adsr_gate_to_adsr_seq_start_end_active_args *args)
+{
+    unsigned int n;
+    for (n = 0; n < args->N; n++) {
+        float g = args->gate[n];
+        if (g == 1) {
+            if (self->state == adsr_state_Z) {
+                self->state = adsr_state_A;
+                self->attack_duration = MAX(1,args->attack_duration[n]);
+                self->attack_n = 0;
+                args->start[n] = 1;
+            }
+        }
+        if (g == 0) {
+            if ((self->state != adsr_state_Z) && (self->state != adsr_state_R)) {
+                self->adsr_state = adsr_state_R;
+                self->release_duration = MAX(1,args->release_duration[n]);
+                self->release_n = 0;
+            }
+        }
+        args->adsr_states[n]=self->state;
+        if (self->adsr_state != adsr_state_Z) {
+            args->active[n]=1;
+        }
+        if (self->state == adsr_state_A) {
+            self->attack_n += 1;
+            if (self->attack_n >= self->attack_duration) {
+                self->state = adsr_state_D;
+                self->decay_duration = MAX(1,args->decay_duration[n]);
+                self->decay_n = 0;
+            }
+        }
+        if (self->state == adsr_state_D) {
+            self->decay_n += 1;
+            if (self->decay_n >= self->decay_duration) {
+                /*
+                NOTE the args->sustain_level gets sampled in the
+                adsr_seq_to_env function.
+                */
+                self->state = adsr_state_S;
+            }
+        }
+        if (self->state == adsr_state_R) {
+            self->release_n += 1;
+            if (self->release_n >= self->release_duration) {
+                self->state = adsr_state_Z;
+                args->end[n]=1;
+            }
+        }
+    }
+}
+
+void adsr_seq_to_env(
+    struct adsr *self,
+    struct adsr_gate_to_adsr_seq_start_end_active_args *args)
+{
+
+    float a[args->N], d[args->N], s[args->N], r[args->N],
+         *adsr_gates[] = {a,d,s,r,NULL}, **adsr_gate_ptr = adsr_gates,
+         a_ramp[args->N], d_trig[args->N], r_trig[args->N];
+    enum adsr_state adsr_states[] = {adsr_state_A,adsr_state_D,adsr_state_S,adsr_state_R},
+         *adsr_state_ptr = adsr_states;
+
+    /*
+    extract the state sections to signals that are 1 when in that section and
+    0 otherwise
+    */
+    while (*adsr_gates) {
+        struct adsr_state_eq_args adsr_state_eq_args = {
+            .result = *adsr_gate_ptr,
+            .states = args->adsr_states,
+            .state = *adsr_state_ptr,
+            .args->N,
+        };
+        adsr_gate_ptr++;
+        adsr_state_ptr++;
+        adsr_state_eq(&adsr_state_eq_args);
+    }
+    
+    /* convert attack gate to ramp */
+    struct adsr_gate_to_ramp_args adsr_gate_to_ramp_args = {
+        /* attack gate */
+        .a = a,
+        /* attack durations sampled from here on 0 to non-zero transition of
+        attack_duration */
+        .attack_duration = args->attack_duration,
+        /* length of the arrays */
+        .N = args->N
+    };
+    adsr_gate_to_ramp(&adsr_gate_to_ramp_args);
+
+    /* convert attack ramp to one specified by look up table */
+    struct adsr_ramp_smooth_args adsr_ramp_smooth_args {
+        .attack_ramp = a,
+        .N = args->N,
+        /* declared in envelopes_attack_table.h and linked from
+        envelopes_attack_table.o */
+        .table = adsr_attack_ramp_table,
+        /* declared in envelopes_attack_table.h */
+        .table_N = adsr_attack_ramp_table_length;
+    };
+    adsr_ramp_smooth(&adsr_ramp_smooth_args);
+
+    /* Convert decay section to impulse marking 0 to non-zero transitions */
+    struct adsr_extract_trigger_args adsr_extract_decay_trigger_args = {
+        /* This will contain the decay triggers */
+        .trigger = d_trig,
+        /* This takes and then replaces the last gate state */
+        .last_state = &self->last_decay_state,
+        .gate = d,
+        /* sustain level sampled on non-zero to zero transition of decay_gate */
+        .sustain_levels = args->sustain_level,
+        .N = args->N,
+    };
+    adsr_extract_trigger(&adsr_extract_decay_trigger_args);
+
+    /* Filter decay triggers to get decay sections */
+    struct adsr_iir_1st_order_filter_args decay_filter_args = {
+        .y = d_trig,
+        .yn_1 = &self->decay_yn_1,
+        .x = d_trig,
+        .a = self->decay_coeff,
+        .N = args->N
+    };
+    adsr_iir_1st_order_filter(&decay_filter_args);
+
+    /* Multiply the decay filter output by the decay gate */
+    adsr_float_multiply(d_trig,d,args->N);
+
+    /* Form sustain signal */
+    adsr_float_add(s,d,args->N);
+    adsr_float_multiply(s,args->sustain_level,args->N);
+
+    /* Form sum of attack decay and sustain signal */
+    memcpy(args->adsr_envelope,a,sizeof(float)*args->N);
+    adsr_float_add(args->adsr_envelope,d_trig,args->N);
+    adsr_float_add(args->adsr_envelope,s,args->N);
+
+    /* Convert release section to impulse marking 0 to non-zero transitions */
+    struct adsr_extract_trigger_args adsr_extract_release_trigger_args = {
+        /* This will contain the release triggers */
+        .trigger = r_trig,
+        .last_state = &self->last_release_state,
+        .gate = d,
+        /* sustain level sampled on non-zero to zero transition of release_gate */
+        .sustain_levels = args->sustain_level,
+        .N = args->N
+    };
+    adsr_extract_trigger(&adsr_extract_release_trigger_args);
+
+    /* Filter release triggers to get release sections */
+    struct adsr_iir_1st_order_filter_args release_filter_args = {
+        .y = r_trig,
+        .yn_1 = &self->release_yn_1,
+        .x = r_trig,
+        .a = self->release_coeff,
+        .N = args->N
+    };
+    adsr_iir_1st_order_filter(&release_filter_args);
+    
+    /* Multiply the release filter output by the release gate */
+    adsr_float_multiply(r_trig,r,args->N);
+
+    /* Add the release section into ads */
+    adsr_float_add(args->adsr_envelope,r_trig,args->N);
+
+    /* result is in args */
+}
