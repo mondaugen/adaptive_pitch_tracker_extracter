@@ -6,6 +6,7 @@ export BINARY_ARCHITECTURE?=i386:x86-64
 
 adsr_envelopes_attack_table.o : \
     adsr_envelopes_attack_table.f32 \
+    adsr_envelopes_attack_table.h \
     ../scripts/binary_to_obj.sh
 	bash ../scripts/binary_to_obj.sh
 

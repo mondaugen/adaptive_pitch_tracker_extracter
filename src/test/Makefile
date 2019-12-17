@@ -49,12 +49,20 @@ src/test/bin/lattice_filter_proc : src/test/lattice_filter_proc.c \
 	$(CC) -g -Isrc -Isrc/test $^ -o $@
 
 src/test/bin/adsr_envelopes_test : src/test/adsr_envelopes_test.c \
-                   src/adsr_envelopes.c \
-                   src/adsr_envelopes_attack_table/adsr_envelopes_attack_table.o \
-                   src/lib/adsr_envelopes/adsr_envelopes_linux_native.c
-	cc -g -Isrc -Isrc/test -Isrc/adsr_envelopes_attack_table/ $^ -o $@
+    src/adsr_envelopes.c \
+    src/adsr_envelopes_attack_table/adsr_envelopes_attack_table.o \
+    src/lib/adsr_envelopes/adsr_envelopes_linux_native.c \
+    src/adsr_envelopes_decay_coeff_table/adsr_envelopes_decay_coeff_table.o
+	cc -g -Isrc -Isrc/test -Isrc/adsr_envelopes_attack_table/ \
+        -Isrc/adsr_envelopes_decay_coeff_table/ \
+        -I src/lib/dsp_math/ \
+        $^ -o $@
 
 src/adsr_envelopes_attack_table/adsr_envelopes_attack_table.o : \
     src/adsr_envelopes_attack_table/Makefile
 	cd src/adsr_envelopes_attack_table/ && $(MAKE)
+
+src/adsr_envelopes_decay_coeff_table/adsr_envelopes_decay_coeff_table.o : \
+    src/adsr_envelopes_decay_coeff_table/Makefile
+	cd src/adsr_envelopes_decay_coeff_table/ && $(MAKE)
 

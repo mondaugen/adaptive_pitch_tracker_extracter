@@ -1,3 +1,0 @@
-#define adsr_envelopes_attack_table_length 4096
-extern const float _binary___adsr_envelopes_attack_table_f32_start;
-#define adsr_envelopes_attack_table (&_binary___adsr_envelopes_attack_table_f32_start)

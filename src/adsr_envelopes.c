@@ -3,6 +3,7 @@
 #include "adsr_envelopes_decay_coeff_table.h"
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 #undef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -37,6 +38,8 @@ struct adsr {
     float last_decay_state;
     /* last release state value (0 or 1) */
     float last_release_state;
+    /* last attack divisor */
+    float last_attack_div;
 };
 
 const struct adsr adsr_default = {
@@ -53,6 +56,7 @@ const struct adsr adsr_default = {
     .last_gate = 0,
     .gtor_cs = 0,
     .last_decay_state = 0,
+    .last_attack_div = 1,
 };
 
 void
@@ -67,7 +71,6 @@ adsr_new(void)
     struct adsr *ret = calloc(1,sizeof(struct adsr));
     if (!ret) { goto fail; }
     *ret = adsr_default;
-    ret->decay_min_A = pow(10,init->decay_min_dB/20.);
 fail:
     if (ret) { adsr_free(ret); }
     return NULL;
@@ -135,7 +138,8 @@ void adsr_seq_to_env(
 
     float a[args->N], d[args->N], s[args->N], r[args->N],
          *adsr_gates[] = {a,d,s,r,NULL}, **adsr_gate_ptr = adsr_gates,
-         a_ramp[args->N], d_trig[args->N], r_trig[args->N], one_minus_sus_level[args->N];
+         a_ramp[args->N], d_trig[args->N], r_trig[args->N], one_minus_sus_level[args->N],
+         decay_coeffs[args->N];
     enum adsr_state adsr_states[] = {adsr_state_A,adsr_state_D,adsr_state_S,adsr_state_R},
          *adsr_state_ptr = adsr_states;
 
@@ -148,7 +152,7 @@ void adsr_seq_to_env(
             .result = *adsr_gate_ptr,
             .states = args->adsr_states,
             .state = *adsr_state_ptr,
-            .args->N,
+            .N = args->N,
         };
         adsr_gate_ptr++;
         adsr_state_ptr++;
@@ -162,20 +166,26 @@ void adsr_seq_to_env(
         /* attack durations sampled from here on 0 to non-zero transition of
         attack_duration */
         .attack_duration = args->attack_duration,
+        /* The last gate value of the last block */
+        .last_gate = &self->last_gate,
+        /* The last gate_to_ramp sum */
+        .last_gtor_cs = &self->gtor_cs,
+        /* Last attack divisor */
+        .last_attack_div = &self->last_attack_div,
         /* length of the arrays */
         .N = args->N
     };
     adsr_gate_to_ramp(&adsr_gate_to_ramp_args);
 
     /* convert attack ramp to one specified by look up table */
-    struct adsr_ramp_smooth_args adsr_ramp_smooth_args {
+    struct adsr_ramp_smooth_args adsr_ramp_smooth_args = {
         .attack_ramp = a,
         .N = args->N,
         /* declared in envelopes_attack_table.h and linked from
         envelopes_attack_table.o */
         .table = adsr_envelopes_attack_table,
         /* declared in envelopes_attack_table.h */
-        .table_N = adsr_envelopes_attack_table_length;
+        .table_N = adsr_envelopes_attack_table_length
     };
     adsr_ramp_smooth(&adsr_ramp_smooth_args);
 
@@ -195,12 +205,27 @@ void adsr_seq_to_env(
     };
     adsr_extract_trigger(&adsr_extract_decay_trigger_args);
 
+    /* Sample decay_duration array when d_trig non-zero, convert these to decay
+    coefficients */ 
+    decay_coeffs[0] = self->decay_coeff;
+    memset(decay_coeffs+1,0,sizeof(float)*args->N-1);
+    struct adsr_sah_duration_to_coeff_args decay_dur_to_coeff_args = {
+        .trigger = d_trig,
+        .durations = args->decay_duration,
+        .decay_coeffs = decay_coeffs,
+        .N = args->N,
+        .decay_coeff_table = adsr_envelopes_decay_coeff_table,
+        .decay_coeff_table_length = adsr_envelopes_decay_coeff_table_length,
+    };
+    adsr_sah_duration_to_coeff(&decay_dur_to_coeff_args);
+    self->decay_coeff = decay_coeffs[args->N-1];
+
     /* Filter decay triggers to get decay sections */
     struct adsr_iir_1st_order_filter_args decay_filter_args = {
         .y = d_trig,
         .yn_1 = &self->decay_yn_1,
         .x = d_trig,
-        .a = self->decay_coeff,
+        .a = decay_coeffs,
         .N = args->N
     };
     adsr_iir_1st_order_filter(&decay_filter_args);
@@ -229,12 +254,27 @@ void adsr_seq_to_env(
     };
     adsr_extract_trigger(&adsr_extract_release_trigger_args);
 
+    /* Sample decay_duration array when d_trig non-zero, convert these to decay
+    coefficients */ 
+    decay_coeffs[0] = self->release_coeff;
+    memset(decay_coeffs+1,0,sizeof(float)*args->N-1);
+    struct adsr_sah_duration_to_coeff_args release_dur_to_coeff_args = {
+        .trigger = r_trig,
+        .durations = args->release_duration,
+        .decay_coeffs = decay_coeffs,
+        .N = args->N,
+        .decay_coeff_table = adsr_envelopes_decay_coeff_table,
+        .decay_coeff_table_length = adsr_envelopes_decay_coeff_table_length,
+    };
+    adsr_sah_duration_to_coeff(&release_dur_to_coeff_args);
+    self->release_coeff = decay_coeffs[args->N-1];
+
     /* Filter release triggers to get release sections */
     struct adsr_iir_1st_order_filter_args release_filter_args = {
         .y = r_trig,
         .yn_1 = &self->release_yn_1,
         .x = r_trig,
-        .a = self->release_coeff,
+        .a = decay_coeffs,
         .N = args->N
     };
     adsr_iir_1st_order_filter(&release_filter_args);

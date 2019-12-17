@@ -23,8 +23,8 @@ struct adsr_iir_1st_order_filter_args {
     float *yn_1;
     /* input taken from here */
     const float *x;
-    /* feedback coefficient */
-    float a;
+    /* feedback coefficients */
+    float *a;
     /* length of x and y */
     unsigned int N;
 };
@@ -143,7 +143,14 @@ struct adsr_gate_to_ramp_args {
     float *a;
     /* attack durations sampled from here on 0 to non-zero transition of
     attack_duration */
-    unsigned int *attack_duration;
+    const unsigned int *attack_duration;
+    /* The last gate value of the last block. Will be updated so that it becomes
+    the last value for the current block. */
+    float *last_gate;
+    /* Last gate_to_ramp sum */
+    float *last_gtor_cs;
+    /* Last attack divisor */
+    float *last_attack_div;
     /* length of the arrays */
     unsigned int N;
 };
@@ -191,16 +198,25 @@ void adsr_seq_to_env(
     struct adsr *self,
     struct adsr_gate_to_adsr_seq_start_end_active_args *args);
 
-struct adsr_decay_coeff_lookup_args {
-    unsigned int decay_time;
-    /* A table such that table[0] contains pow(decay_min_A,1/2) and
+struct adsr_sah_duration_to_coeff_args {
+    /* the sample and hold of durations triggers */
+    const float *trigger;
+    /* The durations */
+    const unsigned int *durations;
+    /* Once returns, will contain the filter coefficients. Initally this is all
+    zeros except for the first value, which contains the last coefficient from
+    the last block */
+    float *decay_coeffs;
+    /* length of the signals */
+    unsigned int N;
+    /* A table such that table[0] contains pow(decay_min_A,1) and
     table[decay_coeff_table_length-1] contains
-    pow(decay_min_A,1/(pow(2,decay_coeff_table_length))) */
+    pow(decay_min_A,1/(pow(2,decay_coeff_table_length-1))) */
     const float *decay_coeff_table;
     /* The length of the table */
     const unsigned int decay_coeff_table_length;
 };
-float
-adsr_decay_coeff_lookup(struct adsr_decay_coeff_lookup_args *args);
+void
+adsr_sah_duration_to_coeff(struct adsr_sah_duration_to_coeff_args *args);
 
 #endif /* ADSR_ENVELOPE_H */
