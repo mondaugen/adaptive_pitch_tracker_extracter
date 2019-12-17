@@ -1,14 +1,11 @@
-#include "envelopes.h"
-#include "envelopes_attack_table.h"
+#include "adsr_envelopes.h"
+#include "adsr_envelopes_attack_table.h"
+#include "adsr_envelopes_decay_coeff_table.h"
 #include <stdlib.h>
 #include <math.h>
 
 #undef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))
-
-const struct adsr_init adsr_init_default {
-    .decay_min_dB = -60
-};
 
 struct adsr {
     /* all duration values in samples and must be >= 1 */
@@ -16,7 +13,6 @@ struct adsr {
     unsigned int decay_duration;
     float sustain_level;
     unsigned int release_duration;
-    float decay_min_A;
     /* attack count */
     unsigned int attack_n;
     /* decay count */
@@ -48,7 +44,6 @@ const struct adsr adsr_default = {
     .decay_duration = 1,
     .sustain_level = 1,
     .release_duration = 1,
-    .decay_min_A = 1e-5,
     .attack_n = 0,
     .decay_n = 0,
     .decay_yn_1 = 0,
@@ -67,7 +62,7 @@ adsr_free(struct adsr *a)
 }
 
 struct adsr *
-adsr_new(struct adsr_init *init)
+adsr_new(void)
 {
     struct adsr *ret = calloc(1,sizeof(struct adsr));
     if (!ret) { goto fail; }
@@ -87,46 +82,46 @@ adsr_gate_to_adsr_seq_start_end_active(
     for (n = 0; n < args->N; n++) {
         float g = args->gate[n];
         if (g == 1) {
-            if (self->state == adsr_state_Z) {
-                self->state = adsr_state_A;
+            if (self->last_adsr_state == adsr_state_Z) {
+                self->last_adsr_state = adsr_state_A;
                 self->attack_duration = MAX(1,args->attack_duration[n]);
                 self->attack_n = 0;
                 args->start[n] = 1;
             }
         }
         if (g == 0) {
-            if ((self->state != adsr_state_Z) && (self->state != adsr_state_R)) {
-                self->adsr_state = adsr_state_R;
+            if ((self->last_adsr_state != adsr_state_Z) && (self->last_adsr_state != adsr_state_R)) {
+                self->last_adsr_state = adsr_state_R;
                 self->release_duration = MAX(1,args->release_duration[n]);
                 self->release_n = 0;
             }
         }
-        args->adsr_states[n]=self->state;
-        if (self->adsr_state != adsr_state_Z) {
+        args->adsr_states[n]=self->last_adsr_state;
+        if (self->last_adsr_state != adsr_state_Z) {
             args->active[n]=1;
         }
-        if (self->state == adsr_state_A) {
+        if (self->last_adsr_state == adsr_state_A) {
             self->attack_n += 1;
             if (self->attack_n >= self->attack_duration) {
-                self->state = adsr_state_D;
+                self->last_adsr_state = adsr_state_D;
                 self->decay_duration = MAX(1,args->decay_duration[n]);
                 self->decay_n = 0;
             }
         }
-        if (self->state == adsr_state_D) {
+        if (self->last_adsr_state == adsr_state_D) {
             self->decay_n += 1;
             if (self->decay_n >= self->decay_duration) {
                 /*
                 NOTE the args->sustain_level gets sampled in the
                 adsr_seq_to_env function.
                 */
-                self->state = adsr_state_S;
+                self->last_adsr_state = adsr_state_S;
             }
         }
-        if (self->state == adsr_state_R) {
+        if (self->last_adsr_state == adsr_state_R) {
             self->release_n += 1;
             if (self->release_n >= self->release_duration) {
-                self->state = adsr_state_Z;
+                self->last_adsr_state = adsr_state_Z;
                 args->end[n]=1;
             }
         }
@@ -140,7 +135,7 @@ void adsr_seq_to_env(
 
     float a[args->N], d[args->N], s[args->N], r[args->N],
          *adsr_gates[] = {a,d,s,r,NULL}, **adsr_gate_ptr = adsr_gates,
-         a_ramp[args->N], d_trig[args->N], r_trig[args->N];
+         a_ramp[args->N], d_trig[args->N], r_trig[args->N], one_minus_sus_level[args->N];
     enum adsr_state adsr_states[] = {adsr_state_A,adsr_state_D,adsr_state_S,adsr_state_R},
          *adsr_state_ptr = adsr_states;
 
@@ -178,11 +173,14 @@ void adsr_seq_to_env(
         .N = args->N,
         /* declared in envelopes_attack_table.h and linked from
         envelopes_attack_table.o */
-        .table = adsr_attack_ramp_table,
+        .table = adsr_envelopes_attack_table,
         /* declared in envelopes_attack_table.h */
-        .table_N = adsr_attack_ramp_table_length;
+        .table_N = adsr_envelopes_attack_table_length;
     };
     adsr_ramp_smooth(&adsr_ramp_smooth_args);
+
+    /* form 1 - sustain level */
+    adsr_subtract_from_const(one_minus_sus_level,1,args->sustain_level,args->N);
 
     /* Convert decay section to impulse marking 0 to non-zero transitions */
     struct adsr_extract_trigger_args adsr_extract_decay_trigger_args = {
@@ -191,8 +189,8 @@ void adsr_seq_to_env(
         /* This takes and then replaces the last gate state */
         .last_state = &self->last_decay_state,
         .gate = d,
-        /* sustain level sampled on non-zero to zero transition of decay_gate */
-        .sustain_levels = args->sustain_level,
+        /* 1 - sustain level sampled on non-zero to zero transition of decay_gate */
+        .sustain_levels = one_minus_sus_level,
         .N = args->N,
     };
     adsr_extract_trigger(&adsr_extract_decay_trigger_args);

@@ -69,6 +69,16 @@ get_file_length(
     return ret;
 }
 
+static inline long
+get_file_length_path(const char *path)
+{
+    FILE *f = fopen(path,"r");
+    if (!f) { return 0; }
+    long length = get_file_length(f);
+    fclose(f);
+    return length;
+}
+
 static inline const char *
 getenv_default(
     const char *env_name,
@@ -78,5 +88,33 @@ getenv_default(
     if (!ret) { return default_value; }
     return ret;
 }
+
+/*
+if longest_length not 0, allocates that length, otherwise allocates length
+that fits whole file
+*/
+static inline void *
+file_to_array(char *path, long longest_length)
+{
+    long file_length;
+    void *file_contents = NULL;
+    FILE *f = fopen(path,"r");
+    if (!f) { goto fail; }
+    if (longest_length != 0) {
+        file_length = longest_length;
+    } else {
+        file_length = get_file_length(f);
+    }
+    file_contents = calloc(file_length,1);
+    if (!file_contents) { goto fail; }
+    fread(file_contents,1,file_length,f);
+    fclose(f);
+    return file_contents;
+fail:
+    if (f) { fclose(f); }
+    if (file_contents) { free(file_contents); }
+    return NULL;
+}
+    
 
 #endif /* COMMON_H */

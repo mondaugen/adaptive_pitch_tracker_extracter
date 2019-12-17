@@ -47,3 +47,14 @@ src/test/bin/iir_lattice_filter_proc : src/test/iir_lattice_filter_proc.c \
 src/test/bin/lattice_filter_proc : src/test/lattice_filter_proc.c \
                                        src/lib/lattice_filter_f32/routines_linux_native.c
 	$(CC) -g -Isrc -Isrc/test $^ -o $@
+
+src/test/bin/adsr_envelopes_test : src/test/adsr_envelopes_test.c \
+                   src/adsr_envelopes.c \
+                   src/adsr_envelopes_attack_table/adsr_envelopes_attack_table.o \
+                   src/lib/adsr_envelopes/adsr_envelopes_linux_native.c
+	cc -g -Isrc -Isrc/test -Isrc/adsr_envelopes_attack_table/ $^ -o $@
+
+src/adsr_envelopes_attack_table/adsr_envelopes_attack_table.o : \
+    src/adsr_envelopes_attack_table/Makefile
+	cd src/adsr_envelopes_attack_table/ && $(MAKE)
+

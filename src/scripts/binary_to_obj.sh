@@ -3,6 +3,7 @@
 [ -z $OUTPUT_FILE_STEM ] && OUTPUT_FILE_STEM=table
 dn="$(dirname $0)"
 objcopy -I binary -O "$OUTPUT_TARGET" -B "$BINARY_ARCHITECTURE"\
-    "$dn/$OUTPUT_FILE_STEM.f32" "$dn/$OUTPUT_FILE_STEM.o"
+    "$OUTPUT_FILE_STEM.f32" "$OUTPUT_FILE_STEM.o"
 objcopy --rename-section .data=.rodata,alloc,load,readonly,data,contents\
-    "$dn/$OUTPUT_FILE_STEM.o"
+    "$OUTPUT_FILE_STEM.o"
+
