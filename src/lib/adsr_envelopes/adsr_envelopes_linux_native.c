@@ -1,5 +1,7 @@
 #include "adsr_envelopes.h"
 #include "dsp_math.h"
+#include <math.h>
+#include <stdio.h>
 
 #undef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -84,19 +86,20 @@ adsr_extract_trigger(struct adsr_extract_trigger_args *args)
 void
 adsr_ramp_smooth(struct adsr_ramp_smooth_args *args)
 {
-    unsigned int N = args->N, N_mask = args->N - 1;
+    unsigned int N = args->N, N_mask = args->table_N - 1;
     float *attack_ramp = args->attack_ramp;
     while (N--) {
         float n = *attack_ramp * args->table_N;
         n = (n < 0) ? 0 : n;
         n = (n > (args->table_N - 1)) ? args->table_N - 1 : n;
-        unsigned int floor = (unsigned int)n;
+        unsigned int flr = (unsigned int)n;
         /* n becomes frac */
-        n -= floor;
+        n -= flr;
         /* we do the wrapping because even when frac is 0 (because n was >=
         table_N-1), if one past the end of table is NaN then 0 * NaN is still
         NaN. */
-        *attack_ramp = args->table[floor] + n * args->table[(floor+1)&N_mask];
+        *attack_ramp = args->table[flr] 
+            + n * (args->table[(flr+1)&N_mask] - args->table[flr]);
         attack_ramp++;
     }
 }
@@ -121,7 +124,8 @@ adsr_decay_coeff_lookup(struct adsr_decay_coeff_lookup_args *args)
     int table_index = dspm_fast_floor_log2_f32(args->decay_time);
     float frac = dspm_fast_log2_aprox_frac_f32(args->decay_time),
           ret = args->decay_coeff_table[table_index] 
-                + frac * args->decay_coeff_table[table_index+1];
+                + frac * (args->decay_coeff_table[table_index+1] 
+                    - args->decay_coeff_table[table_index]);
     return ret;
 }
 
@@ -151,14 +155,20 @@ adsr_sah_duration_to_coeff(struct adsr_sah_duration_to_coeff_args *args)
 }
 
 static inline void
-dur_to_attack_div(const unsigned int *dur, const float *trigs, float *div, unsigned int N)
+dur_to_attack_div(
+const unsigned int *dur,
+const float *trigs,
+float *div,
+float *last_div,
+unsigned int N)
 {
     unsigned int n;
-    float last_div = div[0];
-    for (n = 1; n < N; n++) {
-        if (trigs[n] != 0) { last_div = 1./MAX(dur[n],1); }
-        div[n] = last_div;
+    float last_div_ = *last_div;
+    for (n = 0; n < N; n++) {
+        if (trigs[n] != 0) { last_div_ = 1./MAX(dur[n],1); }
+        div[n] = last_div_;
     }
+    *last_div = last_div_;
 }
 
 void
@@ -169,19 +179,58 @@ adsr_gate_to_ramp(struct adsr_gate_to_ramp_args *args)
     unsigned int n;
     float dec[args->N], ret[args->N], attack_div[args->N];
     for (n = 0; n < args->N; n++) {
-        dec[n] = MIN(args->a[n] - last_gate,0);
+        dec[n] = MIN(last_gate - args->a[n],0);
         last_gate = args->a[n];
     }
     *args->last_gate = last_gate;
-    attack_div[0] = *args->last_attack_div;
-    dur_to_attack_div(args->attack_duration,dec,attack_div,args->N);
-    *args->last_attack_div = attack_div[args->N-1];
+    dur_to_attack_div(
+        args->attack_duration,
+        dec,attack_div,
+        args->last_attack_div,
+        args->N);
     for (n = 0; n < args->N; n++) {
         ret[n] = last_gtor_cs;
-        last_gtor_cs = args->a[n] + last_gtor_cs * (1 + dec[n]);
+        /*
+        Increment last_gtor_cs by 1 when attack gate args->a is non-zero.  Only
+        keep past sum if args->a non-zero and a new attack hasn't happened.
+        */
+        last_gtor_cs = args->a[n] * (1 + last_gtor_cs * (1 + dec[n]));
     }
     *args->last_gtor_cs = last_gtor_cs;
     for (n = 0; n < args->N; n++) {
         args->a[n] = ret[n] * attack_div[n] * args->a[n];
     }
 }
+
+//struct adsr_sah_multiply_sustain_level_args {
+//    /* where sustain and decay are active */,
+//    float *states;
+//    /* sustain levels, sampled when states goes from 0 to non-zero */
+//    const float *sustain_level;
+//    /* the last sampled sustain level, pointer to float */
+//    float *last_sustain_level;
+//    /* length of states and sustain_level */
+//    unsigned int N; 
+//};
+void
+adsr_sah_multiply_sustain_level(struct adsr_sah_multiply_sustain_level_args *args)
+{
+    float last_sustain_level = *args->last_sustain_level,
+          last_sustain_level_sah_state = *args->last_sustain_level_sah_state,
+          diff[args->N];
+    unsigned int n;
+    for (n = 0; n < args->N; n++) {
+        diff[n] = args->states[n] - last_sustain_level_sah_state;
+        diff[n] = MAX(diff[n],0);
+        last_sustain_level_sah_state = args->states[n];
+    }
+    *args->last_sustain_level_sah_state = last_sustain_level_sah_state;
+    for (n = 0; n < args->N; n++) {
+        args->states[n] = diff[n] * args->sustain_level[n]
+            + (1 - diff[n]) * last_sustain_level;
+        last_sustain_level = args->states[n];
+    }
+    *args->last_sustain_level = last_sustain_level;
+}
+
+        

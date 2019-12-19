@@ -13,7 +13,7 @@ file_stem=os.environ['OUTPUT_FILE_STEM']
 # this has to be a power of 2
 N=4096
 assert(is_pow_2(N))
-table=signal.get_window('hann',2*N)[1:N+1]
+table=signal.get_window('hann',2*N)[:N]
 table=table.astype('float32')
 # get dirname $0
 dn=os.path.dirname(__file__)

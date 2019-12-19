@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 #include "test_common.h"
 #include "adsr_envelopes.h"
 
@@ -46,6 +47,7 @@ int main (void)
     float *adsr_envelope = calloc(longest_length,sizeof(float));
     unsigned long n;
     struct adsr *adsr = adsr_new();
+    assert(adsr);
     for (n = 0; n <= (longest_length - BLOCK_SIZE); n += BLOCK_SIZE) {
         adsr_gate_to_adsr_seq_start_end_active_args_alloc(
         adsr_args,

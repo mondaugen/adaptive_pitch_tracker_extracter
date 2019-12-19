@@ -219,4 +219,19 @@ struct adsr_sah_duration_to_coeff_args {
 void
 adsr_sah_duration_to_coeff(struct adsr_sah_duration_to_coeff_args *args);
 
+struct adsr_sah_multiply_sustain_level_args {
+    /* where sustain and decay are active */
+    float *states;
+    /* sustain levels, sampled when states goes from 0 to non-zero */
+    const float *sustain_level;
+    /* the last sampled sustain level */
+    float *last_sustain_level;
+    /* the last sustain level state */
+    float *last_sustain_level_sah_state;
+    /* length of states and sustain_level */
+    unsigned int N; 
+};
+void
+adsr_sah_multiply_sustain_level(struct adsr_sah_multiply_sustain_level_args *args);
+
 #endif /* ADSR_ENVELOPE_H */

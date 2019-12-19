@@ -40,6 +40,10 @@ struct adsr {
     float last_release_state;
     /* last attack divisor */
     float last_attack_div;
+    /* last sampled sustain level */
+    float last_sustain_level;
+    /* last state for sustain level sampling */
+    float last_sustain_level_sah_state;
 };
 
 const struct adsr adsr_default = {
@@ -57,6 +61,8 @@ const struct adsr adsr_default = {
     .gtor_cs = 0,
     .last_decay_state = 0,
     .last_attack_div = 1,
+    .last_sustain_level = 0,
+    .last_sustain_level_sah_state = 0
 };
 
 void
@@ -71,6 +77,7 @@ adsr_new(void)
     struct adsr *ret = calloc(1,sizeof(struct adsr));
     if (!ret) { goto fail; }
     *ret = adsr_default;
+    return ret;
 fail:
     if (ret) { adsr_free(ret); }
     return NULL;
@@ -93,7 +100,8 @@ adsr_gate_to_adsr_seq_start_end_active(
             }
         }
         if (g == 0) {
-            if ((self->last_adsr_state != adsr_state_Z) && (self->last_adsr_state != adsr_state_R)) {
+            if ((self->last_adsr_state != adsr_state_Z) 
+                && (self->last_adsr_state != adsr_state_R)) {
                 self->last_adsr_state = adsr_state_R;
                 self->release_duration = MAX(1,args->release_duration[n]);
                 self->release_n = 0;
@@ -139,7 +147,7 @@ void adsr_seq_to_env(
     float a[args->N], d[args->N], s[args->N], r[args->N],
          *adsr_gates[] = {a,d,s,r,NULL}, **adsr_gate_ptr = adsr_gates,
          a_ramp[args->N], d_trig[args->N], r_trig[args->N], one_minus_sus_level[args->N],
-         decay_coeffs[args->N];
+         decay_coeffs[args->N], sus_level[args->N];
     enum adsr_state adsr_states[] = {adsr_state_A,adsr_state_D,adsr_state_S,adsr_state_R},
          *adsr_state_ptr = adsr_states;
 
@@ -147,7 +155,7 @@ void adsr_seq_to_env(
     extract the state sections to signals that are 1 when in that section and
     0 otherwise
     */
-    while (*adsr_gates) {
+    while (*adsr_gate_ptr) {
         struct adsr_state_eq_args adsr_state_eq_args = {
             .result = *adsr_gate_ptr,
             .states = args->adsr_states,
@@ -158,6 +166,20 @@ void adsr_seq_to_env(
         adsr_state_ptr++;
         adsr_state_eq(&adsr_state_eq_args);
     }
+
+    /* Form sustain signal */
+    memcpy(sus_level,s,sizeof(float)*args->N);
+    adsr_float_add(sus_level,d,args->N);
+
+    /* sample and hold sustain levels */
+    struct adsr_sah_multiply_sustain_level_args adsr_sah_multiply_sustain_level_args = {
+        .states = sus_level, 
+        .sustain_level = args->sustain_level, 
+        .last_sustain_level = &self->last_sustain_level, 
+        .last_sustain_level_sah_state = &self->last_sustain_level_sah_state,
+        .N = args->N, 
+    };
+    adsr_sah_multiply_sustain_level(&adsr_sah_multiply_sustain_level_args);
     
     /* convert attack gate to ramp */
     struct adsr_gate_to_ramp_args adsr_gate_to_ramp_args = {
@@ -190,7 +212,7 @@ void adsr_seq_to_env(
     adsr_ramp_smooth(&adsr_ramp_smooth_args);
 
     /* form 1 - sustain level */
-    adsr_subtract_from_const(one_minus_sus_level,1,args->sustain_level,args->N);
+    adsr_subtract_from_const(one_minus_sus_level,1,sus_level,args->N);
 
     /* Convert decay section to impulse marking 0 to non-zero transitions */
     struct adsr_extract_trigger_args adsr_extract_decay_trigger_args = {
@@ -233,9 +255,8 @@ void adsr_seq_to_env(
     /* Multiply the decay filter output by the decay gate */
     adsr_float_multiply(d_trig,d,args->N);
 
-    /* Form sustain signal */
     adsr_float_add(s,d,args->N);
-    adsr_float_multiply(s,args->sustain_level,args->N);
+    adsr_float_multiply(s,sus_level,args->N);
 
     /* Form sum of attack decay and sustain signal */
     memcpy(args->adsr_envelope,a,sizeof(float)*args->N);
@@ -247,9 +268,9 @@ void adsr_seq_to_env(
         /* This will contain the release triggers */
         .trigger = r_trig,
         .last_state = &self->last_release_state,
-        .gate = d,
+        .gate = r,
         /* sustain level sampled on non-zero to zero transition of release_gate */
-        .sustain_levels = args->sustain_level,
+        .sustain_levels = sus_level,
         .N = args->N
     };
     adsr_extract_trigger(&adsr_extract_release_trigger_args);

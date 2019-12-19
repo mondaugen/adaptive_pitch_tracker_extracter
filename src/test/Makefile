@@ -56,13 +56,15 @@ src/test/bin/adsr_envelopes_test : src/test/adsr_envelopes_test.c \
 	cc -g -Isrc -Isrc/test -Isrc/adsr_envelopes_attack_table/ \
         -Isrc/adsr_envelopes_decay_coeff_table/ \
         -I src/lib/dsp_math/ \
-        $^ -o $@
+        $^ -o $@ -lm
 
 src/adsr_envelopes_attack_table/adsr_envelopes_attack_table.o : \
-    src/adsr_envelopes_attack_table/Makefile
+    src/adsr_envelopes_attack_table/Makefile \
+    src/adsr_envelopes_attack_table/generate_attack_table.py 
 	cd src/adsr_envelopes_attack_table/ && $(MAKE)
 
 src/adsr_envelopes_decay_coeff_table/adsr_envelopes_decay_coeff_table.o : \
-    src/adsr_envelopes_decay_coeff_table/Makefile
+    src/adsr_envelopes_decay_coeff_table/Makefile \
+    src/adsr_envelopes_decay_coeff_table/generate_decay_coeff_table.py
 	cd src/adsr_envelopes_decay_coeff_table/ && $(MAKE)
 
