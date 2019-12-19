@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 x=np.fromfile("/tmp/adsr_envelope.f32",dtype='float32')
+gate=np.fromfile("/tmp/gate.f32",dtype='float32')
 n=np.arange(len(x))
 print(np.max(x))
 #nan_idx=np.where(np.isnan(x))[0][0]

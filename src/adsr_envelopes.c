@@ -254,7 +254,6 @@ void adsr_seq_to_env(
     /* Multiply the decay filter output by the decay gate */
     adsr_float_multiply(d_trig,d,args->N);
 
-
     adsr_float_add(s,d,args->N);
     adsr_float_multiply(s,sus_level,args->N);
 
@@ -263,10 +262,10 @@ void adsr_seq_to_env(
     adsr_float_add(args->adsr_envelope,s,args->N);
 
     /*
-    Sample release_duration array when r_trig non-zero, convert these to decay
-    coefficients.
+    We have to look up release_duration whenever a,d, or s non-zero because the
+    next sample could always be the start of the release section, where we'll
+    need to know the release duration.
     */ 
-
     struct adsr_sah_duration_to_coeff_args release_dur_to_coeff_args = {
         .trigger = ads_states,
         .durations = args->release_duration,
