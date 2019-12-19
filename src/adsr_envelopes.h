@@ -234,4 +234,19 @@ struct adsr_sah_multiply_sustain_level_args {
 void
 adsr_sah_multiply_sustain_level(struct adsr_sah_multiply_sustain_level_args *args);
 
+struct adsr_decay_when_no_gate_args {
+    /* Output goes here */
+    float *y;
+    /* The gate states */
+    float *gate;
+    /* The past output value */
+    float *yn_1;
+    /* The decay coefficients */
+    float *a;
+    /* The length of the signals */
+    unsigned int N;
+};
+void
+adsr_decay_when_no_gate(struct adsr_decay_when_no_gate_args *args);
+
 #endif /* ADSR_ENVELOPE_H */

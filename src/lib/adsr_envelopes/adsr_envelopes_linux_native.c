@@ -202,16 +202,6 @@ adsr_gate_to_ramp(struct adsr_gate_to_ramp_args *args)
     }
 }
 
-//struct adsr_sah_multiply_sustain_level_args {
-//    /* where sustain and decay are active */,
-//    float *states;
-//    /* sustain levels, sampled when states goes from 0 to non-zero */
-//    const float *sustain_level;
-//    /* the last sampled sustain level, pointer to float */
-//    float *last_sustain_level;
-//    /* length of states and sustain_level */
-//    unsigned int N; 
-//};
 void
 adsr_sah_multiply_sustain_level(struct adsr_sah_multiply_sustain_level_args *args)
 {
@@ -233,4 +223,14 @@ adsr_sah_multiply_sustain_level(struct adsr_sah_multiply_sustain_level_args *arg
     *args->last_sustain_level = last_sustain_level;
 }
 
-        
+void
+adsr_decay_when_no_gate(struct adsr_decay_when_no_gate_args *args)
+{
+    float yn_1 = *args->yn_1;
+    unsigned int n;
+    for (n = 0; n < args->N; n++) {
+        args->y[n] = args->gate[n] == 0 ? args->a[n] * yn_1 : args->gate[n];
+        yn_1 = args->y[n];
+    }
+    *args->yn_1 = yn_1;
+}

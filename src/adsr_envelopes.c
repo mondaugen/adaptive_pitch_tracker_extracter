@@ -2,7 +2,6 @@
 #include "adsr_envelopes_attack_table.h"
 #include "adsr_envelopes_decay_coeff_table.h"
 #include <stdlib.h>
-#include <math.h>
 #include <string.h>
 
 #undef MAX
@@ -147,10 +146,11 @@ void adsr_seq_to_env(
     float a[args->N], d[args->N], s[args->N], r[args->N],
          *adsr_gates[] = {a,d,s,r,NULL}, **adsr_gate_ptr = adsr_gates,
          a_ramp[args->N], d_trig[args->N], r_trig[args->N], one_minus_sus_level[args->N],
-         decay_coeffs[args->N], sus_level[args->N];
+         decay_coeffs[args->N], sus_level[args->N], ads_states[args->N];
     enum adsr_state adsr_states[] = {adsr_state_A,adsr_state_D,adsr_state_S,adsr_state_R},
          *adsr_state_ptr = adsr_states;
-
+    unsigned int n;
+    
     /*
     extract the state sections to signals that are 1 when in that section and
     0 otherwise
@@ -166,6 +166,10 @@ void adsr_seq_to_env(
         adsr_state_ptr++;
         adsr_state_eq(&adsr_state_eq_args);
     }
+
+    memcpy(ads_states,a,sizeof(float)*args->N);
+    adsr_float_add(ads_states,d,args->N);
+    adsr_float_add(ads_states,s,args->N);
 
     /* Form sustain signal */
     memcpy(sus_level,s,sizeof(float)*args->N);
@@ -255,6 +259,7 @@ void adsr_seq_to_env(
     /* Multiply the decay filter output by the decay gate */
     adsr_float_multiply(d_trig,d,args->N);
 
+
     adsr_float_add(s,d,args->N);
     adsr_float_multiply(s,sus_level,args->N);
 
@@ -263,24 +268,14 @@ void adsr_seq_to_env(
     adsr_float_add(args->adsr_envelope,d_trig,args->N);
     adsr_float_add(args->adsr_envelope,s,args->N);
 
-    /* Convert release section to impulse marking 0 to non-zero transitions */
-    struct adsr_extract_trigger_args adsr_extract_release_trigger_args = {
-        /* This will contain the release triggers */
-        .trigger = r_trig,
-        .last_state = &self->last_release_state,
-        .gate = r,
-        /* sustain level sampled on non-zero to zero transition of release_gate */
-        .sustain_levels = sus_level,
-        .N = args->N
-    };
-    adsr_extract_trigger(&adsr_extract_release_trigger_args);
-
-    /* Sample decay_duration array when d_trig non-zero, convert these to decay
-    coefficients */ 
+    /*
+    Sample release_duration array when r_trig non-zero, convert these to decay
+    coefficients.
+    */ 
     decay_coeffs[0] = self->release_coeff;
     memset(decay_coeffs+1,0,sizeof(float)*args->N-1);
     struct adsr_sah_duration_to_coeff_args release_dur_to_coeff_args = {
-        .trigger = r_trig,
+        .trigger = ads_states,
         .durations = args->release_duration,
         .decay_coeffs = decay_coeffs,
         .N = args->N,
@@ -290,15 +285,15 @@ void adsr_seq_to_env(
     adsr_sah_duration_to_coeff(&release_dur_to_coeff_args);
     self->release_coeff = decay_coeffs[args->N-1];
 
-    /* Filter release triggers to get release sections */
-    struct adsr_iir_1st_order_filter_args release_filter_args = {
+    /* Convert release section to impulse marking 0 to non-zero transitions */
+    struct adsr_decay_when_no_gate_args adsr_decay_when_no_gate_args = {
         .y = r_trig,
+        .gate = args->adsr_envelope,
         .yn_1 = &self->release_yn_1,
-        .x = r_trig,
         .a = decay_coeffs,
         .N = args->N
     };
-    adsr_iir_1st_order_filter(&release_filter_args);
+    adsr_decay_when_no_gate(&adsr_decay_when_no_gate_args);
     
     /* Multiply the release filter output by the release gate */
     adsr_float_multiply(r_trig,r,args->N);
