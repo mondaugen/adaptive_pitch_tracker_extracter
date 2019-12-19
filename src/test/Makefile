@@ -68,3 +68,21 @@ src/adsr_envelopes_decay_coeff_table/adsr_envelopes_decay_coeff_table.o : \
     src/adsr_envelopes_decay_coeff_table/generate_decay_coeff_table.py
 	cd src/adsr_envelopes_decay_coeff_table/ && $(MAKE)
 
+# Basically, profiling such a simple program doesn't work
+src/test/bin/ptr_arith_vs_indexing : src/test/profiling/ptr_arith_vs_indexing.o \
+    src/test/profiling/aug_note_trans.o
+	cc -pg -g $^ -o $@
+
+src/test/profiling/ptr_arith_vs_indexing.o : \
+    src/test/profiling/ptr_arith_vs_indexing.c \
+    src/test/test_common.h \
+    src/test/profiling/aug_note_trans.h
+	cc -pg -g -Isrc/test -c $< -o $@
+
+src/test/profiling/aug_note_trans.o : \
+    src/test/profiling/aug_note_trans.c \
+    src/test/profiling/aug_note_trans.h
+	cc -pg -g -O2 -fno-inline -Isrc/test -c $< -o $@
+
+src/test/note_region_segmenter.o : src/note_region_segmenter.c
+	cc -g -c -Isrc $< -o $@
