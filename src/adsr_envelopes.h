@@ -177,6 +177,10 @@ adsr_ramp_smooth(struct adsr_ramp_smooth_args *args);
 void 
 adsr_float_add(float *a, const float *b, unsigned int N);
 
+/* form a = b + c where a,b,c vectors */
+void 
+adsr_float_add_out_of_place(float *a, const float *b, const float *c, unsigned int N);
+
 /* form a *= b where a,b vectors */
 void
 adsr_float_multiply(float *a, const float *b, unsigned int N);
@@ -207,6 +211,8 @@ struct adsr_sah_duration_to_coeff_args {
     zeros except for the first value, which contains the last coefficient from
     the last block */
     float *decay_coeffs;
+    /* The last decay coefficient */
+    float *last_decay_coef;
     /* length of the signals */
     unsigned int N;
     /* A table such that table[0] contains pow(decay_min_A,1) and

@@ -142,16 +142,19 @@ adsr_sah_duration_to_coeff(struct adsr_sah_duration_to_coeff_args *args)
         if (args->trigger[n] != 0) {
             adsr_decay_coeff_lookup_args.decay_time = args->durations[n];
             args->decay_coeffs[n] = adsr_decay_coeff_lookup(&adsr_decay_coeff_lookup_args);
+        } else {
+            args->decay_coeffs[n] = 0;
         }
     }
     /* now extend these to cover all non-zero values */
-    float cur_coef = args->decay_coeffs[0];
+    float cur_coef = *args->last_decay_coef;
     for (n = 0; n < args->N; n++) {
         args->decay_coeffs[n] = (args->decay_coeffs[n] == 0) ?
             cur_coef :
             args->decay_coeffs[n]; 
         cur_coef = args->decay_coeffs[n];
     }
+    *args->last_decay_coef = cur_coef;
 }
 
 static inline void
@@ -233,4 +236,12 @@ adsr_decay_when_no_gate(struct adsr_decay_when_no_gate_args *args)
         yn_1 = args->y[n];
     }
     *args->yn_1 = yn_1;
+}
+
+void 
+adsr_float_add_out_of_place(float *a, const float *b, const float *c, unsigned int N)
+{
+    while (N--) {
+        *a++ = *b++ + *c++;
+    }
 }
