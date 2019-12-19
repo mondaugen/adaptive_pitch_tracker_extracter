@@ -42,6 +42,9 @@ struct adsr {
     float last_sustain_level;
     /* last state for sustain level sampling */
     float last_sustain_level_sah_state;
+    /* Last state for differencing filter extracting the start and end of when
+    the ADSR is on */
+    float last_adsr_gate_state;
 };
 
 const struct adsr adsr_default = {
@@ -60,7 +63,8 @@ const struct adsr adsr_default = {
     .last_decay_state = 0,
     .last_attack_div = 1,
     .last_sustain_level = 0,
-    .last_sustain_level_sah_state = 0
+    .last_sustain_level_sah_state = 0,
+    .last_adsr_gate_state = 0,
 };
 
 void
@@ -293,5 +297,15 @@ void adsr_seq_to_env(
     /* Add the release section into ads */
     adsr_float_add(args->adsr_envelope,r_trig,args->N);
 
+    /* Now just extract first on sample, first off sample and entire ADSR gate */
     /* result is in args */
+    struct adsr_extract_start_end_active_args adsr_extract_start_end_active_args = {
+        .adsr_states = args->adsr_states,
+        .start = args->start,
+        .end = args->end,
+        .active = args->active,
+        .last_adsr_gate_state = &self->last_adsr_gate_state,
+        .N = args->N,
+    };
+    adsr_extract_start_end_active(&adsr_extract_start_end_active_args);
 }

@@ -245,3 +245,22 @@ adsr_float_add_out_of_place(float *a, const float *b, const float *c, unsigned i
         *a++ = *b++ + *c++;
     }
 }
+
+void
+adsr_extract_start_end_active(struct adsr_extract_start_end_active_args *args)
+{
+    float last_adsr_gate_state = *args->last_adsr_gate_state,
+          trig;
+    unsigned int n;
+    for (n = 0; n < args->N; n++) {
+        args->active[n] = args->adsr_states[n] != adsr_state_Z;
+    }
+    for (n = 0; n < args->N; n++) {
+        trig = args->active[n] - last_adsr_gate_state;
+        last_adsr_gate_state = args->active[n];
+        args->start[n] = trig > 0 ? 1 : 0;
+        args->end[n] = trig < 0 ? 1 : 0;
+    }
+    *args->last_adsr_gate_state = last_adsr_gate_state;
+}
+

@@ -255,4 +255,15 @@ struct adsr_decay_when_no_gate_args {
 void
 adsr_decay_when_no_gate(struct adsr_decay_when_no_gate_args *args);
 
+struct adsr_extract_start_end_active_args {
+    const enum adsr_state *adsr_states;
+    float *start;
+    float *end;
+    float *active;
+    float *last_adsr_gate_state;
+    unsigned int N;
+};
+void
+adsr_extract_start_end_active(struct adsr_extract_start_end_active_args *args);
+
 #endif /* ADSR_ENVELOPE_H */
