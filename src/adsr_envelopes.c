@@ -43,9 +43,12 @@ struct adsr {
     float last_sustain_level;
     /* last state for sustain level sampling */
     float last_sustain_level_sah_state;
-    /* Last state for differencing filter extracting the start and end of when
-    the ADSR is on */
+    /* Last state for extracting when ADSR active or not */
     float last_adsr_gate_state;
+    /* Last state for differencing filter extracting when notes start */
+    float last_adsr_start_state;
+    /* Last state for differencing filter extracting when notes end */
+    float last_adsr_end_state;
 };
 
 const struct adsr adsr_default = {
@@ -66,6 +69,8 @@ const struct adsr adsr_default = {
     .last_sustain_level = 0,
     .last_sustain_level_sah_state = 0,
     .last_adsr_gate_state = 0,
+    .last_adsr_start_state = 0,
+    .last_adsr_end_state = 0,
 };
 
 void
@@ -92,9 +97,6 @@ adsr_gate_to_adsr_seq_start_end_active(
     struct adsr_gate_to_adsr_seq_start_end_active_args *args)
 {
     unsigned int n;
-    memset(args->start,0,args->N*sizeof(float));
-    memset(args->end,0,args->N*sizeof(float));
-    memset(args->active,0,args->N*sizeof(float));
     for (n = 0; n < args->N; n++) {
         float g = args->gate[n];
         if (g == 1) {
@@ -102,7 +104,6 @@ adsr_gate_to_adsr_seq_start_end_active(
                 self->last_adsr_state = adsr_state_A;
                 self->attack_duration = MAX(1,args->attack_duration[n]);
                 self->attack_n = 0;
-                args->start[n] = 1;
             }
         }
         if (g == 0) {
@@ -114,9 +115,6 @@ adsr_gate_to_adsr_seq_start_end_active(
             }
         }
         args->adsr_states[n]=self->last_adsr_state;
-        if (self->last_adsr_state != adsr_state_Z) {
-            args->active[n]=1;
-        }
         if (self->last_adsr_state == adsr_state_A) {
             self->attack_n += 1;
             if (self->attack_n >= self->attack_duration) {
@@ -139,7 +137,6 @@ adsr_gate_to_adsr_seq_start_end_active(
             self->release_n += 1;
             if (self->release_n >= self->release_duration) {
                 self->last_adsr_state = adsr_state_Z;
-                args->end[n]=1;
             }
         }
     }
@@ -173,6 +170,17 @@ void adsr_seq_to_env(
         adsr_state_ptr++;
         adsr_state_eq(&adsr_state_eq_args);
     }
+
+    struct adsr_extract_start_end_active_args adsr_extract_start_end_active_args = {
+        .adsr_states = args->adsr_states,
+        .start = args->start,
+        .end = args->end,
+        .active = args->active,
+        &self->last_adsr_start_state,
+        &self->last_adsr_end_state,
+        args->N,
+    };
+    adsr_extract_start_end_active(&adsr_extract_start_end_active_args);
 
     adsr_float_add_out_of_place(ads_states,a,d,args->N);
     adsr_float_add(ads_states,s,args->N);

@@ -260,7 +260,8 @@ struct adsr_extract_start_end_active_args {
     float *start;
     float *end;
     float *active;
-    float *last_adsr_gate_state;
+    float *last_adsr_start_state;
+    float *last_adsr_end_state;
     unsigned int N;
 };
 void
