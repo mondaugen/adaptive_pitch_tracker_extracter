@@ -84,5 +84,20 @@ src/test/profiling/aug_note_trans.o : \
     src/test/profiling/aug_note_trans.h
 	cc -pg -g -O2 -fno-inline -Isrc/test -c $< -o $@
 
-src/test/note_region_segmenter.o : src/note_region_segmenter.c
+run_note_region_segmenter_test : src/test/bin/note_region_segmenter_test \
+    src/test/note_region_segmenter/gen_active_1.py \
+    src/test/note_region_segmenter/plot_test.py
+	PYTHONPATH=. python3 src/test/note_region_segmenter/gen_active_1.py && \
+	src/test/bin/note_region_segmenter_test && \
+    PYTHONPATH=. python3 src/test/note_region_segmenter/plot_test.py
+
+src/test/bin/note_region_segmenter_test : \
+    src/test/note_region_segmenter/test.c \
+    src/test/note_region_segmenter.o \
+    src/note_region_segmenter.h \
+    src/test/test_common.h
+	cc -g -Isrc -Isrc/test $(filter %.o %.c, $^) -o $@
+
+src/test/note_region_segmenter.o : src/note_region_segmenter.c \
+    src/note_region_segmenter.h
 	cc -g -c -Isrc $< -o $@
