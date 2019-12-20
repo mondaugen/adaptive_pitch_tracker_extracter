@@ -55,7 +55,7 @@ src/test/bin/adsr_envelopes_test : src/test/adsr_envelopes_test.c \
     src/adsr_envelopes_decay_coeff_table/adsr_envelopes_decay_coeff_table.o
 	cc -g -Isrc -Isrc/test -Isrc/adsr_envelopes_attack_table/ \
         -Isrc/adsr_envelopes_decay_coeff_table/ \
-        -I src/lib/dsp_math/ \
+        -Isrc/lib/dsp_math/ \
         $^ -o $@ -lm
 
 src/adsr_envelopes_attack_table/adsr_envelopes_attack_table.o : \
@@ -88,8 +88,28 @@ run_note_region_segmenter_test : src/test/bin/note_region_segmenter_test \
     src/test/note_region_segmenter/gen_active_1.py \
     src/test/note_region_segmenter/plot_test.py
 	PYTHONPATH=. python3 src/test/note_region_segmenter/gen_active_1.py && \
-	src/test/bin/note_region_segmenter_test && \
+	$< && \
     PYTHONPATH=. python3 src/test/note_region_segmenter/plot_test.py
+
+run_note_region_segmenter_test_adsr : src/test/bin/note_region_segmenter_test_adsr \
+    src/test/note_region_segmenter/gen_active_1.py \
+    src/test/note_region_segmenter/plot_test_adsr.py
+	PYTHONPATH=. python3 src/test/note_region_segmenter/gen_active_1.py && \
+	$< && \
+    PYTHONPATH=. python3 src/test/note_region_segmenter/plot_test_adsr.py
+
+src/test/bin/note_region_segmenter_test_adsr : \
+    src/test/note_region_segmenter/test_adsr.c \
+    src/test/note_region_segmenter.o \
+    src/note_region_segmenter.h \
+    src/test/test_common.h \
+    src/adsr_envelopes.c \
+    src/adsr_envelopes_attack_table/adsr_envelopes_attack_table.o \
+    src/lib/adsr_envelopes/adsr_envelopes_linux_native.c \
+    src/adsr_envelopes_decay_coeff_table/adsr_envelopes_decay_coeff_table.o
+	cc -g -Isrc -Isrc/test -Isrc/adsr_envelopes_attack_table/ \
+        -Isrc/adsr_envelopes_decay_coeff_table/ \
+        -Isrc/lib/dsp_math/ $(filter %.o %.c, $^) -o $@
 
 src/test/bin/note_region_segmenter_test : \
     src/test/note_region_segmenter/test.c \

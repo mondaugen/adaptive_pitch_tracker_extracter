@@ -2,6 +2,7 @@
 #include "adsr_envelopes_attack_table.h"
 #include "adsr_envelopes_decay_coeff_table.h"
 #include <stdlib.h>
+#include <string.h>
 
 #undef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -91,6 +92,9 @@ adsr_gate_to_adsr_seq_start_end_active(
     struct adsr_gate_to_adsr_seq_start_end_active_args *args)
 {
     unsigned int n;
+    memset(args->start,0,args->N*sizeof(float));
+    memset(args->end,0,args->N*sizeof(float));
+    memset(args->active,0,args->N*sizeof(float));
     for (n = 0; n < args->N; n++) {
         float g = args->gate[n];
         if (g == 1) {
