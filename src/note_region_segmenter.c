@@ -31,7 +31,7 @@ compute_aug_note_trans(
         aug_note_trans[n] = note_states[n] - last_val;
         last_val = note_states[n];
     }
-    aug_note_trans[n] = -last_val;
+    aug_note_trans[N] = -last_val;
 }
 
 static inline void
@@ -39,8 +39,16 @@ one_if_gt(float *a, const float *b, const float c, unsigned int N)
 { while (N--) { *a++ = *b++ > c; } }
 
 static inline void
+one_if_gte(float *a, const float *b, const float c, unsigned int N)
+{ while (N--) { *a++ = *b++ >= c; } }
+
+static inline void
 mone_if_lt(float *a, const float *b, const float c, unsigned int N)
 { while (N--) { *a++ = -1 * (*b++ < c); } }
+
+static inline void
+mone_if_lte(float *a, const float *b, const float c, unsigned int N)
+{ while (N--) { *a++ = -1 * (*b++ <= c); } }
 
 static inline void
 pluseq_float(float *a, const float *b, unsigned int N)
@@ -90,10 +98,10 @@ region_segmenter_update(
     compute_aug_note_trans(state,aug_note_trans,N);
     one_if_gt(aug_note_start,aug_note_trans,0,N+1);
     pluseq_float(aug_note_start,start,N);
-    one_if_gt(aug_note_start,aug_note_start,1,N+1);
+    one_if_gte(aug_note_start,aug_note_start,1,N+1);
     mone_if_lt(aug_note_end,aug_note_trans,0,N+1);
     minuseq_float(aug_note_end,end,N);
-    mone_if_lt(aug_note_end,aug_note_end,-1,N+1);
+    mone_if_lte(aug_note_end,aug_note_end,-1,N+1);
     where_gt_zero(start_idcs,aug_note_start,N+1,&N_start_idcs);
     where_lt_zero(end_idcs,aug_note_end,N+1,&N_end_idcs);
     *N_regions = 0;
