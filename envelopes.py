@@ -192,7 +192,7 @@ class gate_to_time_advance:
     """
     This ensures that a sound will be played through while a gate is held high.
     Of course to do it exactly would require clairvoyance, but our technique
-    acheives this in the limited of the duration that a gate is held high. This
+    acheives this in the limit of the duration that a gate is held high. This
     outputs a position between 0 and 1 which can then be scaled according to the
     length of what is being played.
     During the attack portion, the position is advanced at a constant rate equal
