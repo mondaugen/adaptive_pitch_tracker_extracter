@@ -24,3 +24,14 @@ get_pvoc_window(float *dest,
     }
     return -1;
 }
+
+/* Calculate the number of blocks that fit within a signal */
+unsigned int
+pvoc_calc_n_blocks(unsigned int signal_length,
+                   unsigned int hop_size,
+                   unsigned int window_size)
+{
+    unsigned int ret = (signal_length < window_size) ? 0 :
+        (signal_length - window_size) / hop_size + 1;
+    return ret;
+}

@@ -1,3 +1,5 @@
+.PHONY: run_pvoc_calc_n_blocks_test
+
 src/test/bin/kiss_fft_example : src/test/kissfft_example.c \
                                 src/lib/kissfft/kiss_fft.c \
                                 src/lib/kissfft/tools/kiss_fftr.c
@@ -121,3 +123,11 @@ src/test/bin/note_region_segmenter_test : \
 src/test/note_region_segmenter.o : src/note_region_segmenter.c \
     src/note_region_segmenter.h
 	cc -g -c -Isrc $< -o $@
+
+run_pvoc_calc_n_blocks_test : src/test/bin/pvoc_calc_n_blocks_test
+	src/test/bin/pvoc_calc_n_blocks_test
+
+src/test/bin/pvoc_calc_n_blocks_test : \
+        src/test/pvoc_calc_n_blocks_test.c \
+        src/pvoc_windows.c
+	cc -g -Isrc $^ -o $@ -lm

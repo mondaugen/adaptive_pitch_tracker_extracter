@@ -14,6 +14,71 @@ spec_diff_result_free(struct spec_diff_result *x)
     free(x);
 }
 
+struct spec_diff_finder {
+    unsigned int H;
+    unsigned int W;
+    const float *window;
+    /* Auxiliary data for DFT calculations */
+    void *dft_aux;
+    /* This stores the complex data and eventually the magnitude data. This can
+    be anything but the first sizeof(float)*W bytes must be floats and at some
+    point will represent the magnitude spectrum, which will be used to calculate
+    the spectral difference. */
+    void *X0;
+    /* This is the same as X0 but stores the data from a hop ago. This needs to
+    be initialized to contain 0s for the first sizeof(float)*W bytes. */
+    void *X_1;
+};
+
+struct spec_diff_finder_init {
+    unsigned int H;
+    unsigned int W;
+    void (*init_window)(float *w, void *aux, unsigned int window_length);
+    void *init_window_aux;
+};
+
+static int
+spec_diff_finder_init_chk_args(struct spec_diff_finder_init *init)
+{
+    if (init->H == 0) { return -1; }
+    if (init->W == 0) { return -2; }
+    if (!init->init_window) { return -3; }
+    return 0;
+}
+
+void
+spec_diff_finder_free(struct spec_diff_finder *finder)
+{
+    if (finder) {
+        if (finder->window) { free(finder->window); }
+        if (finder->dft_aux) { spec_diff_dft_free(finder->dft_aux); }
+        if (finder->X0) { spec_diff_complex_free(finder->X0); }
+        if (finder->X1) { spec_diff_complex_free(finder->X1); }
+        free(finder);
+    }
+}
+
+struct spec_diff_finder *
+spec_diff_finder_new(struct spec_diff_finder_init *init)
+{
+    if (spec_diff_finder_init_chk_args(init)) { return NULL; }
+    struct spec_diff_finder *ret = calloc(1,sizeof(struct spec_diff_finder));
+    if (!ret) { goto fail; }
+    ret->H = init->H;
+    ret->W = init->W;
+    ret->window = calloc(init->W,sizeof(float));
+    if (!ret->window) { goto fail; }
+    ret->dft_aux = spec_diff_dft_new(init->W);
+    if (!ret->dft_aux) { goto fail; }
+    ret->X0 = spec_diff_complex_alloc(init->W);
+    if (!ret->X0) { goto fail; }
+    ret->X1 = spec_diff_complex_alloc(init->W);
+    if (!ret->X1) { goto fail; }
+    return ret;
+fail:
+    spec_diff_finder_free(ret);
+}
+
 static struct spec_diff_result *
 spec_diff(const float *x,
           unsigned int len_x,
