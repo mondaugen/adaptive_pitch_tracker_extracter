@@ -10,8 +10,23 @@ struct spec_diff_result {
 static void
 spec_diff_result_free(struct spec_diff_result *x)
 {
-    if (x->spec_diff) { free(x->spec_diff); }
-    free(x);
+    if (x) {
+        if (x->spec_diff) { free(x->spec_diff); }
+        free(x);
+    }
+}
+
+static spec_diff_result_new(unsigned int length)
+{
+    struct spec_diff_result *ret = calloc(sizeof(struct spec_diff_result),1);
+    if (!ret) { goto fail; }
+    ret->spec_diff = calloc(sizeof(float),length);
+    if (!ret->spec_diff) { goto fail; }
+    ret->length = length;
+    return ret;
+fail:
+    spec_diff_result_free(ret);
+    return NULL;
 }
 
 struct spec_diff_finder {
@@ -80,18 +95,30 @@ fail:
 }
 
 static struct spec_diff_result *
-spec_diff(const float *x,
-          unsigned int len_x,
-          unsigned int H,
-          unsigned int W,
-          const char *window_type)
+spec_diff_finder_find(struct spec_diff_finder *finder,
+                      const float *x,
+                      unsigned int len_x)
 {
-    float w[W];
-    /* TODO: Figure out how to determine spec_diff length */
-    unsigned int length_spec_diff;
-    if (get_pvoc_window(w,window_type,W)) {
-        return NULL;
-    }
+    float x_tmp[W];
+    char *_X0[spec_diff_complex_size(finder->W)],
+         *_X1[spec_diff_complex_size(finder->W)];
+    void *X0 = _X0, *X1 = _X1;
+    if (len_x == 0) { return NULL; }
+    unsigned int length_spec_diff = pvoc_calc_n_blocks(
+                                    len_x, finder->H, finder->W),
+                 h,
+                 n = 0;
+    struct spec_diff_result = spec_diff_result_new(length_spec_diff);
+    if (!spec_diff_result) { return NULL; }
+    for (h = 0; h < length_spec_diff; h++) {
+        /* multiply by window */
+        dspm_mul_vf32_vf32_vf32(x + n,
+                                finder->window,
+                                x_tmp,
+                                finder->W);
+        /* compute forward DFT of signal-window product */
+        
+
 /*
 def spectral_diff(x,H,W,window_type):
     w=signal.get_window(window_type,W)
