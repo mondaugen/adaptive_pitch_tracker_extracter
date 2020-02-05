@@ -152,7 +152,8 @@ def attacks_from_spectral_diff(
     lmax_filt_rate=16000,
     # the threshold in dB for the noise gate
     ng_th=-60):
-    """ Returns pairs that are an estimation of the attack start and end times """
+    """ Returns pairs that are an estimation of the attack start and end times
+    """
 
     # calculate the max filter rate
     # number of hops in the LMAX_FILT_RATE

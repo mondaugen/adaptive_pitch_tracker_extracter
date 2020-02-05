@@ -1,3 +1,5 @@
+#include <complex.h>
+#include <math.h>
 #include "dsp_math.h"
 #include "kiss_fftr.h"
 
@@ -9,6 +11,76 @@ dspm_mul_vf32_vf32_vf32(const float *src0,
 {
     while (length--) {
         *dst++ = *src0++ * *src1++;
+    }
+}
+
+void
+dspm_abs_vf32(float *srcdst, unsigned int length)
+{
+    while (length--) {
+        *srcdst = fabsf(*srcdst);
+        srcdst++;
+    }
+}
+
+void
+dspm_abs_vz32(float complex *srcdst, unsigned int length)
+{
+    while (length--) {
+        *srcdst = cabsf(*srcdst);
+        srcdst++;
+    }
+}
+
+void
+dspm_abs_vz32_vf32(const float complex *src, float *dst, unsigned int length)
+{
+    while (length--) {
+        *dst++ = cabsf(*srcdst++);
+    }
+}
+
+void
+dspm_sub_vf32_vf32_vf32(const float *src0,
+                        const float *src1,
+                        float *dst,
+                        unsigned int length)
+{
+    while (length--) {
+        *dst++ = *src0++ - *src1++;
+    }
+}
+
+void
+dspm_clip_below_vf32_f32(float *srcdst,
+                         float lb,
+                         unsigned int length)
+{
+    while (length--) {
+        *srcdst = *srcdst < lb ? lb : *srcdst;
+        srcdst++;
+    }
+}
+
+/* Note that this is not compensated summation */
+float
+dspm_sum_vf32(const float *src, unsigned int length)
+{
+    float ret = 0;
+    while (length--) {
+        ret += *src++;
+    }
+    return ret;
+}
+
+/* Assumes d is non-zero */
+void
+dspm_div_vf32_f32(float *srcdst
+                  float d,
+                  unsigned int length)
+{
+    while (length--) {
+        *srcdst++ /= d;
     }
 }
 
