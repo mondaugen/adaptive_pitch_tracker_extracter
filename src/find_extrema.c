@@ -1,17 +1,5 @@
-
-/*
-def discount_local_max(x,rate,min_thresh=0):
-    lmaxs=local_max(x)
-    thresh=np.zeros_like(x)
-    filtered_maxs=[]
-    for n_max in lmaxs:
-        if (x[n_max] > min_thresh) and (x[n_max] > thresh[n_max]):
-            s=np.zeros_like(x)
-            s[n_max]=x[n_max]
-            thresh+=signal.lfilter([1],[1,-rate],s)
-            filtered_maxs.append(n_max)
-    return (np.array(filtered_maxs),thresh)
-*/
+#include <stdlib.h>
+#include "find_extrema.h"
 
 /* if 'right', then a point >= to a point to its right is a candidate for a
 local maximum */
@@ -44,7 +32,7 @@ maximum */
         r = sided_max_both(a,b,c);\
         break;\
     }\
-    r })
+    r; })
 
 unsigned int *
 local_max_f32(const float *x, /* find local maxima in this array */
@@ -72,6 +60,38 @@ local_max_f32(const float *x, /* find local maxima in this array */
     return ret;
 }
 
+static inline void lmax_extract_store_loop( 
+unsigned int length, 
+const unsigned int *lmaxs, 
+unsigned int *n_maxs, 
+const float *x, 
+float min_thresh, 
+float rate, 
+unsigned int *filtered_maxs, 
+unsigned int *filt_maxs_len, 
+float *thresh,
+/* Done this way to optimize out needless code by use of constants */
+const int filtered_maxs_defd,
+const int thresh_defd)
+{
+    float th_x0, cur_thresh = 0; 
+    unsigned int n_x;
+    for (n_x = 0; n_x < length; n_x++) { 
+        /* the x[n] coefficient of the threshold updating filter */ 
+        th_x0 = 0; 
+        if ((n_x == lmaxs[*n_maxs]) 
+                &&(x[n_x]>min_thresh) 
+                &&(x[n_x]>(cur_thresh*rate))) { 
+            if (filtered_maxs_defd) { filtered_maxs[*filt_maxs_len] = n_x; }
+            *filt_maxs_len += 1; 
+            th_x0 = x[n_x]; 
+            *n_maxs += 1; 
+        } 
+        cur_thresh = th_x0 + rate * cur_thresh;
+        if (thresh_defd) { thresh[n_x] = cur_thresh; }
+    }
+}
+
 /*
 When a local maximum is encountered, it is compared with a threshold
 function (which is initially 0). If it is greater than the function at its
@@ -97,60 +117,43 @@ discount_local_max_f32(
     float min_thresh, 
     /* if not NULL, must be an array of length "length" and will
     contain the threshold function after the function returns */
-    float *treshold)
+    float *threshold)
 {
     unsigned int *lmaxs = NULL, lmaxs_len,
-                 *filtered_maxs = NULL, filt_maxs_len = 0,
-                 n_x, n_maxs = 0;
-    float cur_thresh = 0, th_x0;
+                 *filtered_maxs = NULL,
+                 filt_maxs_len,
+                 n_maxs, n_pass;
+    float cur_thresh, th_x0;
     lmaxs = local_max_f32(x,length,&lmaxs_len,type);
     if (!lmaxs) { goto fail; }
-    /* Count the number of maxima and store the threshold function (if not NULL) */
-    for (n_x = 0; n_x < length; n_x++) {
-        /* the x[n] coefficient of the threshold updating filter */
-        th_x0 = 0;
-        if ((n_x == lmaxs[n_maxs])
-            &&(x[n_x]>min_thresh)
-            &&(x[n_x]>(cur_thresh*rate))) {
-            filt_maxs_len += 1;
-            th_x0 = x[n_x];
-            n_maxs++;
+    for (n_pass = 0; n_pass < 2; n_pass++) {
+        /* 1st pass: Count the number of maxima and store the threshold function
+           (if not NULL) */
+        /* 2nd pass: Store the maxima */
+        cur_thresh = 0;
+        n_maxs = 0;
+        filt_maxs_len = 0;
+        if ((n_pass == 0)) {
+            if (threshold) { 
+                lmax_extract_store_loop(length,lmaxs,&n_maxs,x,min_thresh,rate,
+                NULL, &filt_maxs_len, threshold, 0, 1);
+            } else {
+                lmax_extract_store_loop(length,lmaxs,&n_maxs,x,min_thresh,rate,
+                NULL, &filt_maxs_len, NULL, 0, 0);
+            }
+        } else {
+            lmax_extract_store_loop(length,lmaxs,&n_maxs,x,min_thresh,rate,
+            filtered_maxs, &filt_maxs_len, NULL, 1, 0);
         }
-        cur_thresh = th_x0 + rate * cur_thresh;
-        if (thresh) { thresh[n_x] = cur_thresh; }
-    }
-    /* allocate the memory necessary for the filtered maxima */
-    filtered_maxs = malloc(sizeof(unsigned int [n_maxs]));
-    if (!filtered_maxs) { goto fail; }
-    cur_thresh = 0;
-    n_maxs = 0;
-    for (n_x = 0; n_x < length; n_x++) {
-        /* the x[n] coefficient of the threshold updating filter */
-        th_x0 = 0;
-        if ((n_x == lmaxs[n_maxs])
-            &&(x[n_x]>min_thresh)
-            &&(x[n_x]>(cur_thresh*rate))) {
-            filt_maxs_len += 1;
-            th_x0 = x[n_x];
-            n_maxs++;
+        if (n_pass == 0) {
+            /* allocate after 1st pass */
+            /* allocate the memory necessary for the filtered maxima */
+            filtered_maxs = malloc(sizeof(unsigned int [n_maxs]));
+            if (!filtered_maxs) { goto fail; }
         }
-        cur_thresh = th_x0 + rate * cur_thresh;
     }
 fail:
     if (lmaxs) { free(lmaxs); }
     return filtered_maxs;
 }
 
-                 
-    lmaxs=local_max(x)
-    thresh=np.zeros_like(x)
-    filtered_maxs=[]
-    for n_max in lmaxs:
-        if (x[n_max] > min_thresh) and (x[n_max] > thresh[n_max]):
-            s=np.zeros_like(x)
-            s[n_max]=x[n_max]
-            thresh+=signal.lfilter([1],[1,-rate],s)
-            filtered_maxs.append(n_max)
-    return (np.array(filtered_maxs),thresh)
-}
-    

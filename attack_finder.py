@@ -15,7 +15,8 @@ smooth=0.9999,
 N=1000):
     # find local maximum using full-wave rectified signal
     xm=fast_max(np.abs(x),alph=smooth)
-    xmp=thresh_local_max_samples(np.diff(xm),alph=smooth,beta=1,N=N,thresh=thresh)
+    xmp=thresh_local_max_samples(np.diff(xm),alph=smooth,beta=1,N=N,
+        thresh=thresh)
     return np.where(xmp > 0)[0]
 
 def _shifted_lp(N=8,rs=80,Wn=0.5):
@@ -169,7 +170,8 @@ def attacks_from_spectral_diff(
     # set one_sided_max to 'left' so that the first point to become non-zero is
     # included as a local minimum
     sd_mins=spectral_difference.local_max(-sd,one_sided_max='left')
-    sd_mins_filtered=spectral_difference.closest_index_after(sd_maxs,sd_mins,reverse=True)
+    sd_mins_filtered=spectral_difference.closest_index_after(sd_maxs,
+        sd_mins,reverse=True)
 
     x_rms=spectral_difference.local_rms(x,H,W)
     sd_gate=(x_rms>np.power(10,ng_th/20)).astype(x.dtype)

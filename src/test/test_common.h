@@ -94,7 +94,7 @@ if longest_length not 0, allocates that length, otherwise allocates length
 that fits whole file
 */
 static inline void *
-file_to_array(char *path, long longest_length)
+file_to_array(const char *path, long longest_length)
 {
     long file_length;
     void *file_contents = NULL;
@@ -114,6 +114,17 @@ fail:
     if (f) { fclose(f); }
     if (file_contents) { free(file_contents); }
     return NULL;
+}
+
+static inline int
+array_to_file(const char *path, const void *data, unsigned int length)
+{
+    FILE *f = fopen(path,"w");
+    if (!f) { goto fail; }
+    if ((length != fwrite(data,1,length,f))) { goto fail; };
+    return 0;
+fail:
+    return -1;
 }
     
 
