@@ -1,3 +1,5 @@
+.PHONY = run_local_max_f32_tests 
+
 local_max_f32_test_deps = src/find_extrema.c \
                           src/find_extrema.h \
                           src/test/test_common.h
@@ -15,6 +17,9 @@ src/test/bin/find_extrema/local_max_f32_test_type_
 run_local_max_f32_test_target_stem = \
 run_local_max_f32_test_type_
 
+run_local_max_f32_tests : $(foreach type,$(local_max_f32_test_types),\
+$(run_local_max_f32_test_target_stem)$(type))
+
 # TODO: Make tests for other local max types
 $(foreach type,$(local_max_f32_test_types),\
 $(run_local_max_f32_test_target_stem)$(type)) : \
@@ -25,7 +30,7 @@ $(run_local_max_f32_test_target_stem)$(type)) : \
 	PYTHONPATH=. python3 \
     src/test/find_extrema/local_max_f32_type_$*_gen_input.py
 	$(local_max_f32_test_target_stem)$*
-	PYTHONPATH=. python3 \
+	ONE_SIDED_MAX="$*" PYTHONPATH=. python3 \
 	src/test/find_extrema/local_max_f32_check_output.py
 
 $(foreach type,$(local_max_f32_test_types),\
