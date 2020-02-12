@@ -22,6 +22,7 @@ struct rngbuf {
     char *data;
 };
 
+/* This can only be used if rngbuf_new was used */
 void
 rngbuf_free(struct rngbuf *rb)
 {
@@ -29,11 +30,13 @@ rngbuf_free(struct rngbuf *rb)
 }
 
 /*
-Capacity is the minimum number of values you want to be able to store in the
-ring buffer. Its actual capacity will probably be greater.
+Like rngbuf_new but a custom function gets the memory that the ringbuffer is
+put into. The alloc function should return NULL if it can't allocate the memory.
 */
 struct rngbuf *
-rngbuf_new(unsigned int capacity)
+rngbuf_overlay(unsigned int capacity,
+           void *(*alloc)(unsigned int capacity, void *aux),
+           void *aux)
 {
     if (capacity == 0) { return NULL; }
     unsigned int size = 1;
@@ -45,11 +48,28 @@ rngbuf_new(unsigned int capacity)
     capacity += 1;
     /* size is made to be power of 2 so we can wrap the indices quickly */
     while (size < capacity) { size <<= 1; }
-    struct rngbuf *ret = calloc(1,sizeof(struct rngbuf)+size);
+    struct rngbuf *ret = alloc(sizeof(struct rngbuf)+size,aux);
+    if (!ret) { return NULL; }
     ret->data = (char *)(ret+1);
     ret->size = size;
     ret->size_mask = size - 1;
     return ret;
+}
+
+static void *
+default_alloc(unsigned int capacity, void *aux)
+{
+    return calloc(1,capacity);
+}
+
+/*
+Capacity is the minimum number of values you want to be able to store in the
+ring buffer. Its actual capacity will probably be greater.
+*/
+struct rngbuf *
+rngbuf_new(unsigned int capacity)
+{
+    return rngbuf_overlay(capacity,default_alloc,NULL);
 }
 
 /* The size of the stuff currently stored in the ring buffer */

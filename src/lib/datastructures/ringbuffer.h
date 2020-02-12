@@ -14,6 +14,11 @@ void
 rngbuf_free(struct rngbuf *rb);
 
 struct rngbuf *
+rngbuf_overlay(unsigned int capacity,
+               void *(*alloc)(unsigned int capacity, void *aux),
+               void *aux);
+
+struct rngbuf *
 rngbuf_new(unsigned int capacity);
 
 unsigned int
