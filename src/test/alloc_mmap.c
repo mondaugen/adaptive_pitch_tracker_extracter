@@ -20,7 +20,7 @@ producer and signal consumer threads.
 Call this on the aux you used when you used alloc_mmap to free the memory it
 allocated
 */
-void alloc_mmap_free(struct alloc_mmap_free *aux)
+void alloc_mmap_free(struct alloc_mmap_aux *aux)
 {
     if (!aux) { return; }
     if (aux->fn >= 0) { close(aux->fn); }
@@ -31,18 +31,18 @@ void *alloc_mmap(
     unsigned int capacity,
     void *_aux)
 {
-    struct alloc_mmap *aux = _aux;
+    struct alloc_mmap_aux *aux = _aux;
     aux->capacity = capacity;
     aux->fn = -1;
     aux->s = NULL;
-    fn = shm_open(aux->path, O_RDWR | O_CREAT, 0644);
-    if (fn < 0) { report_and_fail("opening shared memory"); }
-    ftruncate(fn,capacity);
-    s = mmap(NULL, capacity,
+    aux->fn = shm_open(aux->path, O_RDWR | O_CREAT, 0644);
+    if (aux->fn < 0) { report_and_fail("opening shared memory"); }
+    ftruncate(aux->fn,capacity);
+    aux->s = mmap(NULL, capacity,
     PROT_WRITE | PROT_READ,
-    MAP_SHARED, fn, 0);
-    if ((s == MAP_FAILED)) { s = NULL; report_and_fail("mapping memory"); }
-    return s;
+    MAP_SHARED, aux->fn, 0);
+    if ((aux->s == MAP_FAILED)) { aux->s = NULL; report_and_fail("mapping memory"); }
+    return aux->s;
 fail:
     alloc_mmap_free(aux);
     return 0;

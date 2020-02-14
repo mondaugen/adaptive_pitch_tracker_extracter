@@ -8,7 +8,7 @@ struct alloc_mmap_aux {
     unsigned int capacity;
 };
 
-void alloc_mmap_free(struct alloc_mmap_free *aux);
+void alloc_mmap_free(struct alloc_mmap_aux *aux);
 
 void *alloc_mmap(unsigned int capacity,
                  void *_aux);

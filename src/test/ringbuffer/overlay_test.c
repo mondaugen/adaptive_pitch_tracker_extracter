@@ -20,14 +20,17 @@ const char *strs[] = {
     NULL
 };
 
-char **cur_str = strs;
+const char **cur_str = strs;
 
 int running = 1;
 
 static void send_next_string(struct rngbuf *rb)
 {
-    int slen = sprintf(NULL,"%s\n",*cur_str);
+    /* Get length of formatted string */
+    int slen = snprintf(NULL,0,"%s\n",*cur_str);
+    /* Allocate enough memory */
     char buf[slen+1];
+    /* Format it */
     sprintf(buf,"%s\n",*cur_str);
     if ((rngbuf_push_copy(rb,buf,slen) == 0)) {
         cur_str = *(cur_str + 1) == NULL ? strs : cur_str + 1;
@@ -43,7 +46,7 @@ end_prog(int sn)
 int main (void)
 {
     int ret = 0;
-    struct alloc_mmap_aux alloc_mmap_aux {
+    struct alloc_mmap_aux alloc_mmap_aux = {
         .path = "overlay_test_output_path"
         /* the rest gets filled in by alloc_mmap */
     };
