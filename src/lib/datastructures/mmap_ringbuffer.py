@@ -92,3 +92,33 @@ def rb_push_copy(buf,data):
     rb_set_data(buf,0,data[r1_s:])
     rb_set_tail_idx((t+n)&m)
     return 0
+
+def rb_get_slice(buf,start,length):
+    contents_size = rb_contents_size(buf)
+    if start >= contents_size:
+        return None
+    if length > (contents_size-start):
+        return None
+    h=rb_get_head_idx(buf)
+    m=rb_get_size_mask(buf)
+    s=rb_get_size(buf)
+    start_idx = (start + h) & m;
+    first_region_size = min(s - start_idx,length),
+    second_region_size = length - first_region_size,
+    data=rb_get_data(buf)
+    rb_slice=dict(
+        first_region_size = first_region_size,
+        second_region_size = second_region_size,
+        first_region = data[start_idx:start_idx+first_region_size],
+        second_region = data[:second_region_size] if second_region_size > 0 else None
+    )
+    return rb_slice
+
+def rb_memcpy(buf,start,length):
+    sl=rb_get_slice(buf,start,length)
+    if sl is None:
+        return None
+    ret = bytearray(sl['first_region'])
+    if sr['second_region'] is not None:
+        ret += sr['second_region']
+    return ret
