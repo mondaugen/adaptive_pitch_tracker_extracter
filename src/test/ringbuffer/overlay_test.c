@@ -22,6 +22,8 @@ const char *strs[] = {
 
 const char **cur_str = strs;
 
+const char overlay_test_path[] = "/overlay_test";
+
 int running = 1;
 
 static void send_next_string(struct rngbuf *rb)
@@ -47,7 +49,7 @@ int main (void)
 {
     int ret = 0;
     struct alloc_mmap_aux alloc_mmap_aux = {
-        .path = "overlay_test_output_path"
+        .path = overlay_test_path
         /* the rest gets filled in by alloc_mmap */
     };
     struct rngbuf *rb = rngbuf_overlay(RB_CAPACITY,
