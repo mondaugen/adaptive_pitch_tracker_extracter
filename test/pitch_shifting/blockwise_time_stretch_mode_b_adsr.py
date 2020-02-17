@@ -1,4 +1,4 @@
-# A gate signal is converted to and ADSR signal
+# A gate signal is converted to an ADSR signal
 # At the attacks, the time stretcher is reset and played for the time required
 # to fill the envelope
 # The time-stretcher uses the audio-rate time-stretch and pitch-shift signals
