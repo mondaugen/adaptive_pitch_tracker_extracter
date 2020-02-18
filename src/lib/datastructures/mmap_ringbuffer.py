@@ -24,7 +24,7 @@ rb_offsets=dict(
 )
 
 def rb_unpack(buf):
-    return struct.unpack(rb_format,buf)
+    return struct.unpack(rb_format,buf[:sizeof_rb])
 
 def rb_get_head_idx(buf):
     return rb_unpack(buf)[0]
@@ -102,9 +102,9 @@ def rb_get_slice(buf,start,length):
     h=rb_get_head_idx(buf)
     m=rb_get_size_mask(buf)
     s=rb_get_size(buf)
-    start_idx = (start + h) & m;
-    first_region_size = min(s - start_idx,length),
-    second_region_size = length - first_region_size,
+    start_idx = (start + h) & m
+    first_region_size = min(s - start_idx,length)
+    second_region_size = length - first_region_size
     data=rb_get_data(buf)
     rb_slice=dict(
         first_region_size = first_region_size,
@@ -119,6 +119,6 @@ def rb_memcpy(buf,start,length):
     if sl is None:
         return None
     ret = bytearray(sl['first_region'])
-    if sr['second_region'] is not None:
-        ret += sr['second_region']
+    if sl['second_region'] is not None:
+        ret += sl['second_region']
     return ret
