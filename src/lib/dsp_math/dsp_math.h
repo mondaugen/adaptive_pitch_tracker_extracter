@@ -14,6 +14,10 @@ so the function dspm_add_vf32_vf32(float *srcdst, const float* src, unsigned int
 length) computes srcdst[n] += src[n] for n in [0,length) and the function
 dspm_add_vf32_vf32_vf32(const float *src0, const float *src1, float *dst,
 unsigned int length) computs dst[n] = src0[n] + src1[n] for n in [0,length).
+
+For operations requiring vectors, calling these on vectors of length zero or
+NULL pointer arguments, the results are undefined.
+
 */
 
 /* Fast floor(log2(x)) */
@@ -41,6 +45,19 @@ dspm_mul_vf32_vf32_vf32(const float *src0,
                         const float *src1,
                         float *dst,
                         unsigned int length);
+
+void
+dspm_mul_vf32_f32(float *srcdst,
+                  float src1,
+                  unsigned int length);
+
+void
+dspm_neg_vf32(float *srcdst,
+              unsigned int length);
+
+float
+dspm_max_vf32(const float *src,
+              unsigned int length);
 
 void
 dspm_abs_vf32(float *srcdst, unsigned int length);

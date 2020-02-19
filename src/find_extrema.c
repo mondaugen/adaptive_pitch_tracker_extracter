@@ -148,7 +148,7 @@ discount_local_max_f32(
         if (n_pass == 0) {
             /* allocate after 1st pass */
             /* allocate the memory necessary for the filtered maxima */
-            filtered_maxs = malloc(sizeof(unsigned int [n_maxs]));
+            filtered_maxs = malloc(sizeof(unsigned int)*n_maxs);
             if (!filtered_maxs) { goto fail; }
         }
     }

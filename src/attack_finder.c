@@ -253,20 +253,58 @@ attacks_from_spec_diff_finder_compute(
     if (!x) { return NULL; }
     if (length < 1) { return NULL; }
     struct spec_diff_result *sd = NULL;
-    struct index_points *sd_mins = NULL,
-                        *sd_maxs = NULL,
-                        *sd_mins_filtered = NULL;
+    unsigned int *sd_mins = NULL,
+                 *sd_maxs = NULL,
+                 *sd_mins_filtered = NULL,
+                 n_sd_maxs,
+                 n_sd_mins,
+                 n_sd_mins_filtered;
     struct attacks_from_spec_diff_result *ret = NULL;
     /* Find spectral difference */
     sd = spec_diff_finder_find(finder->spec_diff_finder,x,length);
     if (!sd) { goto fail; }
     /* Smooth the spectral difference */
     iir_avg(sd->spec_diff,sd->spec_diff,sd->length,finder->smoothing);
+    /* Find local maxima using a discounting technique */
+    sd_maxs = discount_local_max_f32(sd->spec_diff, sd->length, &n_sd_maxs,
+        local_max_type_right, finder->smoothing, finder->ng_th_A, NULL)
+    if (!sd_maxs) { goto fail; }
+    /* Multiply spectral difference by -1 to find local minima */
+    // dspm_mul_vf32_f32(sd->spec_diff, -1, n_sd_maxs);
+    dspm_neg_vf32(sd->spec_diff, sd->length);
+    /* Find local minima */
+    sd_mins = local_max_f32(sd->spec_diff, sd->length, &n_sd_mins,
+        local_max_type_left);
+    if (!sd_mins) { goto fail; }
+/* TODO: we still have to write these routines
+    sd_mins_filtered=spectral_difference.closest_index_after(sd_maxs,
+        sd_mins,reverse=True)
+
+    x_rms=spectral_difference.local_rms(x,H,W)
+    sd_gate=(x_rms>np.power(10,ng_th/20)).astype(x.dtype)
+    #sd_gate_t=np.arange(len(sd_gate))*H_SF/SAMPLE_RATE
+    sd_maxs=spectral_difference.index_mask(sd_maxs,sd_gate)
+
+    # add one hop to compensate for the differencing operation
+    sd_maxs+=1
+    sd_mins_filtered+=1
+    
+    # multiply by hop size because we want the indices in samples not hops
+    sd_maxs*=H
+    sd_mins_filtered*=H
+
+    # compensate for window by offseting the maxima by half a window
+    sd_maxs += W//2
+    sd_mins_filtered += W//2
+
+    return spectral_difference.up_down_match(sd_mins_filtered,sd_maxs)
+*/
 fail:
     if (sd) { spec_diff_result_free(sd); }
     if (sd_mins) { index_points_free(sd_mins); }
     if (sd_maxs) { index_points_free(sd_maxs); }
     if (sd_mins_filtered) { index_points_free(sd_mins_filtered); }
+    if (sd_local_maxs) { free(sd_local_maxs); }
     return ret;
 }
 

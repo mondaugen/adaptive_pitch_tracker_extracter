@@ -15,6 +15,39 @@ dspm_mul_vf32_vf32_vf32(const float *src0,
 }
 
 void
+dspm_mul_vf32_f32(float *srcdst,
+                  float src1,
+                  unsigned int length)
+{
+    while (length--) {
+        *srcdst++ *= src1;
+    }
+}
+
+void
+dspm_neg_vf32(float *srcdst,
+              unsigned int length)
+{
+    /* Negation of IEEE floating point involves flipping highest-bit */
+    while (length--) {
+        *srcdst++ ^= 0x80000000;
+    }
+}
+
+float
+dspm_max_vf32(const float *src,
+              unsigned int length)
+{
+    float ret = *src++;
+    length--;
+    while (length--) {
+        ret = *src > ret ? *src : ret;
+        src++;
+    }
+    return ret;
+}
+
+void
 dspm_abs_vf32(float *srcdst, unsigned int length)
 {
     while (length--) {
