@@ -72,7 +72,8 @@ pv=pvoc_synth(
     wl_access)
 
 # estimate attack times
-attack_time_pairs=attack_finder.attacks_from_spectral_diff(x,lmax_filt_rate=LMAX_FILT_RATE)
+attack_time_pairs=attack_finder.attacks_from_spectral_diff(x,
+lmax_filt_rate=LMAX_FILT_RATE)
 attack_times=np.array([b for a,b in attack_time_pairs])
 # make attack avoider
 av=attack_avoider(attack_times,-H,H+W,H)

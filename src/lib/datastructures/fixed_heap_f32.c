@@ -11,8 +11,8 @@ static int heap_item_f32_min_cmp(void *a_, void *b_, void *aux)
 static int heap_item_f32_max_cmp(void *a_, void *b_, void *aux)
 {
     struct fixed_heap_item_f32 *a = a_,
-                         *b = b_;
-    if (a->index > b->index) { return 1; }
+                               *b = b_;
+    if (b->index > a->index) { return 1; }
     return 0;
 }
 

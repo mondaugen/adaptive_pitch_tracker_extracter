@@ -141,8 +141,10 @@ def up_down_match(up,down):
 
 def local_max_mat(x):
     """ for matrices, finds the local maxima within the columns """
-    gtr=np.concatenate((x[:-1,:]>=x[1:,:],np.zeros((1,x.shape[1]),dtype='bool')),axis=0)
-    gtl=np.concatenate((np.zeros((1,x.shape[1]),dtype='bool'),x[1:,:]>x[:-1,:]),axis=0)
+    gtr=np.concatenate((x[:-1,:]>=x[1:,:],
+        np.zeros((1,x.shape[1]),dtype='bool')),axis=0)
+    gtl=np.concatenate((np.zeros((1,x.shape[1]),dtype='bool'),
+        x[1:,:]>x[:-1,:]),axis=0)
     return np.where(gtr&gtl)
 
 def filtered_local_max(x,H,W,a):

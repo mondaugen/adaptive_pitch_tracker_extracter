@@ -59,6 +59,10 @@ float
 dspm_max_vf32(const float *src,
               unsigned int length);
 
+unsigned int
+dspm_max_vu32(const unsigned int *src,
+              unsigned int length);
+
 void
 dspm_abs_vf32(float *srcdst, unsigned int length);
 

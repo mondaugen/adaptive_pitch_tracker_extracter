@@ -3,8 +3,13 @@
 #include <math.h>
 #include <string.h>
 #include "pvoc_windows.h"
+#include "fixed_heap_u32_key.h"
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MAX(a,b) \
+  ({ typeof (a) _a = (a); \
+     typeof (b) _b = (b); \
+     _a > _b ? _a : _b; })
+
 #define SWAP(a,b)\
     ({ typeof(a) tmp = a;\
        a = b;\
@@ -243,12 +248,103 @@ iir_avg(const float *x, float *y, unsigned int length, float a)
     }
 }
 
+/*
+filter out the indices in find_closest by leaving only the ones coming right
+after indices on the left.
+Output is sorted in ascending order.
+filter and find_closest must be sorted in ascending order
+*/
+static unsigned int *
+attack_finder_closest_index_after(
+    const unsigned int *filtered,
+    /* length of filtered */
+    unsigned int n_filtered,
+    const unsigned int *find_closest,
+    /* length of find_closest */
+    unsigned int n_find_closest,
+    /* after returning, contains the number of indices in resulting array */
+    unsigned int *n_idcs,
+    /* if non-zero, filters out indices in find_closest by leaving only those
+    coming before indices on the right */ 
+    int reverse)
+{
+    struct fixed_heap *filtered_heap = NULL,
+                      *find_closest_heap = NULL,
+                      *idcs = NULL;
+    unsigned int *ret = NULL, *pu32,
+                 ary_len = MAX(filtered[n_filtered-1], 
+                    find_closest[n_find_closest-1]) + 1,
+                 n, n_idcs_, val;
+    struct fixed_heap_u32_key_init hinit {
+        .max_heap = 0;
+    };
+    float x_1 = 0, x, dx, a_n, b_n;
+    hinit.max_n_items = n_filtered;
+    filtered_heap = fixed_heap_u32_key_new(&hinit);
+    if (!filtered_heap) { goto fail; }
+    for (n = 0; n < n_filtered; n++) {
+        val = filtered[n];
+        if (reverse) { val = ary_len - val - 1; }
+        fixed_heap_insert(filtered_heap,&val);
+    }
+    hinit.max_n_items = n_find_closest;
+    find_closest_heap = fixed_heap_u32_key_new(&hinit);
+    if (!find_closest_heap) { goto fail; }
+    for (n = 0; n < n_find_closest; n++) {
+        val = find_closest[n];
+        if (reverse) { val = ary_len - val - 1; }
+        fixed_heap_insert(find_closest_heap,&val);
+    }
+    hinit.max_n_items = n_filtered + n_find_closest;
+    idcs = fixed_heap_u32_key_new(&hinit);
+    if (!idcs) { goto fail; }
+    n_idcs_ = 0;
+    for (n = 0; n < ary_len; n++) {
+        a_n = 0; b_n = 0;
+        if (*(unsigned int *)fixed_heap_access(
+            filtered_heap,0) == n) {
+            a_n = 1;
+            fixed_heap_remove_top(filtered_heap);
+        }
+        if (*(unsigned int *)fixed_heap_access(
+            find_closest_heap,0) == n) {
+            b_n = 1;
+            fixed_heap_remove_top(find_closest_heap);
+        }
+        x = x_1 + a_n - b_n;
+        if (x < 0) { x = 0; }
+        if (x > 1) { x = 1; }
+        dx = x - x_1;
+        if (dx < 0) { fixed_heap_insert(idcs,&n); n_idcs_++; }
+        x_1 = x;
+    }
+    ret = malloc(sizeof(unsigned int)*n_idcs_);
+    if (!ret) { goto fail; }
+    *n_idcs = n_idcs_;
+    pu32 = ret;
+    while (n_idcs_--) {
+        val = *(unsigned int*)fixed_heap_access(idcs,0);
+        if (reverse) { val = ary_len - val - 1; }
+        *pu32++ = val;
+    }
+fail:
+    if (filtered_heap) { fixed_heap_free(filtered_heap); }
+    if (find_closest_heap) { fixed_heap_free(find_closest_heap); }
+    if (idcs) { fixed_heap_free(idcs); }
+    return ret;
+}
+
 /* Returns pairs that are an estimation of the attack start and end times. */
 struct attacks_from_spec_diff_result *
 attacks_from_spec_diff_finder_compute(
     struct attacks_from_spec_diff_finder *finder,
     float *x
-    unsigned int length)
+    unsigned int length,
+    /* If non-zero, trys to find the beginning of the attack just before the
+    estimated attack peak and if found, puts it in the "beginning" field of the
+    same attack_sample_time_pair as the attack peak time. Otherwise it just puts
+    the attack time peaks in the "end" field of the attack_sample_time_pairs. */
+    int return_time_pairs)
 {
     if (!x) { return NULL; }
     if (length < 1) { return NULL; }
@@ -276,6 +372,8 @@ attacks_from_spec_diff_finder_compute(
     sd_mins = local_max_f32(sd->spec_diff, sd->length, &n_sd_mins,
         local_max_type_left);
     if (!sd_mins) { goto fail; }
+    if (return_time_pairs) { goto fail; /* not implemented */ }
+
 /* TODO: we still have to write these routines
     sd_mins_filtered=spectral_difference.closest_index_after(sd_maxs,
         sd_mins,reverse=True)

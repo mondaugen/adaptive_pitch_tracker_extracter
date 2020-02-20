@@ -31,17 +31,22 @@ heapify(struct fixed_heap *h, unsigned int n)
                  ci;
     if (li >= h->cur_n_items) { return; }
     if (ri >= h->cur_n_items) { 
-        if (h->cmp(h->items + h->item_size*n, h->items + h->item_size*li, h->cmp_aux)) {
-            item_swap(h->items + h->item_size*n, h->items + h->item_size*li, h->item_size);
+        if (h->cmp(h->items + h->item_size*n, h->items + h->item_size*li,
+            h->cmp_aux)) {
+            item_swap(h->items + h->item_size*n, h->items + h->item_size*li,
+                h->item_size);
         }
         return;
     }
     ci = li;
-    if (h->cmp(h->items + h->item_size*li, h->items + h->item_size*ri, h->cmp_aux)) {
+    if (h->cmp(h->items + h->item_size*li, h->items + h->item_size*ri,
+        h->cmp_aux)) {
         ci = ri;
     }
-    if (h->cmp(h->items + h->item_size*n, h->items + h->item_size*ci, h->cmp_aux)) {
-        item_swap(h->items + h->item_size*n, h->items + h->item_size*ci, h->item_size);
+    if (h->cmp(h->items + h->item_size*n, h->items + h->item_size*ci,
+        h->cmp_aux)) {
+        item_swap(h->items + h->item_size*n, h->items + h->item_size*ci,
+            h->item_size);
     }
 }
 
