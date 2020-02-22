@@ -1,0 +1,30 @@
+.PHONY: run_closest_index_after_test
+
+run_closest_index_after_test : \
+    src/test/bin/closest_index_after_test \
+    src/test/attack_finder/closest_index_after_test.py \
+    src/test/attack_finder/closest_index_after_test_plot.py
+	python3 src/test/attack_finder/closest_index_after_test.py && \
+        src/test/bin/closest_index_after_test && \
+        PYTHONPATH=. python3 src/test/attack_finder/closest_index_after_test_plot.py
+
+src/test/bin/closest_index_after_test : \
+    src/test/attack_finder/closest_index_after_test.c \
+    src/attack_finder.c \
+    src/attack_finder.h \
+    src/test/test_common.h \
+    src/pvoc_windows.c \
+    src/pvoc_windows.h \
+    src/find_extrema.c \
+    src/find_extrema.h \
+    src/lib/datastructures/fixed_heap.h \
+    src/lib/datastructures/fixed_heap.c \
+    src/lib/datastructures/fixed_heap_u32_key.c \
+    src/lib/datastructures/fixed_heap_u32_key.h \
+    src/lib/attack_finder/routines_linux_native.c \
+    src/lib/dsp_math/dsp_math.h \
+    src/lib/dsp_math/dsp_math_linux_native.c \
+    src/lib/kissfft/kiss_fft.c \
+    src/lib/kissfft/tools/kiss_fftr.c
+	cc -g $(filter %.c, $^) -I src/lib/kissfft/tools/ -I src/lib/kissfft/\
+        -Isrc -Isrc/test -Isrc/lib/datastructures/ -Isrc/lib/dsp_math -o $@ -lm

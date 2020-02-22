@@ -54,4 +54,18 @@ struct attacks_from_spec_diff_result {
     unsigned int n_attack_time_pairs;
 };
 
+unsigned int *
+attack_finder_closest_index_after(
+    const unsigned int *filtered,
+    /* length of filtered */
+    unsigned int n_filtered,
+    const unsigned int *find_closest,
+    /* length of find_closest */
+    unsigned int n_find_closest,
+    /* after returning, contains the number of indices in resulting array */
+    unsigned int *n_idcs,
+    /* if non-zero, filters out indices in find_closest by leaving only those
+    coming before indices on the right */ 
+    int reverse);
+
 #endif /* ATTACK_FINDER_H */

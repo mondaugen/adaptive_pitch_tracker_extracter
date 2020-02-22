@@ -89,7 +89,7 @@ dspm_sum_vf32(const float *src, unsigned int length);
 
 /* Assumes d is non-zero */
 void
-dspm_div_vf32_f32(float *srcdst
+dspm_div_vf32_f32(float *srcdst,
                   float d,
                   unsigned int length);
 
@@ -117,7 +117,7 @@ dspm_rfft_vf32_vz32_cfg_free(struct dspm_rfft_vf32_vz32_cfg *cfg);
 
 void
 dspm_rfft_vf32_vz32(struct dspm_rfft_vf32_vz32_cfg *cfg,
-                    const float *src,
-                    float complex *dst);
+                    float *time,
+                    float complex *freq);
 
 #endif /* DSP_MATH_H */

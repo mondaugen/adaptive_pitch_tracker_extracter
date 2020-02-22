@@ -30,7 +30,7 @@ dspm_neg_vf32(float *srcdst,
 {
     /* Negation of IEEE floating point involves flipping highest-bit */
     while (length--) {
-        *srcdst++ ^= 0x80000000;
+        *(unsigned int*)srcdst++ ^= 0x80000000;
     }
 }
 
@@ -82,7 +82,7 @@ void
 dspm_abs_vz32_vf32(const float complex *src, float *dst, unsigned int length)
 {
     while (length--) {
-        *dst++ = cabsf(*srcdst++);
+        *dst++ = cabsf(*src++);
     }
 }
 
@@ -121,7 +121,7 @@ dspm_sum_vf32(const float *src, unsigned int length)
 
 /* Assumes d is non-zero */
 void
-dspm_div_vf32_f32(float *srcdst
+dspm_div_vf32_f32(float *srcdst,
                   float d,
                   unsigned int length)
 {
@@ -138,7 +138,7 @@ struct dspm_rfft_vf32_vz32_cfg {
 void
 dspm_rfft_vf32_vz32_cfg_free(struct dspm_rfft_vf32_vz32_cfg *cfg)
 {
-    if (cfg)
+    if (cfg) {
         if (cfg->cfg) {
             kiss_fftr_free(cfg->cfg);
         }
@@ -168,7 +168,7 @@ is const and latter case freq is const.
 void
 dspm_rfft_vf32_vz32(struct dspm_rfft_vf32_vz32_cfg *cfg,
                     float *time,
-                    complex *freq)
+                    float complex *freq)
 {
     if (cfg->inverse) {
         kiss_fftri(cfg->cfg,freq,time);

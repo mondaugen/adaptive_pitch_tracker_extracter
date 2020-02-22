@@ -1,9 +1,15 @@
 /* Estimate the time of attacks in audio signals */
 
+#include <stdint.h>
+#include <stdlib.h>
+#include <complex.h>
 #include <math.h>
 #include <string.h>
 #include "pvoc_windows.h"
 #include "fixed_heap_u32_key.h"
+#include "attack_finder.h"
+#include "dsp_math.h"
+#include "find_extrema.h"
 
 #define MAX(a,b) \
   ({ typeof (a) _a = (a); \
@@ -14,6 +20,24 @@
     ({ typeof(a) tmp = a;\
        a = b;\
        b = tmp; })
+
+/*
+Define these somewhere for the relevant implementation.
+The argument for doing it this way is because there are many ways to
+implement the DFT. For example you might have a real-only DFT that is packed or
+unpacked, or one where the values are permuted. These may all exist one day in
+the dsp_math routines, but only one can be chosen for this routine.
+*/
+/* free a dft object */
+extern void spec_diff_dft_free(void *aux);
+/* allocate a dft object for a given window size W */
+extern void *spec_diff_dft_new(unsigned int W);
+/* carry out a forward DFT */
+extern void spec_diff_forward_dft(void *aux, float *time, float complex *freq);
+/* Return the number of complex values in the result of a DFT from W real
+numbers. For example if the DFT is the unpacked real DFT then the number of
+complex values is floor(W/2) + 1 for most implementations. */
+extern unsigned int spec_diff_complex_size(unsigned int W);
 
 struct spec_diff_result {
     float *spec_diff;
@@ -32,7 +56,8 @@ spec_diff_result_free(struct spec_diff_result *x)
 /* TODO: The policy should be that structs whose fields are known (i.e., users
 of the struct can allocate them and access their fields without helper functions
 provided by the implementation), should be freeable with free */
-static spec_diff_result_new(unsigned int length)
+static struct spec_diff_result *
+spec_diff_result_new(unsigned int length)
 {
     struct spec_diff_result *ret = calloc(sizeof(struct spec_diff_result),1);
     if (!ret) { goto fail; }
@@ -48,7 +73,7 @@ fail:
 struct spec_diff_finder {
     unsigned int H;
     unsigned int W;
-    const float *window;
+    float *window;
     /* Auxiliary data for DFT calculations */
     void *dft_aux;
 };
@@ -82,7 +107,7 @@ spec_diff_finder_new(struct spec_diff_finder_init *init)
     ret->W = init->W;
     ret->window = calloc(init->W,sizeof(float));
     if (!ret->window) { goto fail; }
-    if (init->init_window(ret->window,init->init_window_aux,init-W)) {
+    if (init->init_window(ret->window,init->init_window_aux,init->W)) {
         goto fail;
     };
     ret->dft_aux = spec_diff_dft_new(init->W);
@@ -106,7 +131,7 @@ spec_diff_finder_find(struct spec_diff_finder *finder,
     float complex *z_tmp = (float complex *)tmp;
     float _X0[L], _X1[L],
           *X0 = _X0, *X1 = _X1,
-          x_tmp = (float*)tmp;
+          *x_tmp = (float*)tmp;
     if (len_x == 0) { return NULL; }
     memset(X1,0,sizeof(float)*L);
     unsigned int length_spec_diff = pvoc_calc_n_blocks(
@@ -185,7 +210,7 @@ compute_lmfr(float lmax_filt_rate, float H)
     calculate the max filter rate
     number of hops in the lmax_filt_rate
     */
-    float lmfr_n_H=args->lmax_filt_rate/H;
+    float lmfr_n_H=lmax_filt_rate/H;
     /* Must be greater than 0 */
     if (lmfr_n_H <= 0) { lmfr_n_H=1; }
     /* what number to this power is .01 ? */
@@ -215,15 +240,16 @@ struct attacks_from_spec_diff_finder_args *args)
     if (!ret) { return NULL; }
     struct spec_diff_finder_init spec_diff_finder_init = {
         .H = args->H,
-        .W = args->W
+        .W = args->W,
         .init_window = get_normalized_window,
-        .init_window_aux = args->window_type
+        /* We can discard const because get_normalized_window only reads init_window_aux */
+        .init_window_aux = (void*)(uintptr_t)args->window_type
     };
     ret->spec_diff_finder = spec_diff_finder_new(&spec_diff_finder_init);
     if (!ret->spec_diff_finder) { goto fail; }
     ret->H = args->H;
     ret->W = args->W;
-    ret->smoothing = smoothing;
+    ret->smoothing = args->smoothing;
     ret->lmfr = compute_lmfr(args->lmax_filt_rate, args->H);
     return ret;
 fail:
@@ -254,7 +280,7 @@ after indices on the left.
 Output is sorted in ascending order.
 filter and find_closest must be sorted in ascending order
 */
-static unsigned int *
+unsigned int *
 attack_finder_closest_index_after(
     const unsigned int *filtered,
     /* length of filtered */
@@ -275,8 +301,8 @@ attack_finder_closest_index_after(
                  ary_len = MAX(filtered[n_filtered-1], 
                     find_closest[n_find_closest-1]) + 1,
                  n, n_idcs_, val;
-    struct fixed_heap_u32_key_init hinit {
-        .max_heap = 0;
+    struct fixed_heap_u32_key_init hinit = {
+        .max_heap = 0
     };
     float x_1 = 0, x, dx, a_n, b_n;
     hinit.max_n_items = n_filtered;
@@ -338,7 +364,7 @@ fail:
 struct attacks_from_spec_diff_result *
 attacks_from_spec_diff_finder_compute(
     struct attacks_from_spec_diff_finder *finder,
-    float *x
+    float *x,
     unsigned int length,
     /* If non-zero, trys to find the beginning of the attack just before the
     estimated attack peak and if found, puts it in the "beginning" field of the
@@ -363,7 +389,7 @@ attacks_from_spec_diff_finder_compute(
     iir_avg(sd->spec_diff,sd->spec_diff,sd->length,finder->smoothing);
     /* Find local maxima using a discounting technique */
     sd_maxs = discount_local_max_f32(sd->spec_diff, sd->length, &n_sd_maxs,
-        local_max_type_right, finder->smoothing, finder->ng_th_A, NULL)
+        local_max_type_right, finder->smoothing, finder->ng_th_A, NULL);
     if (!sd_maxs) { goto fail; }
     /* Multiply spectral difference by -1 to find local minima */
     // dspm_mul_vf32_f32(sd->spec_diff, -1, n_sd_maxs);
@@ -399,11 +425,8 @@ attacks_from_spec_diff_finder_compute(
 */
 fail:
     if (sd) { spec_diff_result_free(sd); }
-    if (sd_mins) { index_points_free(sd_mins); }
-    if (sd_maxs) { index_points_free(sd_maxs); }
-    if (sd_mins_filtered) { index_points_free(sd_mins_filtered); }
-    if (sd_local_maxs) { free(sd_local_maxs); }
+    if (sd_mins) { free(sd_mins); }
+    if (sd_maxs) { free(sd_maxs); }
+    if (sd_mins_filtered) { free(sd_mins_filtered); }
     return ret;
 }
-
-                                      

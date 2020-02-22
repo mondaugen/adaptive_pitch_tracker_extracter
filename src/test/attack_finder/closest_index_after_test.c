@@ -5,10 +5,10 @@
 #include "test_common.h"
 
 /* Assert x, print error and goto fail if failed */
-#define CHK_PRINT_ERR_FAIL(x,msg,...)\
+#define CHK_PRINT_ERR_FAIL(x, msg, ...)\
     if (!x) {\
-        fprintf(stderr,msg,__VA_ARGS__);\
-        fprintf("\n");\
+        fprintf(stderr, msg, ##__VA_ARGS__);\
+        fprintf(stderr,"\n");\
         ret = -1;\
         goto fail;\
     }
