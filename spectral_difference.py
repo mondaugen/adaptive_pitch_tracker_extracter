@@ -114,7 +114,8 @@ def closest_index_after(filtered,find_closest,reverse=False):
         x=x+a[n]-b[n]
         if x < 0:
             x = 0
-        # TODO: Shouldn't we also put "if x > 1: x = 1" ?
+        if x > 1:
+            x = 1
         c[n]=x
     dx=np.concatenate(([0],np.diff(c)))
     dx[dx>0]=0

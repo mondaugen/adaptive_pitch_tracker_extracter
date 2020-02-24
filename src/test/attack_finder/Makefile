@@ -1,10 +1,26 @@
 .PHONY: run_closest_index_after_test
 
+src/test/bin/fixed_heap_u32_test : \
+    src/test/fixed_heap/u32_test.c \
+    src/lib/datastructures/fixed_heap_u32_key.h \
+    src/lib/datastructures/fixed_heap_u32_key.c \
+    src/lib/datastructures/fixed_heap.h \
+    src/lib/datastructures/fixed_heap.c
+	cc -g $(filter %.c, $^) -I src/lib/datastructures/ -o $@
+
 run_closest_index_after_test : \
     src/test/bin/closest_index_after_test \
     src/test/attack_finder/closest_index_after_test.py \
     src/test/attack_finder/closest_index_after_test_plot.py
 	python3 src/test/attack_finder/closest_index_after_test.py && \
+        src/test/bin/closest_index_after_test && \
+        PYTHONPATH=. python3 src/test/attack_finder/closest_index_after_test_plot.py
+
+run_closest_index_after_simple_test : \
+    src/test/bin/closest_index_after_test \
+    src/test/attack_finder/closest_index_after_test.py \
+    src/test/attack_finder/closest_index_after_test_plot.py
+	python3 src/test/attack_finder/closest_index_after_simple_test.py && \
         src/test/bin/closest_index_after_test && \
         PYTHONPATH=. python3 src/test/attack_finder/closest_index_after_test_plot.py
 

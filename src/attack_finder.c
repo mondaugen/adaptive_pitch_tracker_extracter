@@ -278,7 +278,7 @@ iir_avg(const float *x, float *y, unsigned int length, float a)
 filter out the indices in find_closest by leaving only the ones coming right
 after indices on the left.
 Output is sorted in ascending order.
-filter and find_closest must be sorted in ascending order
+filter and find_closest must be sorted in ascending order and contain only unique items
 */
 unsigned int *
 attack_finder_closest_index_after(
@@ -305,6 +305,7 @@ attack_finder_closest_index_after(
         .max_heap = 0
     };
     float x_1 = 0, x, dx, a_n, b_n;
+    if ((n_filtered == 0)||(n_find_closest == 0)) { goto fail; }
     hinit.max_n_items = n_filtered;
     filtered_heap = fixed_heap_u32_key_new(&hinit);
     if (!filtered_heap) { goto fail; }
@@ -327,13 +328,13 @@ attack_finder_closest_index_after(
     n_idcs_ = 0;
     for (n = 0; n < ary_len; n++) {
         a_n = 0; b_n = 0;
-        if (*(unsigned int *)fixed_heap_access(
-            filtered_heap,0) == n) {
+        const unsigned int *point = fixed_heap_access(filtered_heap,0);
+        if (point && (*point == n)) {
             a_n = 1;
             fixed_heap_remove_top(filtered_heap);
         }
-        if (*(unsigned int *)fixed_heap_access(
-            find_closest_heap,0) == n) {
+        point = fixed_heap_access(find_closest_heap,0);
+        if (point && (*point == n)) {
             b_n = 1;
             fixed_heap_remove_top(find_closest_heap);
         }
@@ -350,6 +351,7 @@ attack_finder_closest_index_after(
     pu32 = ret;
     while (n_idcs_--) {
         val = *(unsigned int*)fixed_heap_access(idcs,0);
+        fixed_heap_remove_top(idcs);
         if (reverse) { val = ary_len - val - 1; }
         *pu32++ = val;
     }

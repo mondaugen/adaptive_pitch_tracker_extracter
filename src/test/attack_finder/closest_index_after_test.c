@@ -43,11 +43,11 @@ static int test_find_closest(
     n_find_closest = get_file_length_path(
         find_closest_path)/sizeof(unsigned int);
     closest = attack_finder_closest_index_after(
-    filtered,n_filtered,find_closest,n_find_closest,&n_closest,0);
+    filtered,n_filtered,find_closest,n_find_closest,&n_closest,reverse);
     CHK_PRINT_ERR_FAIL(filtered,"calling attack_finder_closest_index_after");
     CHK_PRINT_ERR_FAIL(
         (array_to_file(closest_path,
-            closest,n_find_closest*sizeof(unsigned int)) == 0),
+            closest,n_closest*sizeof(unsigned int)) == 0),
         "saving %s",
         closest_path);
 fail:
