@@ -176,3 +176,13 @@ dspm_rfft_vf32_vz32(struct dspm_rfft_vf32_vz32_cfg *cfg,
         kiss_fftr(cfg->cfg,time,freq);
     }
 }
+
+/* assumes length > 0 */
+float
+dspm_mean_vf32_f32(const float *src, unsigned int length)
+{
+    float ret = dspm_sum_vf32(src, length);
+    ret /= length;
+    return ret;
+}
+

@@ -120,4 +120,7 @@ dspm_rfft_vf32_vz32(struct dspm_rfft_vf32_vz32_cfg *cfg,
                     float *time,
                     float complex *freq);
 
+float
+dspm_mean_vf32_f32(const float *src, unsigned int length);
+
 #endif /* DSP_MATH_H */

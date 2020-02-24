@@ -10,7 +10,7 @@ random.seed(SEED)
 # values must be unique
 filtered=np.array(random.sample(range(MAX),N),dtype='uint32')
 filtered.sort()
-find_closest=np.array(random.sample(range(MAX),N),dtype='uint32')
+find_closest=np.array(random.sample(range(MAX),2*N),dtype='uint32')
 find_closest.sort()
 
 filtered.tofile('/tmp/closest_index_after_test_filtered_forward.u32')

@@ -174,7 +174,7 @@ struct attacks_from_spec_diff_finder {
     float smoothing;
     /* the local maxmimum filter coefficient computed from lmax_filt_rate*/
     float lmfr;
-    /* the linear threshold in dB */
+    /* the linear threshold */
     float ng_th_A;
 };
 
@@ -251,6 +251,9 @@ struct attacks_from_spec_diff_finder_args *args)
     ret->W = args->W;
     ret->smoothing = args->smoothing;
     ret->lmfr = compute_lmfr(args->lmax_filt_rate, args->H);
+    /* To avoid having to find the mean square when computing, we scale the
+    threshold accordingly */
+    ret->ng_th_A = ret->W*power(10,args->ng_th/10);
     return ret;
 fail:
     attacks_from_spec_diff_finder_free(ret);
@@ -274,6 +277,27 @@ iir_avg(const float *x, float *y, unsigned int length, float a)
     }
 }
 
+static inline float *
+local_sum_square(
+    const float *x,
+    unsigned int N,
+    unsigned int H,
+    unsigned int W)
+{
+    unsigned int n_mean_square = pvoc_calc_n_blocks(N, H, W),
+                 n = 0;
+    float tmp[W], *px = x, *ret = NULL, *pret;
+    ret = malloc(n_mean_square*sizeof(float));
+    if (!ret) { return NULL; }
+    pret = ret;
+    for (n = 0; n < n_mean_square; n++) {
+        dspm_mul_vf32_vf32_vf32(px, px, tmp, W);
+        *pret++ = dspm_sum_vf32(tmp,W);
+        px += H;
+    }
+    return ret;
+}
+
 /*
 filter out the indices in find_closest by leaving only the ones coming right
 after indices on the left.
@@ -294,6 +318,11 @@ attack_finder_closest_index_after(
     coming before indices on the right */ 
     int reverse)
 {
+    /* TODO: Is this the best policy? This function shouldn't get called at all
+    in the following cases */
+    if ((!filtered)||(n_filtered==0)||(!find_closest)||(n_find_closest==0)||(!n_idcs)) {
+        return NULL;
+    }
     struct fixed_heap *filtered_heap = NULL,
                       *find_closest_heap = NULL,
                       *idcs = NULL;
@@ -305,7 +334,6 @@ attack_finder_closest_index_after(
         .max_heap = 0
     };
     float x_1 = 0, x, dx, a_n, b_n;
-    if ((n_filtered == 0)||(n_find_closest == 0)) { goto fail; }
     hinit.max_n_items = n_filtered;
     filtered_heap = fixed_heap_u32_key_new(&hinit);
     if (!filtered_heap) { goto fail; }
@@ -362,6 +390,17 @@ fail:
     return ret;
 }
 
+static inline void threshold_to_gate(
+    float *x,
+    unsigned int N,
+    float threshold)
+{
+    while (N--) {
+        *x = *x > threshold ? 1 : 0;
+        x++;
+    }
+}
+
 /* Returns pairs that are an estimation of the attack start and end times. */
 struct attacks_from_spec_diff_result *
 attacks_from_spec_diff_finder_compute(
@@ -383,6 +422,7 @@ attacks_from_spec_diff_finder_compute(
                  n_sd_maxs,
                  n_sd_mins,
                  n_sd_mins_filtered;
+    float sd_gate = NULL;
     struct attacks_from_spec_diff_result *ret = NULL;
     /* Find spectral difference */
     sd = spec_diff_finder_find(finder->spec_diff_finder,x,length);
@@ -392,23 +432,32 @@ attacks_from_spec_diff_finder_compute(
     /* Find local maxima using a discounting technique */
     sd_maxs = discount_local_max_f32(sd->spec_diff, sd->length, &n_sd_maxs,
         local_max_type_right, finder->smoothing, finder->ng_th_A, NULL);
-    if (!sd_maxs) { goto fail; }
+    if (!sd_maxs || (n_sd_maxs == 0)) { goto fail; }
     /* Multiply spectral difference by -1 to find local minima */
     // dspm_mul_vf32_f32(sd->spec_diff, -1, n_sd_maxs);
     dspm_neg_vf32(sd->spec_diff, sd->length);
-    /* Find local minima */
-    sd_mins = local_max_f32(sd->spec_diff, sd->length, &n_sd_mins,
-        local_max_type_left);
-    if (!sd_mins) { goto fail; }
-    if (return_time_pairs) { goto fail; /* not implemented */ }
+    if (return_time_pairs) {
+        /* Find local minima */
+        sd_mins = local_max_f32(sd->spec_diff, sd->length, &n_sd_mins,
+            local_max_type_left);
+        if (!sd_mins || (n_sd_mins == 0)) { goto fail; }
+        sd_mins_filtered = attack_finder_closest_index_after(
+            sd_maxs,
+            n_sd_maxs,
+            sd_mins,
+            n_sd_mins,
+            &n_sd_mins_filtered,
+            1 /* reverse */);
+        if (!sd_mins_filtered || (n_sd_mins_filtered == 0)) { goto fail; }
+    }
+    sd_gate = local_sum_square(x, N, H, W);
+    if (!sd_gate) { goto fail; }
+    threshold_to_gate(sd_gate,N,finder->ng_th_A);
 
 /* TODO: we still have to write these routines
-    sd_mins_filtered=spectral_difference.closest_index_after(sd_maxs,
-        sd_mins,reverse=True)
 
-    x_rms=spectral_difference.local_rms(x,H,W)
-    sd_gate=(x_rms>np.power(10,ng_th/20)).astype(x.dtype)
-    #sd_gate_t=np.arange(len(sd_gate))*H_SF/SAMPLE_RATE
+    # TODO: if sd_maxs were returned as a heap, then the masking operation would
+    # use little memory 
     sd_maxs=spectral_difference.index_mask(sd_maxs,sd_gate)
 
     # add one hop to compensate for the differencing operation
@@ -430,5 +479,6 @@ fail:
     if (sd_mins) { free(sd_mins); }
     if (sd_maxs) { free(sd_maxs); }
     if (sd_mins_filtered) { free(sd_mins_filtered); }
+    if (sd_gate) { free(sd_gate); }
     return ret;
 }
