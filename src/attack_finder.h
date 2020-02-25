@@ -31,6 +31,8 @@ struct attacks_from_spec_diff_finder_args {
     unsigned int lmax_filt_rate;
     /* the threshold in dB for the noise gate */
     float ng_th;
+    /* the threshold (> 0) for the spectral difference */
+    float sd_th;
 };
 
 #define attacks_from_spec_diff_args_default \
@@ -40,7 +42,8 @@ struct attacks_from_spec_diff_finder_args {
     .window_type = "hann",\
     .smoothing = 1,\
     .lmax_filt_rate = 16000,\
-    ng_th=-60\
+    .ng_th=-60,\
+    .sd_th=0,\
 }
 
 /* Used to store time of beginning and end of attack */

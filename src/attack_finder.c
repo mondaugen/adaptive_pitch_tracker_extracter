@@ -176,6 +176,8 @@ struct attacks_from_spec_diff_finder {
     float lmfr;
     /* the linear threshold */
     float ng_th_A;
+    /* the spectral difference threshold */
+    float sd_th;
 };
 
 void
@@ -254,6 +256,7 @@ struct attacks_from_spec_diff_finder_args *args)
     /* To avoid having to find the mean square when computing, we scale the
     threshold accordingly */
     ret->ng_th_A = ret->W*pow(10,args->ng_th/10);
+    ret->sd_th = args->sd_th;
     return ret;
 fail:
     attacks_from_spec_diff_finder_free(ret);
@@ -297,6 +300,68 @@ local_sum_square(
         px += H;
     }
     return ret;
+}
+
+static inline float
+compute_gate(
+    const float *px,
+    unsigned int W,
+    float thresh)
+{
+    float tmp[W], rms;
+    dspm_mul_vf32_vf32_vf32(px,px,tmp,W);
+    rms = dspm_sum_vf32(tmp,W);
+    if (rms > thresh) { return 1.; }
+    return 0;
+}
+
+/*
+What is returned is the indices of the gate changes. The gate is either 0 or
+1 and has the initial value 0. The first index is when the gate goes from 0 to
+1, then the second when it goes from 1 to 0, etc.
+*/
+static inline unsigned int *
+gate_via_rms_thresh(
+    /* signal to determine gates from */
+    const float *x,
+    /* its length */
+    unsigned int len_x,
+    /* hop size */
+    unsigned int H,
+    /* window size */
+    unsigned int W,
+    /* after returns contains the length of the returned array */
+    unsigned int *n_gate_changes,
+    /* if RMS of x is greater than this threshold, gate is high */
+    float thresh)
+{
+    /* algorithm done in 2 passes to save on memory */
+    unsigned int *gates = NULL,
+                 n_mean_square = pvoc_calc_n_blocks(len_x, H, W),
+                 n, ngc, pass;
+    float gate, gate_1, dgate;
+    const float *px;
+    for (pass = 0; pass < 2; pass++) {
+        px = x;
+        gate_1 = 0;
+        ngc = 0;
+        for (n = 0; n < n_mean_square; n++) {
+            gate = compute_gate(px,W,thresh);
+            dgate = gate - gate_1;
+            if (dgate) { 
+                /* first pass we just count the number of gates */
+                if (pass > 0) { gates[ngc] = n; }
+                ngc++;
+            }
+            gate_1 = gate;
+            px += H;
+        }
+        if (pass > 0) { break; }
+        gates = malloc(sizeof(unsigned int)*ngc);
+        if (!gates) { return NULL; }
+    }
+    *n_gate_changes = ngc;
+    return gates;
 }
 
 /* converts v into heap and then frees v. recommended use:
@@ -464,29 +529,58 @@ static inline void threshold_to_gate(
     }
 }
 
-/* Remove indices i for which gate[i] == 0 */
-//sd_maxs=spectral_difference.index_mask(sd_maxs,sd_gate)
-static inline unsigned int *
-index_mask(
+/* 
+idcs is an array of length *n_idcs containing unique unsigned ints in ascending
+order.
+gate_changes is an array of length n_gate_changes containing unique unsigned
+integers in ascending order that indicate when the gate goes from 0 to 1 or 1 to
+0.
+len_sig is the length of the signal gate_changes is derived from, i.e., neither
+idcs nor gate_changes should contain an index >= len_sig
+*/
+unsigned int *
+attack_finder_index_mask(
     /* gets freed by this function if it succeeds */
     unsigned int *idcs,
     /* on entry contains length of indcs,
     on exit contains length of masked idcs */
     unsigned int *n_idcs,
-    const float *gate,
+    /* all values in gate_changes must be unique 
+    and sorted in ascending order */
+    const unsigned int *gate_changes,
     /* assumes n_gate >= max(idcs) */
-    unsigned int n_gate)
+    unsigned int n_gate_changes,
+    /* length of signal that gate is based off of */
+    unsigned int len_sig)
 {
-    unsigned int n, n_idcs_ = *n_idcs, n_filtered = 0, ret = NULL;
-    for (n = 0; n < n_idcs_; n++) {
-        if (gate[idcs[n]] != 0) { n_filtered++; }
-    }
-    ret = malloc(sizeof(unsigned int)*n_filtered);
-    /* If failed just return idcs */
-    if (!ret) { ret = idcs; goto fail; }
-    n_filtered = 0;
-    for (n = 0; n < n_idcs_; n++) {
-        if (gate[idcs[n]] != 0) { ret[n_filtered++] = idcs[n]; }
+    unsigned int n, n_entry_idcs = *n_idcs,
+                 n_filtered, *ret = NULL, pass, gcn, n_idc;
+    int gate, gate_dir;
+    for (pass = 0; pass < 2; pass++) {
+        gcn = 0;
+        gate = 0;
+        gate_dir = 1;
+        n_idc = 0;
+        n_filtered = 0;
+        for (n = 0; n < len_sig; n++) {
+            if ((gcn < n_gate_changes) &&
+                    (gate_changes[gcn] == n)) {
+                gate += gate_dir;
+                gate_dir *= -1;
+                gcn++;
+            }
+            if (gate && (idcs[n_idc] == n)) {
+                if (pass > 0) { ret[n_filtered] = idcs[n_idc]; }
+                n_filtered++;
+                n_idc++;
+                /* force quit if no more indices */
+                if (n_idc >= n_entry_idcs) { n = len_sig; }
+            }
+        }
+        if (pass > 0) { break; }
+        ret = malloc(sizeof(unsigned int)*n_filtered);
+        /* If failed just return idcs */
+        if (!ret) { ret = idcs; goto fail; }
     }
     free(idcs);
     *n_idcs = n_filtered;
@@ -514,10 +608,11 @@ attacks_from_spec_diff_finder_compute(
     unsigned int *sd_mins = NULL,
                  *sd_maxs = NULL,
                  *sd_mins_filtered = NULL,
+                 *sd_gate = NULL,
                  n_sd_maxs,
                  n_sd_mins,
-                 n_sd_mins_filtered;
-    float *sd_gate = NULL;
+                 n_sd_mins_filtered,
+                 n_gate_changes;
     struct attacks_from_spec_diff_result *ret = NULL;
     /* Find spectral difference */
     sd = spec_diff_finder_find(finder->spec_diff_finder,x,length);
@@ -526,16 +621,22 @@ attacks_from_spec_diff_finder_compute(
     iir_avg(sd->spec_diff,sd->spec_diff,sd->length,finder->smoothing);
     /* Find local maxima using a discounting technique */
     sd_maxs = discount_local_max_f32(sd->spec_diff, sd->length, &n_sd_maxs,
-        local_max_type_right, finder->smoothing, finder->ng_th_A, NULL);
+        local_max_type_right, finder->smoothing, finder->sd_th, NULL);
     if (!sd_maxs || (n_sd_maxs == 0)) { goto fail; }
-    /* Multiply spectral difference by -1 to find local minima */
-    // dspm_mul_vf32_f32(sd->spec_diff, -1, n_sd_maxs);
-    dspm_neg_vf32(sd->spec_diff, sd->length);
-    sd_gate = local_sum_square(x, length, finder->H, finder->W);
-    if (!sd_gate) { goto fail; }
-    threshold_to_gate(sd_gate,length,finder->ng_th_A);
-    sd_maxs = index_mask(sd_maxs,&n_sd_maxs, sd_gate, length);
+    sd_gate = gate_via_rms_thresh(x,length,finder->H,finder->W,&n_gate_changes,
+    finder->ng_th_A);
+    if (!sd_gate || (n_gate_changes == 0)) { goto fail; }
+    sd_maxs = attack_finder_index_mask(
+        sd_maxs,
+        &n_sd_maxs,
+        sd_gate,
+        n_gate_changes,
+        length);
+    if (!sd_maxs || (n_sd_maxs == 0)) { goto fail; }
     if (return_time_pairs) {
+        /* Multiply spectral difference by -1 to find local minima */
+        // dspm_mul_vf32_f32(sd->spec_diff, -1, n_sd_maxs);
+        dspm_neg_vf32(sd->spec_diff, sd->length);
         /* Find local minima */
         sd_mins = local_max_f32(sd->spec_diff, sd->length, &n_sd_mins,
             local_max_type_left);
