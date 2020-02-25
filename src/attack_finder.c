@@ -253,7 +253,7 @@ struct attacks_from_spec_diff_finder_args *args)
     ret->lmfr = compute_lmfr(args->lmax_filt_rate, args->H);
     /* To avoid having to find the mean square when computing, we scale the
     threshold accordingly */
-    ret->ng_th_A = ret->W*power(10,args->ng_th/10);
+    ret->ng_th_A = ret->W*pow(10,args->ng_th/10);
     return ret;
 fail:
     attacks_from_spec_diff_finder_free(ret);
@@ -286,7 +286,8 @@ local_sum_square(
 {
     unsigned int n_mean_square = pvoc_calc_n_blocks(N, H, W),
                  n = 0;
-    float tmp[W], *px = x, *ret = NULL, *pret;
+    float tmp[W], *ret = NULL, *pret;
+    const float *px = x;
     ret = malloc(n_mean_square*sizeof(float));
     if (!ret) { return NULL; }
     pret = ret;
@@ -298,14 +299,32 @@ local_sum_square(
     return ret;
 }
 
-/*
-filter out the indices in find_closest by leaving only the ones coming right
-after indices on the left.
-Output is sorted in ascending order.
-filter and find_closest must be sorted in ascending order and contain only unique items
-*/
-unsigned int *
-attack_finder_closest_index_after(
+/* converts v into heap and then frees v. recommended use:
+    convert_vu32_to_heap(function_that_gives_vu32(...),...)*/
+static inline struct fixed_heap *
+convert_vu32_to_heap(
+    unsigned int *v,
+    unsigned int length,
+    int max_heap)
+{
+    if (!v) { return NULL; }
+    unsigned int *pu32 = v;
+    struct fixed_heap_u32_key_init hinit = {
+        .max_n_items = length,
+        .max_heap = max_heap
+    };
+    struct fixed_heap *heap = fixed_heap_u32_key_new(&hinit);
+    if (!heap) { goto fail; }
+    while (length--) {
+        fixed_heap_insert(heap,pu32++);
+    }
+fail:
+    free(v);
+    return heap;
+}
+
+static struct fixed_heap *
+attack_finder_closest_index_after_heap(
     const unsigned int *filtered,
     /* length of filtered */
     unsigned int n_filtered,
@@ -320,14 +339,17 @@ attack_finder_closest_index_after(
 {
     /* TODO: Is this the best policy? This function shouldn't get called at all
     in the following cases */
-    if ((!filtered)||(n_filtered==0)||(!find_closest)||(n_find_closest==0)||(!n_idcs)) {
+    if ((!filtered)||
+        (n_filtered==0)||
+        (!find_closest)||
+        (n_find_closest==0)||
+        (!n_idcs)) {
         return NULL;
     }
     struct fixed_heap *filtered_heap = NULL,
                       *find_closest_heap = NULL,
                       *idcs = NULL;
-    unsigned int *ret = NULL, *pu32,
-                 ary_len = MAX(filtered[n_filtered-1], 
+    unsigned int ary_len = MAX(filtered[n_filtered-1], 
                     find_closest[n_find_closest-1]) + 1,
                  n, n_idcs_, val;
     struct fixed_heap_u32_key_init hinit = {
@@ -370,22 +392,63 @@ attack_finder_closest_index_after(
         if (x < 0) { x = 0; }
         if (x > 1) { x = 1; }
         dx = x - x_1;
-        if (dx < 0) { fixed_heap_insert(idcs,&n); n_idcs_++; }
+        if (dx < 0) {
+            val = n;
+            if (reverse) { val = ary_len - val - 1; }
+            fixed_heap_insert(idcs,&val);
+            n_idcs_++;
+        }
         x_1 = x;
     }
+    *n_idcs = n_idcs_;
+fail:
+    if (filtered_heap) { fixed_heap_free(filtered_heap); }
+    if (find_closest_heap) { fixed_heap_free(find_closest_heap); }
+    return idcs;
+}
+
+
+/*
+filter out the indices in find_closest by leaving only the ones coming right
+after indices on the left.
+Output is sorted in ascending order.
+filter and find_closest must be sorted in ascending order and contain only unique items
+*/
+unsigned int *
+attack_finder_closest_index_after(
+    const unsigned int *filtered,
+    /* length of filtered */
+    unsigned int n_filtered,
+    const unsigned int *find_closest,
+    /* length of find_closest */
+    unsigned int n_find_closest,
+    /* after returning, contains the number of indices in resulting array */
+    unsigned int *n_idcs,
+    /* if non-zero, filters out indices in find_closest by leaving only those
+    coming before indices on the right */ 
+    int reverse)
+{
+    unsigned int n_idcs_ = 0, *pu32, val, *ret = NULL;
+    struct fixed_heap *idcs = attack_finder_closest_index_after_heap(
+        filtered,
+        n_filtered,
+        find_closest,
+        n_find_closest,
+        n_idcs,
+        reverse);
+    n_idcs_ = *n_idcs;
+    if (!idcs) { goto fail; }
     ret = malloc(sizeof(unsigned int)*n_idcs_);
     if (!ret) { goto fail; }
-    *n_idcs = n_idcs_;
     pu32 = ret;
     while (n_idcs_--) {
         val = *(unsigned int*)fixed_heap_access(idcs,0);
         fixed_heap_remove_top(idcs);
-        if (reverse) { val = ary_len - val - 1; }
+        /* if reverse, it was already reversed by
+        attack_finder_closest_index_after_heap */
         *pu32++ = val;
     }
 fail:
-    if (filtered_heap) { fixed_heap_free(filtered_heap); }
-    if (find_closest_heap) { fixed_heap_free(find_closest_heap); }
     if (idcs) { fixed_heap_free(idcs); }
     return ret;
 }
@@ -400,6 +463,7 @@ static inline void threshold_to_gate(
         x++;
     }
 }
+
 
 /* Returns pairs that are an estimation of the attack start and end times. */
 struct attacks_from_spec_diff_result *
@@ -422,7 +486,7 @@ attacks_from_spec_diff_finder_compute(
                  n_sd_maxs,
                  n_sd_mins,
                  n_sd_mins_filtered;
-    float sd_gate = NULL;
+    float *sd_gate = NULL;
     struct attacks_from_spec_diff_result *ret = NULL;
     /* Find spectral difference */
     sd = spec_diff_finder_find(finder->spec_diff_finder,x,length);
@@ -450,9 +514,9 @@ attacks_from_spec_diff_finder_compute(
             1 /* reverse */);
         if (!sd_mins_filtered || (n_sd_mins_filtered == 0)) { goto fail; }
     }
-    sd_gate = local_sum_square(x, N, H, W);
+    sd_gate = local_sum_square(x, length, finder->H, finder->W);
     if (!sd_gate) { goto fail; }
-    threshold_to_gate(sd_gate,N,finder->ng_th_A);
+    threshold_to_gate(sd_gate,length,finder->ng_th_A);
 
 /* TODO: we still have to write these routines
 
