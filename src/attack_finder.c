@@ -464,6 +464,37 @@ static inline void threshold_to_gate(
     }
 }
 
+/* Remove indices i for which gate[i] == 0 */
+//sd_maxs=spectral_difference.index_mask(sd_maxs,sd_gate)
+static inline unsigned int *
+index_mask(
+    /* gets freed by this function if it succeeds */
+    unsigned int *idcs,
+    /* on entry contains length of indcs,
+    on exit contains length of masked idcs */
+    unsigned int *n_idcs,
+    const float *gate,
+    /* assumes n_gate >= max(idcs) */
+    unsigned int n_gate)
+{
+    unsigned int n, n_idcs_ = *n_idcs, n_filtered = 0, ret = NULL;
+    for (n = 0; n < n_idcs_; n++) {
+        if (gate[idcs[n]] != 0) { n_filtered++; }
+    }
+    ret = malloc(sizeof(unsigned int)*n_filtered);
+    /* If failed just return idcs */
+    if (!ret) { ret = idcs; goto fail; }
+    n_filtered = 0;
+    for (n = 0; n < n_idcs_; n++) {
+        if (gate[idcs[n]] != 0) { ret[n_filtered++] = idcs[n]; }
+    }
+    free(idcs);
+    *n_idcs = n_filtered;
+fail:
+    return ret;
+}
+            
+            
 
 /* Returns pairs that are an estimation of the attack start and end times. */
 struct attacks_from_spec_diff_result *
@@ -500,6 +531,10 @@ attacks_from_spec_diff_finder_compute(
     /* Multiply spectral difference by -1 to find local minima */
     // dspm_mul_vf32_f32(sd->spec_diff, -1, n_sd_maxs);
     dspm_neg_vf32(sd->spec_diff, sd->length);
+    sd_gate = local_sum_square(x, length, finder->H, finder->W);
+    if (!sd_gate) { goto fail; }
+    threshold_to_gate(sd_gate,length,finder->ng_th_A);
+    sd_maxs = index_mask(sd_maxs,&n_sd_maxs, sd_gate, length);
     if (return_time_pairs) {
         /* Find local minima */
         sd_mins = local_max_f32(sd->spec_diff, sd->length, &n_sd_mins,
@@ -514,14 +549,10 @@ attacks_from_spec_diff_finder_compute(
             1 /* reverse */);
         if (!sd_mins_filtered || (n_sd_mins_filtered == 0)) { goto fail; }
     }
-    sd_gate = local_sum_square(x, length, finder->H, finder->W);
-    if (!sd_gate) { goto fail; }
-    threshold_to_gate(sd_gate,length,finder->ng_th_A);
 
 /* TODO: we still have to write these routines
 
-    # TODO: if sd_maxs were returned as a heap, then the masking operation would
-    # use little memory 
+    # TODO: nonono if sd_gate were a more sparse data structure, we use less memory
     sd_maxs=spectral_difference.index_mask(sd_maxs,sd_gate)
 
     # add one hop to compensate for the differencing operation

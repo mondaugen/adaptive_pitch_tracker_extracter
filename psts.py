@@ -12,6 +12,16 @@ import attack_finder
 import common
 import envelopes
 import lfo
+import math
+
+def adjust_x_for_time_stretch(x,TS):
+    new_len=math.ceil(len(x)/TS)
+    if new_len < len(x):
+        return (x[:new_len],new_len)
+    elif new_len > len(x):
+        len_diff = new_len - len(x)
+        return (np.concatenate((x,np.zeros(len_diff,dtype=x.dtype))),new_len)
+    return (x,new_len)
 
 def psts_const_amount(
     x, # input signal
@@ -47,6 +57,7 @@ def psts_const_amount(
     while N < len(x):
         N+=H
     x=np.concatenate((x,np.zeros(N-len(x))))
+    x,N=adjust_x_for_time_stretch(x,TS)
     # add dither
     x+=np.random.standard_normal(len(x))*1e-8
 

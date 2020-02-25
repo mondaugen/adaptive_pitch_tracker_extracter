@@ -58,4 +58,5 @@ y=np.zeros(N_CHANS*max([len(_) for _ in y_sigs]))
 for chan,y_ in enumerate(y_sigs):
     y[chan:len(y_)*N_CHANS:N_CHANS] = y_
 
+y=common.normalize(y)*.99
 y.tofile(OUT_FILE)
