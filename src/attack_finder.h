@@ -58,6 +58,21 @@ struct attacks_from_spec_diff_result {
 };
 
 unsigned int *
+attack_finder_index_mask(
+    /* gets freed by this function if it succeeds */
+    unsigned int *idcs,
+    /* on entry contains length of indcs,
+    on exit contains length of masked idcs */
+    unsigned int *n_idcs,
+    /* all values in gate_changes must be unique 
+    and sorted in ascending order */
+    const unsigned int *gate_changes,
+    /* assumes n_gate >= max(idcs) */
+    unsigned int n_gate_changes,
+    /* length of signal that gate is based off of */
+    unsigned int len_sig);
+
+unsigned int *
 attack_finder_closest_index_after(
     const unsigned int *filtered,
     /* length of filtered */

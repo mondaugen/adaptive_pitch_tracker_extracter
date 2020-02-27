@@ -569,12 +569,14 @@ attack_finder_index_mask(
                 gate_dir *= -1;
                 gcn++;
             }
-            if (gate && (idcs[n_idc] == n)) {
-                if (pass > 0) { ret[n_filtered] = idcs[n_idc]; }
-                n_filtered++;
+            if ((idcs[n_idc] == n)) {
+                if (gate) {
+                    if (pass > 0) { ret[n_filtered] = idcs[n_idc]; }
+                    n_filtered++;
+                    /* force quit if no more indices */
+                    if (n_idc >= n_entry_idcs) { n = len_sig; }
+                }
                 n_idc++;
-                /* force quit if no more indices */
-                if (n_idc >= n_entry_idcs) { n = len_sig; }
             }
         }
         if (pass > 0) { break; }
@@ -631,11 +633,10 @@ attacks_from_spec_diff_finder_compute(
         &n_sd_maxs,
         sd_gate,
         n_gate_changes,
-        length);
+        sd->length);
     if (!sd_maxs || (n_sd_maxs == 0)) { goto fail; }
     if (return_time_pairs) {
         /* Multiply spectral difference by -1 to find local minima */
-        // dspm_mul_vf32_f32(sd->spec_diff, -1, n_sd_maxs);
         dspm_neg_vf32(sd->spec_diff, sd->length);
         /* Find local minima */
         sd_mins = local_max_f32(sd->spec_diff, sd->length, &n_sd_mins,
