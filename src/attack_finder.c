@@ -6,7 +6,6 @@
 #include <math.h>
 #include <string.h>
 #include "pvoc_windows.h"
-#include "fixed_heap_u32_key.h"
 #include "attack_finder.h"
 #include "dsp_math.h"
 #include "find_extrema.h"
@@ -364,32 +363,14 @@ gate_via_rms_thresh(
     return gates;
 }
 
-/* converts v into heap and then frees v. recommended use:
-    convert_vu32_to_heap(function_that_gives_vu32(...),...)*/
-static inline struct fixed_heap *
-convert_vu32_to_heap(
-    unsigned int *v,
-    unsigned int length,
-    int max_heap)
-{
-    if (!v) { return NULL; }
-    unsigned int *pu32 = v;
-    struct fixed_heap_u32_key_init hinit = {
-        .max_n_items = length,
-        .max_heap = max_heap
-    };
-    struct fixed_heap *heap = fixed_heap_u32_key_new(&hinit);
-    if (!heap) { goto fail; }
-    while (length--) {
-        fixed_heap_insert(heap,pu32++);
-    }
-fail:
-    free(v);
-    return heap;
-}
-
-static struct fixed_heap *
-attack_finder_closest_index_after_heap(
+/*
+filter out the indices in find_closest by leaving only the ones coming right
+after indices on the left.
+Output is sorted in ascending order.
+filter and find_closest must be sorted in ascending order and contain only unique items
+*/
+unsigned int *
+attack_finder_closest_index_after(
     const unsigned int *filtered,
     /* length of filtered */
     unsigned int n_filtered,
@@ -411,111 +392,57 @@ attack_finder_closest_index_after_heap(
         (!n_idcs)) {
         return NULL;
     }
-    struct fixed_heap *filtered_heap = NULL,
-                      *find_closest_heap = NULL,
-                      *idcs = NULL;
     unsigned int ary_len = MAX(filtered[n_filtered-1], 
-                    find_closest[n_find_closest-1]) + 1,
-                 n, n_idcs_, val;
-    struct fixed_heap_u32_key_init hinit = {
-        .max_heap = 0
-    };
-    float x_1 = 0, x, dx, a_n, b_n;
-    hinit.max_n_items = n_filtered;
-    filtered_heap = fixed_heap_u32_key_new(&hinit);
-    if (!filtered_heap) { goto fail; }
-    for (n = 0; n < n_filtered; n++) {
-        val = filtered[n];
-        if (reverse) { val = ary_len - val - 1; }
-        fixed_heap_insert(filtered_heap,&val);
-    }
-    hinit.max_n_items = n_find_closest;
-    find_closest_heap = fixed_heap_u32_key_new(&hinit);
-    if (!find_closest_heap) { goto fail; }
-    for (n = 0; n < n_find_closest; n++) {
-        val = find_closest[n];
-        if (reverse) { val = ary_len - val - 1; }
-        fixed_heap_insert(find_closest_heap,&val);
-    }
-    hinit.max_n_items = n_filtered + n_find_closest;
-    idcs = fixed_heap_u32_key_new(&hinit);
-    if (!idcs) { goto fail; }
-    n_idcs_ = 0;
-    for (n = 0; n < ary_len; n++) {
-        a_n = 0; b_n = 0;
-        const unsigned int *point = fixed_heap_access(filtered_heap,0);
-        if (point && (*point == n)) {
-            a_n = 1;
-            fixed_heap_remove_top(filtered_heap);
+                 find_closest[n_find_closest-1]) + 1,
+                 *idcs = NULL,
+                 n, n_idcs_, val, pass, idc, f_idc, fc_idc;
+    float x_1, x, dx, a_n, b_n;
+    for (pass = 0; pass < 2; pass++) {
+        x_1 = 0;
+        n_idcs_ = 0;
+        f_idc = 0;
+        fc_idc = 0;
+        for (n = 0; n < ary_len; n++) {
+            a_n = 0; b_n = 0;
+            if (f_idc < n_filtered) {
+                idc = reverse ? n_filtered - f_idc - 1 : f_idc;
+                val = filtered[idc];
+                if (reverse) { val = ary_len - val - 1; }
+                if (val == n) {
+                    a_n = 1;
+                    f_idc++;
+                }
+            }
+            if (fc_idc < n_find_closest) {
+                idc = reverse ? n_find_closest - fc_idc - 1 : fc_idc;
+                val = find_closest[idc];
+                if (reverse) { val = ary_len - val - 1; }
+                if (val == n) {
+                    b_n = 1;
+                    fc_idc++;
+                }
+            }
+            x = x_1 + a_n - b_n;
+            if (x < 0) { x = 0; }
+            if (x > 1) { x = 1; }
+            dx = x - x_1;
+            x_1 = x;
+            if (dx < 0) {
+                val = n;
+                if (reverse) { val = ary_len - val - 1; }
+                if (pass > 0) {
+                    idcs[n_idcs_] = val;
+                }
+                n_idcs_++;
+            }
         }
-        point = fixed_heap_access(find_closest_heap,0);
-        if (point && (*point == n)) {
-            b_n = 1;
-            fixed_heap_remove_top(find_closest_heap);
+        if (pass == 0) {
+            idcs = malloc(n_idcs_*sizeof(unsigned int));
+            if (!idcs) { return NULL; }
         }
-        x = x_1 + a_n - b_n;
-        if (x < 0) { x = 0; }
-        if (x > 1) { x = 1; }
-        dx = x - x_1;
-        if (dx < 0) {
-            val = n;
-            if (reverse) { val = ary_len - val - 1; }
-            fixed_heap_insert(idcs,&val);
-            n_idcs_++;
-        }
-        x_1 = x;
     }
     *n_idcs = n_idcs_;
-fail:
-    if (filtered_heap) { fixed_heap_free(filtered_heap); }
-    if (find_closest_heap) { fixed_heap_free(find_closest_heap); }
     return idcs;
-}
-
-
-/*
-filter out the indices in find_closest by leaving only the ones coming right
-after indices on the left.
-Output is sorted in ascending order.
-filter and find_closest must be sorted in ascending order and contain only unique items
-*/
-unsigned int *
-attack_finder_closest_index_after(
-    const unsigned int *filtered,
-    /* length of filtered */
-    unsigned int n_filtered,
-    const unsigned int *find_closest,
-    /* length of find_closest */
-    unsigned int n_find_closest,
-    /* after returning, contains the number of indices in resulting array */
-    unsigned int *n_idcs,
-    /* if non-zero, filters out indices in find_closest by leaving only those
-    coming before indices on the right */ 
-    int reverse)
-{
-    unsigned int n_idcs_ = 0, *pu32, val, *ret = NULL;
-    struct fixed_heap *idcs = attack_finder_closest_index_after_heap(
-        filtered,
-        n_filtered,
-        find_closest,
-        n_find_closest,
-        n_idcs,
-        reverse);
-    n_idcs_ = *n_idcs;
-    if (!idcs) { goto fail; }
-    ret = malloc(sizeof(unsigned int)*n_idcs_);
-    if (!ret) { goto fail; }
-    pu32 = ret;
-    while (n_idcs_--) {
-        val = *(unsigned int*)fixed_heap_access(idcs,0);
-        fixed_heap_remove_top(idcs);
-        /* if reverse, it was already reversed by
-        attack_finder_closest_index_after_heap */
-        *pu32++ = val;
-    }
-fail:
-    if (idcs) { fixed_heap_free(idcs); }
-    return ret;
 }
 
 static inline void threshold_to_gate(
@@ -665,24 +592,20 @@ up_down_match(
     ret->n_attack_time_pairs = n_pairs;
     return ret;
 }
-    /*
-def up_down_match(up,down):
-    """
-    Given two sorted arrays of indices, "up" and "down", for each value in "up",
-    give the closest value in "down"
-    """
-    ret=[]
-    m=0
-    for u in up:
-        while down[m] < u:
-            m += 1
-            if m >= len(down):
-                return ret
-        ret.append((u,down[m]))
-    return ret
-    */
-}
     
+static void
+offset_extrema(
+    unsigned int *idcs,
+    unsigned int n_idcs,
+    struct attacks_from_spec_diff_finder *finder)
+{
+    /* add one hop to compensate for the differencing operation */
+    dspm_add_vu32_u32(idcs,n_idcs,1);
+    /* multiply by hop size because we want the indices in samples not hops */
+    dspm_mul_vu32_u32(idcs,n_idcs,finder->H);
+    /* compensate for window by offseting the maxima by half a window */
+    dspm_add_vu32_u32(idcs,n_idcs,finder->W/2);
+}
 
 /* Returns pairs that are an estimation of the attack start and end times. */
 struct attacks_from_spec_diff_result *
@@ -727,12 +650,7 @@ attacks_from_spec_diff_finder_compute(
         n_gate_changes,
         sd->length);
     if (!sd_maxs || (n_sd_maxs == 0)) { goto fail; }
-    /* add one hop to compensate for the differencing operation */
-    dspm_add_vu32_u32(sd_maxs,n_sd_maxs,1);
-    /* multiply by hop size because we want the indices in samples not hops */
-    dspm_mul_vu32_u32(sd_maxs,n_sd_maxs,finder->H);
-    /* compensate for window by offseting the maxima by half a window */
-    dspm_add_vu32_u32(sd_maxs,n_sd_maxs,finder->W/2);
+    offset_extrema(sd_maxs,n_sd_maxs,finder);
     if (return_time_pairs) {
         /* Multiply spectral difference by -1 to find local minima */
         dspm_neg_vf32(sd->spec_diff, sd->length);
@@ -748,9 +666,7 @@ attacks_from_spec_diff_finder_compute(
             &n_sd_mins_filtered,
             1 /* reverse */);
         if (!sd_mins_filtered || (n_sd_mins_filtered == 0)) { goto fail; }
-        dspm_add_vu32_u32(sd_mins_filtered,n_sd_mins_filtered,1);
-        dspm_mul_vu32_u32(sd_mins_filtered,n_sd_mins_filtered,finder->H);
-        dspm_add_vu32_u32(sd_mins_filtered,n_sd_mins_filtered,finder->W/2);
+        offset_extrema(sd_mins_filtered,n_sd_mins_filtered,finder);
         ret = up_down_match(
             sd_mins_filtered,
             n_sd_mins_filtered,
