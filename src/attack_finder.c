@@ -589,8 +589,100 @@ attack_finder_index_mask(
 fail:
     return ret;
 }
-            
-            
+
+void
+attacks_from_spec_diff_result_free(struct attacks_from_spec_diff_result *r)
+{
+    if (r) {
+        if (r->attack_time_pairs) {
+            free(r->attack_time_pairs);
+        }
+        free(r);
+    }
+}
+
+static struct attacks_from_spec_diff_result *
+attacks_from_spec_diff_result_new(unsigned int n_attack_time_pairs)
+{
+    struct attacks_from_spec_diff_result *ret = NULL;
+    ret = calloc(1,sizeof(struct attacks_from_spec_diff_result));
+    if (!ret) { goto fail; }
+    ret->attack_time_pairs = calloc(n_attack_time_pairs,
+        sizeof(struct attack_sample_time_pair));
+    if (!ret->attack_time_pairs) { goto fail; }
+    return ret;
+fail:
+    attacks_from_spec_diff_result_free(ret);
+    return NULL;
+}
+
+static struct attacks_from_spec_diff_result *
+unpaired_ends(
+    unsigned int *down,
+    unsigned int n_down)
+{
+    struct attacks_from_spec_diff_result *ret =
+        attacks_from_spec_diff_result_new(n_down);
+    if (!ret) { return NULL; }
+    ret->n_attack_time_pairs = 0;
+    while (n_down--) {
+        ret->attack_time_pairs[ret->n_attack_time_pairs++].end =
+            *down++;
+    }
+    return ret;
+}
+
+/* up, down cannot be NULL */
+static struct attacks_from_spec_diff_result *
+up_down_match(
+    unsigned int *up,
+    unsigned int n_up,
+    unsigned int *down,
+    unsigned int n_down)
+{
+    struct attacks_from_spec_diff_result *ret = NULL;
+    unsigned int n, m, pass, n_pairs;
+    for (pass = 0; pass < 2; pass++) {
+        n_pairs = 0;
+        m = 0;
+        for (n = 0; n < n_up; n++) {
+            while ((m < n_down) && (down[m] < up[n])) {
+                m++;
+            }
+            if (m < n_down) {
+                if (pass > 0) {
+                    ret->attack_time_pairs[n_pairs].beginning = up[n];
+                    ret->attack_time_pairs[n_pairs].end = down[m];
+                }
+                n_pairs++;
+            }
+        }
+        if (pass == 0) {
+            ret = attacks_from_spec_diff_result_new(n_pairs);
+            if (!ret) { return NULL; }
+        }
+    }
+    ret->n_attack_time_pairs = n_pairs;
+    return ret;
+}
+    /*
+def up_down_match(up,down):
+    """
+    Given two sorted arrays of indices, "up" and "down", for each value in "up",
+    give the closest value in "down"
+    """
+    ret=[]
+    m=0
+    for u in up:
+        while down[m] < u:
+            m += 1
+            if m >= len(down):
+                return ret
+        ret.append((u,down[m]))
+    return ret
+    */
+}
+    
 
 /* Returns pairs that are an estimation of the attack start and end times. */
 struct attacks_from_spec_diff_result *
@@ -635,6 +727,12 @@ attacks_from_spec_diff_finder_compute(
         n_gate_changes,
         sd->length);
     if (!sd_maxs || (n_sd_maxs == 0)) { goto fail; }
+    /* add one hop to compensate for the differencing operation */
+    dspm_add_vu32_u32(sd_maxs,n_sd_maxs,1);
+    /* multiply by hop size because we want the indices in samples not hops */
+    dspm_mul_vu32_u32(sd_maxs,n_sd_maxs,finder->H);
+    /* compensate for window by offseting the maxima by half a window */
+    dspm_add_vu32_u32(sd_maxs,n_sd_maxs,finder->W/2);
     if (return_time_pairs) {
         /* Multiply spectral difference by -1 to find local minima */
         dspm_neg_vf32(sd->spec_diff, sd->length);
@@ -650,27 +748,17 @@ attacks_from_spec_diff_finder_compute(
             &n_sd_mins_filtered,
             1 /* reverse */);
         if (!sd_mins_filtered || (n_sd_mins_filtered == 0)) { goto fail; }
+        dspm_add_vu32_u32(sd_mins_filtered,n_sd_mins_filtered,1);
+        dspm_mul_vu32_u32(sd_mins_filtered,n_sd_mins_filtered,finder->H);
+        dspm_add_vu32_u32(sd_mins_filtered,n_sd_mins_filtered,finder->W/2);
+        ret = up_down_match(
+            sd_mins_filtered,
+            n_sd_mins_filtered,
+            sd_maxs,
+            n_sd_maxs);
+    } else {
+        ret = unpaired_ends(sd_maxs,n_sd_maxs);
     }
-
-/* TODO: we still have to write these routines
-
-    # TODO: nonono if sd_gate were a more sparse data structure, we use less memory
-    sd_maxs=spectral_difference.index_mask(sd_maxs,sd_gate)
-
-    # add one hop to compensate for the differencing operation
-    sd_maxs+=1
-    sd_mins_filtered+=1
-    
-    # multiply by hop size because we want the indices in samples not hops
-    sd_maxs*=H
-    sd_mins_filtered*=H
-
-    # compensate for window by offseting the maxima by half a window
-    sd_maxs += W//2
-    sd_mins_filtered += W//2
-
-    return spectral_difference.up_down_match(sd_mins_filtered,sd_maxs)
-*/
 fail:
     if (sd) { spec_diff_result_free(sd); }
     if (sd_mins) { free(sd_mins); }

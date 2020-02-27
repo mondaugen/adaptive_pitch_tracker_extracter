@@ -64,6 +64,16 @@ dspm_max_vu32(const unsigned int *src,
               unsigned int length);
 
 void
+dspm_add_vu32_u32(unsigned int *srcdst,
+                  unsigned int length,
+                  unsigned int c);
+
+void
+dspm_mul_vu32_u32(unsigned int *srcdst,
+                  unsigned int length,
+                  unsigned int c);
+
+void
 dspm_abs_vf32(float *srcdst, unsigned int length);
 
 void

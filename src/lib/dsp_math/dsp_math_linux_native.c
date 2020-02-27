@@ -98,6 +98,26 @@ dspm_sub_vf32_vf32_vf32(const float *src0,
 }
 
 void
+dspm_add_vu32_u32(unsigned int *srcdst,
+                  unsigned int length,
+                  unsigned int c)
+{
+    while (length--) {
+        *srcdst++ += c;
+    }
+}
+
+void
+dspm_mul_vu32_u32(unsigned int *srcdst,
+                  unsigned int length,
+                  unsigned int c)
+{
+    while (length--) {
+        *srcdst++ *= c;
+    }
+}
+
+void
 dspm_clip_below_vf32_f32(float *srcdst,
                          float lb,
                          unsigned int length)
