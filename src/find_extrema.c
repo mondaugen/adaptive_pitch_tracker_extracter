@@ -152,6 +152,7 @@ discount_local_max_f32(
             if (!filtered_maxs) { goto fail; }
         }
     }
+    *n_max = n_maxs;
 fail:
     if (lmaxs) { free(lmaxs); }
     return filtered_maxs;

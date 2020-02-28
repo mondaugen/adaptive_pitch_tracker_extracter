@@ -69,6 +69,32 @@ fail:
     return NULL;
 }
 
+unsigned int *
+attacks_result_extract_beginnings(
+    struct attacks_from_spec_diff_result *a)
+{
+    unsigned int *ret = malloc(sizeof(unsigned int)*a->n_attack_time_pairs),
+                  n;
+    if (!ret) { return NULL; }
+    for (n = 0; n < a->n_attack_time_pairs; n++) {
+        ret[n] = a->attack_time_pairs[n].beginning;
+    }
+    return ret;
+}
+
+unsigned int *
+attacks_result_extract_ends(
+    struct attacks_from_spec_diff_result *a)
+{
+    unsigned int *ret = malloc(sizeof(unsigned int)*a->n_attack_time_pairs),
+                  n;
+    if (!ret) { return NULL; }
+    for (n = 0; n < a->n_attack_time_pairs; n++) {
+        ret[n] = a->attack_time_pairs[n].end;
+    }
+    return ret;
+}
+
 struct spec_diff_finder {
     unsigned int H;
     unsigned int W;

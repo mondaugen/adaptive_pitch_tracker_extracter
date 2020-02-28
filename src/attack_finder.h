@@ -86,4 +86,21 @@ attack_finder_closest_index_after(
     coming before indices on the right */ 
     int reverse);
 
+unsigned int *
+attacks_result_extract_beginnings(struct attacks_from_spec_diff_result *a);
+
+unsigned int *
+attacks_result_extract_ends(struct attacks_from_spec_diff_result *a);
+
+struct attacks_from_spec_diff_finder *
+attacks_from_spec_diff_finder_new(
+struct attacks_from_spec_diff_finder_args *args);
+
+struct attacks_from_spec_diff_result *
+attacks_from_spec_diff_finder_compute(
+    struct attacks_from_spec_diff_finder *finder,
+    float *x,
+    unsigned int length,
+    int return_time_pairs);
+
 #endif /* ATTACK_FINDER_H */
