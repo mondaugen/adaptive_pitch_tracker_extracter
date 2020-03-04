@@ -63,7 +63,7 @@ local_max_f32(const float *x, /* find local maxima in this array */
 static inline void lmax_extract_store_loop( 
 unsigned int length, 
 const unsigned int *lmaxs, 
-unsigned int *n_maxs, 
+unsigned int len_lmaxs, 
 const float *x, 
 float min_thresh, 
 float rate, 
@@ -75,17 +75,18 @@ const int filtered_maxs_defd,
 const int thresh_defd)
 {
     float th_x0, cur_thresh = 0; 
-    unsigned int n_x;
+    unsigned int n_x, n_maxs = 0;
     for (n_x = 0; n_x < length; n_x++) { 
         /* the x[n] coefficient of the threshold updating filter */ 
         th_x0 = 0; 
-        if ((n_x == lmaxs[*n_maxs]) 
-                &&(x[n_x]>min_thresh) 
+        if ((n_maxs < len_lmaxs) && (n_x == lmaxs[n_maxs])) {
+            n_maxs++;
+            if ((x[n_x]>min_thresh) 
                 &&(x[n_x]>(cur_thresh*rate))) { 
-            if (filtered_maxs_defd) { filtered_maxs[*filt_maxs_len] = n_x; }
-            *filt_maxs_len += 1; 
-            th_x0 = x[n_x]; 
-            *n_maxs += 1; 
+                if (filtered_maxs_defd) { filtered_maxs[*filt_maxs_len] = n_x; }
+                *filt_maxs_len += 1; 
+                th_x0 = x[n_x]; 
+            }
         } 
         cur_thresh = th_x0 + rate * cur_thresh;
         if (thresh_defd) { thresh[n_x] = cur_thresh; }
@@ -122,7 +123,7 @@ discount_local_max_f32(
     unsigned int *lmaxs = NULL, lmaxs_len,
                  *filtered_maxs = NULL,
                  filt_maxs_len,
-                 n_maxs, n_pass;
+                 n_pass;
     float cur_thresh, th_x0;
     lmaxs = local_max_f32(x,length,&lmaxs_len,type);
     if (!lmaxs) { goto fail; }
@@ -131,28 +132,27 @@ discount_local_max_f32(
            (if not NULL) */
         /* 2nd pass: Store the maxima */
         cur_thresh = 0;
-        n_maxs = 0;
         filt_maxs_len = 0;
         if ((n_pass == 0)) {
             if (threshold) { 
-                lmax_extract_store_loop(length,lmaxs,&n_maxs,x,min_thresh,rate,
+                lmax_extract_store_loop(length,lmaxs,lmaxs_len,x,min_thresh,rate,
                 NULL, &filt_maxs_len, threshold, 0, 1);
             } else {
-                lmax_extract_store_loop(length,lmaxs,&n_maxs,x,min_thresh,rate,
+                lmax_extract_store_loop(length,lmaxs,lmaxs_len,x,min_thresh,rate,
                 NULL, &filt_maxs_len, NULL, 0, 0);
             }
         } else {
-            lmax_extract_store_loop(length,lmaxs,&n_maxs,x,min_thresh,rate,
+            lmax_extract_store_loop(length,lmaxs,lmaxs_len,x,min_thresh,rate,
             filtered_maxs, &filt_maxs_len, NULL, 1, 0);
         }
         if (n_pass == 0) {
             /* allocate after 1st pass */
             /* allocate the memory necessary for the filtered maxima */
-            filtered_maxs = malloc(sizeof(unsigned int)*n_maxs);
+            filtered_maxs = malloc(sizeof(unsigned int)*filt_maxs_len);
             if (!filtered_maxs) { goto fail; }
         }
     }
-    *n_max = n_maxs;
+    *n_max = filt_maxs_len;
 fail:
     if (lmaxs) { free(lmaxs); }
     return filtered_maxs;

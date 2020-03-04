@@ -1,4 +1,4 @@
-.PHONY = run_local_max_f32_tests 
+.PHONY:  run_local_max_f32_tests run_discount_local_max_f32_tests
 
 local_max_f32_test_deps = src/find_extrema.c \
                           src/find_extrema.h \
@@ -40,3 +40,17 @@ $(local_max_f32_test_target_stem)$(type)) : \
     $(local_max_f32_test_deps)
 	$(call local_max_f32_test_template,local_max_type_$*)
 
+run_discount_local_max_f32_tests : \
+    src/test/bin/discount_local_max_f32_test \
+    src/test/find_extrema/discount_local_max_f32_gen_sig.py \
+    src/test/find_extrema/discount_local_max_f32_test_plot.py
+	PYTHONPATH=. python3 src/test/find_extrema/discount_local_max_f32_gen_sig.py && \
+    src/test/bin/discount_local_max_f32_test && \
+    PYTHONPATH=. python3 src/test/find_extrema/discount_local_max_f32_test_plot.py
+
+src/test/bin/discount_local_max_f32_test : \
+    src/test/find_extrema/discount_local_max_f32_test.c \
+    src/test/test_common.h \
+    src/find_extrema.h \
+    src/find_extrema.c
+	cc -g -Isrc -Isrc/test $(filter %.c, $^) -o $@
