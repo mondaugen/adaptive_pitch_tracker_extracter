@@ -3,3 +3,4 @@ extensions/build/*
 *.bak
 *~
 gmon.out
+tags

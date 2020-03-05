@@ -1,17 +1,6 @@
 #ifndef ATTACK_FINDER_H
 #define ATTACK_FINDER_H 
 
-struct spec_diff_finder_init {
-    unsigned int H;
-    unsigned int W;
-    /* Returns non-zero if it didn't succeed in initializing the window. NOTE:
-    From prototype implementation in spectral_difference.py, the window W is
-    divided by sum(W) to normalize it, so the init_window should also do this
-    normalization to the window it puts in w. */
-    int (*init_window)(float *w, void *aux, unsigned int window_length);
-    void *init_window_aux;
-};
-
 struct attacks_from_spec_diff_finder_args {
     /* hop size */
     unsigned int H;

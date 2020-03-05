@@ -3,6 +3,11 @@
 #include "dsp_math.h"
 #include "kiss_fftr.h"
 
+#define SWAP(a,b)\
+    ({ typeof(a) tmp = a;\
+       a = b;\
+       b = tmp; })
+
 void
 dspm_mul_vf32_vf32_vf32(const float *src0,
                         const float *src1,
@@ -204,5 +209,17 @@ dspm_mean_vf32_f32(const float *src, unsigned int length)
     float ret = dspm_sum_vf32(src, length);
     ret /= length;
     return ret;
+}
+
+/* assumes length > 0 */
+void
+dspm_rev_vu32(unsigned int *srcdst, unsigned int length)
+{
+    unsigned int beg = 0, end = length - 1;
+    while (beg < (length>>1)) {
+        SWAP(srcdst[beg],srcdst[end]);
+        beg++;
+        end--;
+    }
 }
 

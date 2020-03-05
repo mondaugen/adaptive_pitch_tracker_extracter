@@ -1,4 +1,4 @@
-.PHONY: run_closest_index_after_test attacks_from_sd_plot_extraction
+.PHONY: run_closest_index_after_test attacks_from_sd_plot_extraction run_spec_diff_test
 
 src/test/bin/fixed_heap_u32_test : \
     src/test/fixed_heap/u32_test.c \
@@ -64,4 +64,19 @@ attacks_from_sd_plot_extraction : \
 src/test/bin/attacks_from_sd : \
     src/test/attack_finder/attacks_from_sd_test.c \
     $(ATTACK_FINDER_DEPS)
-	cc -g $(filter %.c, $^) -I src/test $(ATTACK_FINDER_INC) -o $@ -lm
+	cc -g -DDEBUG $(filter %.c, $^) -I src/test $(ATTACK_FINDER_INC) -o $@ -lm
+
+run_spec_diff_test : \
+	src/test/attack_finder/spec_diff_test_gen_sig.py \
+	src/test/bin/spec_diff_test \
+	src/test/attack_finder/plot_snd_file.py
+	PYTHONPATH=. python3 src/test/attack_finder/spec_diff_test_gen_sig.py && \
+	src/test/bin/spec_diff_test && \
+	PYTHONPATH=. FILEPATH=/tmp/sd_test_out.f32 python3 \
+		src/test/attack_finder/plot_snd_file.py
+
+src/test/bin/spec_diff_test : \
+	src/test/attack_finder/spec_diff_test.c \
+	$(ATTACK_FINDER_DEPS)
+	cc -g $(patsubst src/attack_finder.c,,$(filter %.c, $^)) -I src/test $(ATTACK_FINDER_INC) -o $@ -lm
+

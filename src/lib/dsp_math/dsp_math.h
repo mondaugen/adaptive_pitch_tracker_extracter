@@ -133,4 +133,7 @@ dspm_rfft_vf32_vz32(struct dspm_rfft_vf32_vz32_cfg *cfg,
 float
 dspm_mean_vf32_f32(const float *src, unsigned int length);
 
+void
+dspm_rev_vu32(unsigned int *srcdst, unsigned int length);
+
 #endif /* DSP_MATH_H */

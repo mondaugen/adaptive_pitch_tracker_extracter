@@ -49,7 +49,7 @@ int main (void)
         ret->n_attack_time_pairs*sizeof(unsigned int));
     array_to_file(
         OUT_FILE_PATH_END,
-        beginnings,
+        ends,
         ret->n_attack_time_pairs*sizeof(unsigned int));
     return 0;
 }

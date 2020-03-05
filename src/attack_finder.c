@@ -43,6 +43,17 @@ struct spec_diff_result {
     unsigned int length;
 };
 
+struct spec_diff_finder_init {
+    unsigned int H;
+    unsigned int W;
+    /* Returns non-zero if it didn't succeed in initializing the window. NOTE:
+    From prototype implementation in spectral_difference.py, the window W is
+    divided by sum(W) to normalize it, so the init_window should also do this
+    normalization to the window it puts in w. */
+    int (*init_window)(float *w, void *aux, unsigned int window_length);
+    void *init_window_aux;
+};
+
 static void
 spec_diff_result_free(struct spec_diff_result *x)
 {
@@ -185,6 +196,7 @@ spec_diff_finder_find(struct spec_diff_finder *finder,
         /* Make X0 into X1 and X1 is now X0, which will be overwritten on next
         pass */
         SWAP(X0,X1);
+        n += finder->H;
     }
     return ret;
 }
@@ -468,6 +480,11 @@ attack_finder_closest_index_after(
         }
     }
     *n_idcs = n_idcs_;
+    if (reverse) {
+        /* the indices are currently in decreasing order, reverse the order so
+        they are ascending */
+        dspm_rev_vu32(idcs,n_idcs_);
+    }
     return idcs;
 }
 
@@ -657,14 +674,19 @@ attacks_from_spec_diff_finder_compute(
                  n_sd_mins_filtered,
                  n_gate_changes;
     struct attacks_from_spec_diff_result *ret = NULL;
+    float *thresh = NULL;
     /* Find spectral difference */
     sd = spec_diff_finder_find(finder->spec_diff_finder,x,length);
     if (!sd) { goto fail; }
     /* Smooth the spectral difference */
     iir_avg(sd->spec_diff,sd->spec_diff,sd->length,finder->smoothing);
     /* Find local maxima using a discounting technique */
+#ifdef DEBUG
+    thresh = calloc(sizeof(float),sd->length);
+    if (!thresh) { goto fail; }
+#endif
     sd_maxs = discount_local_max_f32(sd->spec_diff, sd->length, &n_sd_maxs,
-        local_max_type_right, finder->smoothing, finder->sd_th, NULL);
+        local_max_type_right, finder->lmfr, finder->sd_th,thresh);
     if (!sd_maxs || (n_sd_maxs == 0)) { goto fail; }
     sd_gate = gate_via_rms_thresh(x,length,finder->H,finder->W,&n_gate_changes,
     finder->ng_th_A);
@@ -676,7 +698,6 @@ attacks_from_spec_diff_finder_compute(
         n_gate_changes,
         sd->length);
     if (!sd_maxs || (n_sd_maxs == 0)) { goto fail; }
-    offset_extrema(sd_maxs,n_sd_maxs,finder);
     if (return_time_pairs) {
         /* Multiply spectral difference by -1 to find local minima */
         dspm_neg_vf32(sd->spec_diff, sd->length);
@@ -692,6 +713,7 @@ attacks_from_spec_diff_finder_compute(
             &n_sd_mins_filtered,
             1 /* reverse */);
         if (!sd_mins_filtered || (n_sd_mins_filtered == 0)) { goto fail; }
+        offset_extrema(sd_maxs,n_sd_maxs,finder);
         offset_extrema(sd_mins_filtered,n_sd_mins_filtered,finder);
         ret = up_down_match(
             sd_mins_filtered,
@@ -699,6 +721,7 @@ attacks_from_spec_diff_finder_compute(
             sd_maxs,
             n_sd_maxs);
     } else {
+        offset_extrema(sd_maxs,n_sd_maxs,finder);
         ret = unpaired_ends(sd_maxs,n_sd_maxs);
     }
 fail:
@@ -707,5 +730,6 @@ fail:
     if (sd_maxs) { free(sd_maxs); }
     if (sd_mins_filtered) { free(sd_mins_filtered); }
     if (sd_gate) { free(sd_gate); }
+    if (thresh) { free(thresh); }
     return ret;
 }
