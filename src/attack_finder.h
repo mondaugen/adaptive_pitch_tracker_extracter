@@ -85,11 +85,17 @@ struct attacks_from_spec_diff_finder *
 attacks_from_spec_diff_finder_new(
 struct attacks_from_spec_diff_finder_args *args);
 
+void
+attacks_from_spec_diff_finder_free(struct attacks_from_spec_diff_finder *finder);
+
 struct attacks_from_spec_diff_result *
 attacks_from_spec_diff_finder_compute(
     struct attacks_from_spec_diff_finder *finder,
     float *x,
     unsigned int length,
     int return_time_pairs);
+
+void
+attacks_from_spec_diff_result_free(struct attacks_from_spec_diff_result *r);
 
 #endif /* ATTACK_FINDER_H */

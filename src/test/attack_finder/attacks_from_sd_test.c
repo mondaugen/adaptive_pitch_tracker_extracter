@@ -13,12 +13,12 @@ input file should be mono
 
 int main (void)
 {
-    float *x = file_to_array(
-        IN_FILE_PATH,
-        0);
+    float *x = NULL;
     unsigned int length = get_file_length_path(IN_FILE_PATH)/sizeof(float),
                 *beginnings = NULL,
                 *ends = NULL;
+    struct attacks_from_spec_diff_finder *finder = NULL;
+    struct attacks_from_spec_diff_result *ret = NULL;
     struct attacks_from_spec_diff_finder_args args = {
         /* these settings worked well for 16Khz sampled files */
         .H = 256,
@@ -29,20 +29,22 @@ int main (void)
         .ng_th = -60,
         .sd_th = 0
     };
-    struct attacks_from_spec_diff_finder *finder =
-        attacks_from_spec_diff_finder_new(&args);
-    assert(finder);
-    struct attacks_from_spec_diff_result *ret =
-        attacks_from_spec_diff_finder_compute(
+    x = file_to_array(
+        IN_FILE_PATH,
+        0);
+    if (!x) { goto fail; }
+    finder = attacks_from_spec_diff_finder_new(&args);
+    if (!finder) { goto fail; }
+    ret = attacks_from_spec_diff_finder_compute(
         finder,
         x,
         length,
         1);
-    assert(ret);
+    if (!ret) { goto fail; }
     beginnings = attacks_result_extract_beginnings(ret);
-    assert(beginnings);
+    if (!beginnings) { goto fail; }
     ends = attacks_result_extract_ends(ret);
-    assert(ends);
+    if (!ends) { goto fail; }
     array_to_file(
         OUT_FILE_PATH_BEG,
         beginnings,
@@ -51,5 +53,11 @@ int main (void)
         OUT_FILE_PATH_END,
         ends,
         ret->n_attack_time_pairs*sizeof(unsigned int));
+fail:
+    if (finder) { attacks_from_spec_diff_finder_free(finder); }
+    if (ret) { attacks_from_spec_diff_result_free(ret); }
+    if (beginnings) { free(beginnings); }
+    if (ends) { free(ends); }
+    if (x) { free(x); }
     return 0;
 }

@@ -543,10 +543,10 @@ attack_finder_index_mask(
                 if (gate) {
                     if (pass > 0) { ret[n_filtered] = idcs[n_idc]; }
                     n_filtered++;
-                    /* force quit if no more indices */
-                    if (n_idc >= n_entry_idcs) { n = len_sig; }
                 }
                 n_idc++;
+                /* force quit if no more indices */
+                if (n_idc >= n_entry_idcs) { n = len_sig; }
             }
         }
         if (pass > 0) { break; }
@@ -650,36 +650,26 @@ offset_extrema(
     dspm_add_vu32_u32(idcs,n_idcs,finder->W/2);
 }
 
-/* Returns pairs that are an estimation of the attack start and end times. */
 struct attacks_from_spec_diff_result *
-attacks_from_spec_diff_finder_compute(
+attacks_from_spec_diff(
     struct attacks_from_spec_diff_finder *finder,
-    float *x,
-    unsigned int length,
+    struct spec_diff_result *sd,
+    unsigned int *sd_gate,
+    unsigned int n_gate_changes,
     /* If non-zero, trys to find the beginning of the attack just before the
     estimated attack peak and if found, puts it in the "beginning" field of the
     same attack_sample_time_pair as the attack peak time. Otherwise it just puts
     the attack time peaks in the "end" field of the attack_sample_time_pairs. */
     int return_time_pairs)
 {
-    if (!x) { return NULL; }
-    if (length < 1) { return NULL; }
-    struct spec_diff_result *sd = NULL;
     unsigned int *sd_mins = NULL,
                  *sd_maxs = NULL,
                  *sd_mins_filtered = NULL,
-                 *sd_gate = NULL,
                  n_sd_maxs,
                  n_sd_mins,
-                 n_sd_mins_filtered,
-                 n_gate_changes;
-    struct attacks_from_spec_diff_result *ret = NULL;
+                 n_sd_mins_filtered;
     float *thresh = NULL;
-    /* Find spectral difference */
-    sd = spec_diff_finder_find(finder->spec_diff_finder,x,length);
-    if (!sd) { goto fail; }
-    /* Smooth the spectral difference */
-    iir_avg(sd->spec_diff,sd->spec_diff,sd->length,finder->smoothing);
+    struct attacks_from_spec_diff_result *ret = NULL;
     /* Find local maxima using a discounting technique */
 #ifdef DEBUG
     thresh = calloc(sizeof(float),sd->length);
@@ -688,9 +678,6 @@ attacks_from_spec_diff_finder_compute(
     sd_maxs = discount_local_max_f32(sd->spec_diff, sd->length, &n_sd_maxs,
         local_max_type_right, finder->lmfr, finder->sd_th,thresh);
     if (!sd_maxs || (n_sd_maxs == 0)) { goto fail; }
-    sd_gate = gate_via_rms_thresh(x,length,finder->H,finder->W,&n_gate_changes,
-    finder->ng_th_A);
-    if (!sd_gate || (n_gate_changes == 0)) { goto fail; }
     sd_maxs = attack_finder_index_mask(
         sd_maxs,
         &n_sd_maxs,
@@ -725,11 +712,40 @@ attacks_from_spec_diff_finder_compute(
         ret = unpaired_ends(sd_maxs,n_sd_maxs);
     }
 fail:
-    if (sd) { spec_diff_result_free(sd); }
     if (sd_mins) { free(sd_mins); }
     if (sd_maxs) { free(sd_maxs); }
     if (sd_mins_filtered) { free(sd_mins_filtered); }
-    if (sd_gate) { free(sd_gate); }
     if (thresh) { free(thresh); }
+    return ret;
+}
+
+/* Returns pairs that are an estimation of the attack start and end times. */
+struct attacks_from_spec_diff_result *
+attacks_from_spec_diff_finder_compute(
+    struct attacks_from_spec_diff_finder *finder,
+    float *x,
+    unsigned int length,
+    int return_time_pairs)
+{
+    if (!x) { return NULL; }
+    if (length < 1) { return NULL; }
+    struct attacks_from_spec_diff_result *ret = NULL;
+    unsigned int *sd_gate = NULL,
+                  n_gate_changes;
+    struct spec_diff_result *sd = NULL;
+    /* Find spectral difference */
+    sd = spec_diff_finder_find(finder->spec_diff_finder,x,length);
+    if (!sd) { goto fail; }
+    /* Smooth the spectral difference */
+    iir_avg(sd->spec_diff,sd->spec_diff,sd->length,finder->smoothing);
+    sd_gate = gate_via_rms_thresh(x,length,finder->H,finder->W,&n_gate_changes,
+    finder->ng_th_A);
+    if (!sd_gate || (n_gate_changes == 0)) { goto fail; }
+    ret = attacks_from_spec_diff(finder,sd,sd_gate,n_gate_changes,
+    return_time_pairs);
+    if (!ret) { goto fail; } /* for completeness */
+fail:
+    if (sd_gate) { free(sd_gate); }
+    if (sd) { spec_diff_result_free(sd); }
     return ret;
 }
