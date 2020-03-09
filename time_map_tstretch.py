@@ -211,16 +211,28 @@ def get_contained_attack_times(attack_times, start, end):
 def contains_atime(attack_times, start, end):
     return len(get_contained_attack_times(attack_times,start,end)) > 0
 
+# TODO we need this but a version that could work in real-time. The analysis
+# window sits parked at a time within a region without attacks when the most
+# recent samples contain an attack. Then when enough time in the past up to the
+# last received sample contain no attacks, the window advances at synthesis rate
+# until it gets to a time without attacks. While the time just before the last
+# received sample contains no attacks, the analysis window is immediately moved
+# to this position to do analysis there. This is for use with real-time pitch
+# shifters, which require some time-modification of the signal being
+# over/under-sampled: by forcing the analysis window to be close to the most
+# recently received sample (when it can be), the output's features will be
+# related to the input's.
 class attack_avoider:
     def __init__(self,
-        # Some data structure containing points in time that we want to preserve. It
-        # shouldn't contain time points closer than awin_len, otherwise this
-        # algorithm won't be able put a window in a place not containing one of
-        # those time points.
+        # Some data structure containing points in time that we want to
+        # preserve. It shouldn't contain time points closer than awin_len,
+        # otherwise this algorithm won't be able put a window in a place not
+        # containing one of those time points.
         attack_times,
-        # This is the time we want to put the analysis window. A possible/recommended
-        # value for this is a number such that analysis_time + awin_start gives
-        # the start time of the window, but other values might end up sounding better.
+        # This is the time we want to put the analysis window. A
+        # possible/recommended value for this is a number such that
+        # analysis_time + awin_start gives the start time of the window, but
+        # other values might end up sounding better.
         awin_start,
         # A number such that analysis_time + awin_start + awin_len gives the first
         # sample just after the end of a window.
