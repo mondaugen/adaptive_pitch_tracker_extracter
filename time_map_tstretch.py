@@ -14,6 +14,7 @@ General assumputions:
 
 from functools import reduce
 import numpy as np
+import datastructures as ds
 
 class io_time_pair:
     def __init__(self,in_time,out_time):
@@ -304,3 +305,94 @@ class attack_avoid_access:
     def __call__(self,t):
         atime,reset=self.av.adjust(int(np.round(t)))
         return self.get_samples(atime,reset)
+
+def compute_attack_index(a):
+    i=np.where(a==1)[0]
+    if (len(i) > 1):
+        # we don't want more than 1 attack
+        raise ValueError
+    if len(i) < 1:
+        return None
+    return i[0]
+
+class real_time_attack_avoid_controller:
+    def __init__(self,M,W,H):
+        # margin on either side of attack
+        self.M=M
+        # analysis window length
+        self.W=W
+        # hop size
+        self.H=H
+        # size of safe region
+        self.R=2*M+W+H
+        # read head
+        self.r=-(M+W+H)
+        # previous read head
+        self.r_prev=self.r
+        # write head
+        self.w=0
+        # read head safe point
+        self.safe_point=self.r
+        # We always start in a safe region
+        self.was_safe=True
+        # ringbuffer to store samples
+        # it is this size because in the worst case, rb contains 2*R samples
+        # (because there's no room at the front to advance), so we need to shift
+        # in H samples and then we'll have room to advance (because of
+        # guaranteed spacing of attacks)
+        self.rb = ds.ringbuffer(2*self.R+self.H)
+        # ringbuffer to store attack indices
+        self.rb_attacks = ds.ringbuffer(2,dtype='uint')
+        # push R samples of "silence" (but with dither)
+        self.rb.push_copy(np.random.standard_normal(self.R)*1e-6)
+    def write(self,samples,attack_idx_):
+        """
+        if no attack, pass attack_idx_ < 0
+        """
+        assert(len(samples)==self.H)
+        self.rb.push_copy(samples)
+        self.w += self.H
+        if attack_idx_ >= 0:
+            attack_idx = self.w - self.H + attack_idx_
+            self.rb_attacks.push_copy(np.array([attack_idx],dtype='uint'))
+    def write_read_cycle(self,samples,attack_idx_):
+        """
+        if no attack, pass attack_idx_ < 0
+        """
+        assert(len(samples)==self.H)
+        self.rb.push_copy(samples)
+        self.w += self.H
+        if attack_idx_ >= 0:
+            attack_idx = self.w - self.H + attack_idx_
+            self.rb_attacks.push_copy(np.array([attack_idx],dtype='uint'))
+        # compute region to return
+        # now we advance the read head in a way that avoids any attacks
+        reset=False
+        if self.rb_attacks.contents_size() > 0:
+            index_to_pass = self.rb_attacks.get_region(0,1)[0]
+            # even if there are multiple attacks in the rb_attacks
+            # ringbuffer, if this passes it is guaranteed to be a safe spot
+            # because of the guaranteed distance between attacks
+            if (self.w - index_to_pass) > self.R:
+                # can start advancing
+                self.r += self.H
+                if self.was_safe:
+                    reset=True
+                    self.was_safe=False
+                if self.r > index_to_pass:
+                    self.was_safe=True
+                    # remove the attack we passed
+                    self.rb_attacks.advance_head(1)
+        else:
+            # if we've crossed the safe point (we've crossed the attack
+            # without smearing), then just return samples from just before
+            # the write head
+            self.r = self.w-self.M-self.W-self.H
+        # TODO: What read index do we return and when? Here we output a copy of
+        # the samples, but what if we want to avoid a copy?
+        # discard samples up to read head
+        n_discard=self.r-self.r_prev
+        self.rb.advance_head(n_discard)
+        ret=self.rb.get_region(0,self.H+self.W)
+        self.r_prev=self.r
+        return (ret,self.r,reset)

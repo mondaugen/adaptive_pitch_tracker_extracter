@@ -38,7 +38,8 @@ class ringbuffer:
             raise ValueError
         first_region_size = min(self.buffer_size - self.tail_index,n)
         second_region_size = n - first_region_size
-        self.buffer[self.tail_index:self.tail_index+first_region_size] = buffer[:first_region_size]
+        self.buffer[self.tail_index:
+            self.tail_index+first_region_size] = buffer[:first_region_size]
         self.buffer[:second_region_size] = buffer[first_region_size:]
         self.tail_index = (self.tail_index + n) & self.buf_size_mask
     def shift_in(self,buffer):
