@@ -355,16 +355,7 @@ class real_time_attack_avoid_controller:
         if attack_idx_ >= 0:
             attack_idx = self.w - self.H + attack_idx_
             self.rb_attacks.push_copy(np.array([attack_idx],dtype='uint'))
-    def write_read_cycle(self,samples,attack_idx_):
-        """
-        if no attack, pass attack_idx_ < 0
-        """
-        assert(len(samples)==self.H)
-        self.rb.push_copy(samples)
-        self.w += self.H
-        if attack_idx_ >= 0:
-            attack_idx = self.w - self.H + attack_idx_
-            self.rb_attacks.push_copy(np.array([attack_idx],dtype='uint'))
+    def read(self):
         # compute region to return
         # now we advance the read head in a way that avoids any attacks
         reset=False
@@ -396,3 +387,9 @@ class real_time_attack_avoid_controller:
         ret=self.rb.get_region(0,self.H+self.W)
         self.r_prev=self.r
         return (ret,self.r,reset)
+    def write_read_cycle(self,samples,attack_idx_):
+        """
+        if no attack, pass attack_idx_ < 0
+        """
+        self.write(samples,attack_idx_)
+        return self.read()
