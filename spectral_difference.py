@@ -11,6 +11,18 @@ def iir_avg(x,a):
     y=signal.lfilter([a],[1,-(1-a)],x)
     return y
 
+class iir_avg_rt:
+    """ like iir_avg but can be called block-wise """
+    def __init__(self,a):
+        # is like in iir_avg
+        self.b=np.array([a])
+        self.a=np.array([1,-(1-a)])
+        # past filter values
+        self.v_1=np.zeros(1)
+    def __call__(self,x):
+        y,self.v_1=signal.lfilter(self.b,self.a,x,zi=self.v_1)
+        return y
+
 def spectral_diff(x,H,W,window_type):
     w=signal.get_window(window_type,W)
     x_framed=common.frame(x,H,W)*w[:,None]
@@ -20,6 +32,22 @@ def spectral_diff(x,H,W,window_type):
     sd[sd<0]=0
     sd=np.sum(sd,axis=0)
     return sd
+
+class spectral_diff_rt:
+    """ spectral difference that can be called block-wise """
+    def __init__(self,W,window_type='hann'):
+        self.W=W
+        self.w=signal.get_window(window_type,self.W)
+        self.sum_w=np.sum(self.w)
+        self.X_1=np.zeros(W//2+1)
+    def __call__(self,x):
+        assert(len(x)==self.W)
+        X0=np.abs(np.fft.rfft(x)/self.sum_w)
+        sd=X0-self.X_1
+        self.X_1=X0
+        sd[sd<0]=0
+        sd=np.sum(sd)
+        return sd
 
 def high_frequency_weight(x,H,W,window_type):
     w=signal.get_window(window_type,W)
@@ -35,12 +63,16 @@ def local_rms(x,H,W):
     x_rms=np.sqrt(np.mean(x_framed**2,axis=0))
     return x_rms
 
+def local_rms_rt(x):
+    ret=np.sqrt(np.mean(x**2))
+    return ret
+
 def local_max(x,one_sided_max='right'):
     """
     for vectors only
     one_sided_max controls what happens if a point is equal to one of its adjacent points
     if 'right', then a point >= to a point to its right is a candidate for a local maximum
-    if 'left', then a point >= to a point to its left is a candidate for a  local maximum
+    if 'left', then a point >= to a point to its left is a candidate for a local maximum
     if 'none', then a point must be > than both points
     if 'both', then a point only needs to be >= than both points
     """
@@ -59,6 +91,27 @@ def local_max(x,one_sided_max='right'):
     gtr=np.concatenate((gtr,np.zeros((1),dtype='bool')),axis=0)
     gtl=np.concatenate((np.zeros((1),dtype='bool'),gtl),axis=0)
     return np.where(gtr&gtl)[0]
+
+_concat=np.concatenate
+one_sided_max_funs=dict(
+    right= lambda x: (_concat((x[:-1]>=x[1:],[False]))&_concat(([False],x[1:]>x[:-1])))[1],
+    left= lambda x:  (_concat((x[:-1]>x[1:],[False]))&_concat(([False],x[1:]>=x[:-1])))[1],
+    none= lambda x:  (_concat((x[:-1]>x[1:],[False]))&_concat(([False],x[1:]>x[:-1])))[1],
+    both= lambda x:  (_concat((x[:-1]>=x[1:],[False]))&_concat(([False],x[1:]>=x[:-1])))[1])
+
+class local_max_rt:
+    def __init__(self,one_sided_max='right'):
+        self.max_fun=one_sided_max_funs[one_sided_max]
+        self.x=np.zeros(3)
+    def __call__(self,x):
+        # x cannot be array, just signal number
+        self.x[-1]=x
+        ret = (0,self.x[-2])
+        if self.max_fun(self.x):
+            ret = (1,self.x[-2])
+        # shift over values
+        self.x[:-1]=self.x[1:]
+        return ret
 
 def discount_local_max(x,rate,min_thresh=0):
     """
@@ -80,6 +133,29 @@ def discount_local_max(x,rate,min_thresh=0):
             thresh+=signal.lfilter([1],[1,-rate],s)
             filtered_maxs.append(n_max)
     return (np.array(filtered_maxs),thresh)
+
+class discount_local_max_rt:
+    def __init__(self,rate,min_thresh=0,one_sided_max='right'):
+        self.rate=rate
+        self.min_thresh=min_thresh
+        self.thresh=0
+        self.local_max_finder=local_max_rt(one_sided_max=one_sided_max)
+    def __call__(self,x,record_thresh=None):
+        # x must be number not array
+        # returns 1 if x[-2] is local maximum (x 2 samples/calls ago), otherwise 0
+        # record_thresh is a function for recording the threshold somewhere
+        is_lmax,lmax=self.local_max_finder(x)
+        th_x0 = 0
+        ret=0
+        if (is_lmax
+            and (lmax > self.min_thresh)
+            and (lmax > (self.thresh*self.rate))):
+            ret=1
+            th_x0=lmax
+        self.thresh=th_x0+self.rate*self.thresh
+        if record_thresh is not None:
+            record_thresh(self.thresh)
+        return ret
 
 def discount_local_max_rate_calc(n,bottom=0.01):
     """ Find the rate that reaches bottom in n steps """
@@ -172,3 +248,19 @@ def filtered_local_max(x,H,W,a):
         if (c_max[max_n_sorted[-1]] > a*np.mean(c)):
             res[max_n[max_n_sorted[-1]]+h] = 1
     return np.where(res>0)[0]
+
+class impulse_rate_limiter:
+    def __init__(self,timeout):
+        assert(timeout>0)
+        self.timeout=timeout
+        self.t=0
+    def __call__(self,x):
+        ret=0
+        if self.t == 0:
+            ret = x
+            if x > 0:
+                self.t=self.timeout
+        if self.t > 0:
+            self.t -= 1
+        return ret
+            

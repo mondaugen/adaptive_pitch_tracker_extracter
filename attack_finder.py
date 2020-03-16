@@ -3,6 +3,7 @@ import numpy as np
 from scipy import signal
 import common
 import spectral_difference
+import datastructures
 
 def find_attacks(
 x,
@@ -153,7 +154,8 @@ def attacks_from_spectral_diff(
     lmax_filt_rate=16000,
     # the threshold in dB for the noise gate
     ng_th=-60):
-    """ Returns pairs that are an estimation of the attack start and end times
+    """
+    Returns pairs that are an estimation of the attack start and end times
     """
 
     # calculate the max filter rate
@@ -191,3 +193,55 @@ def attacks_from_spectral_diff(
     sd_mins_filtered += W//2
 
     return spectral_difference.up_down_match(sd_mins_filtered,sd_maxs)
+
+class attacks_from_spectral_diff_rt:
+    def __init__(self,
+                 # hop size or block size
+                 H=256,
+                 # window size for spectral difference
+                 W=1024,
+                 # window type for spectral difference
+                 window_type='hann',
+                 # smoothing factor s. 0 < s <= 1
+                 # 1 means no smoothing, 0 would mean totally rejecting new
+                 # values
+                 smoothing=1,
+                 # max filter discount rate, the time in hops until it
+                 # reaches 1% of the maximum
+                 lmax_filt_rate=64,
+                 # the threshold in dB for the noise gate
+                 ng_th=-60,
+                 # the attack frequency limit (in hops)
+                 attack_freq_limit=5,
+                 record_sd=None,
+                 record_thresh=None):
+        self.H=H
+        self.W=W
+        self.ng_th_A=np.power(10,ng_th/20)
+        self.rb=datastructures.ringbuffer(W)
+        self.sd=spectral_difference.spectral_diff_rt(W,window_type)
+        self.iira=spectral_difference.iir_avg_rt(smoothing)
+        rate=spectral_difference.discount_local_max_rate_calc(lmax_filt_rate)
+        self.dlm=spectral_difference.discount_local_max_rt(rate)
+        self.rb.push_copy(np.zeros(W))
+        self.record_thresh=record_thresh
+        self.record_sd=record_sd
+        self.irl=spectral_difference.impulse_rate_limiter(attack_freq_limit)
+    def __call__(self,x):
+        assert(len(x)==self.H)
+        self.rb.shift_in(x)
+        r=self.rb.get_region(0,self.W)
+        sd=self.sd(r)
+        if self.record_sd is not None:
+            self.record_sd(sd)
+        sd=self.iira([sd])[0]
+        sd_max=self.dlm(sd,self.record_thresh)
+        p=spectral_difference.local_rms_rt(r)
+        ret = 1 if (sd_max>0) and (p > self.ng_th_A) else 0
+        ret = self.irl(ret)
+        return ret
+
+
+
+
+
