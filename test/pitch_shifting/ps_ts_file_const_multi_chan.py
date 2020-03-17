@@ -66,7 +66,7 @@ for chan in range(N_CHANS):
             x[chan::N_CHANS],
             # set margin to W
             M,
-            lmax_filt_rate_s=LMAX_FILT_RATE*SR,
+            lmax_filt_rate=LMAX_FILT_RATE,
             SR=SR,
             W=W,
             H=H,

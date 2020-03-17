@@ -208,7 +208,7 @@ class attacks_from_spectral_diff_rt:
                  smoothing=1,
                  # max filter discount rate, the time in hops until it
                  # reaches 1% of the maximum
-                 lmax_filt_rate=64,
+                 lmax_filt_rate=4,
                  # the threshold in dB for the noise gate
                  ng_th=-60,
                  # the attack frequency limit (in hops)
@@ -216,6 +216,7 @@ class attacks_from_spectral_diff_rt:
                  record_sd=None,
                  record_thresh=None):
         print('attack_freq_limit',attack_freq_limit)
+        print('lmax_filt_rate_h',lmax_filt_rate)
         self.H=H
         self.W=W
         self.ng_th_A=np.power(10,ng_th/20)

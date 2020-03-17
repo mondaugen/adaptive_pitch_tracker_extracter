@@ -121,8 +121,8 @@ def psts_const_amount_rt(
     # window cannot fall within (see
     # time_map_tstretch.real_time_attack_avoid_controller)
     M,
-    # time in seconds for max filtering IR to fall to 0.01 of original value
-    lmax_filt_rate_s=2.,
+    # time in samples for max filtering IR to fall to 0.01 of original value
+    lmax_filt_rate=16000,
     # minimum threshold of local power for local maximum in attack estimation
     # signal (spectral difference) to be accepted
     ng_th=-60,
@@ -156,8 +156,7 @@ def psts_const_amount_rt(
     # make position signal, just 0 for whole file
     pos_sig=np.zeros(N)
 
-    # convert lmax_filt_rate_s in seconds to hops
-    lmax_filt_rate=lmax_filt_rate_s*H
+    # convert lmax_filt_rate in samples to hops
     lmax_filt_rate_h=int(np.ceil(lmax_filt_rate/H))
 
     # the size of the safe region in which an analysis window can sit without
