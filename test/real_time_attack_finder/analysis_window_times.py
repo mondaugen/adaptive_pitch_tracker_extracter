@@ -9,18 +9,15 @@ import common
 
 W=1024
 H=256
-# TODO: The ringbuffer overflows if M=W
-# It seems with W//2 that it doesn't ignore the correct attack
-M=W//2
+M=W
+R=2*M+W+H
 rtaac=time_map_tstretch.real_time_attack_avoid_controller(M,W,H)
-print(rtaac.R/H)
 afsd=rtaf_common.afdf_rt_test(
-        # hop size or block size
-        H=H,
-        # window size for spectral difference
-        W=W,
-        N=25600,
-        attack_freq_limit=rtaac.R//H+2)
+H=H,
+W=W,
+a_dist=R+1,
+last_a=150000,
+attack_freq_limit=int(np.ceil((R+1)/H)))
 
 rh=-1
 for h in range(0,afsd.N,afsd.H):
@@ -28,7 +25,6 @@ for h in range(0,afsd.N,afsd.H):
     ai=-1
     if afsd.attacks[h//afsd.H] > 0:
         ai=0
-    print(h)
     _,read_idx,reset=rtaac.write_read_cycle(afsd.x[h:h+afsd.H],ai)
     color = 'red' if reset else 'black'
     common.plot_arch(plt,read_idx,W+H,rh,color=color)

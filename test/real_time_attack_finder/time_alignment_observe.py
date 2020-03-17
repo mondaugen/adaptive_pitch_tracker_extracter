@@ -5,7 +5,17 @@ import matplotlib.pyplot as plt
 import attack_finder
 import rtaf_common
 
-afsd=rtaf_common.afdf_rt_test()
+H=256
+W=1024
+M=W
+R=2*M+W+H
+afsd=rtaf_common.afdf_rt_test(
+H=H,
+W=W,
+a_dist=R+1,
+last_a=150000,
+attack_freq_limit=int(np.ceil((R+1)/H))
+)
 for h in range(0,afsd.N,afsd.H):
     afsd.attacks[h//afsd.H]=afsd.afsd(afsd.x[h:h+afsd.H])
 

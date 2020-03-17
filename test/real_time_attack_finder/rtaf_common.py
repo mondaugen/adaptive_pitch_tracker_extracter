@@ -10,16 +10,22 @@ class afdf_rt_test:
         # window size for spectral difference
         W=1024,
         N=25600,
+        # minimum distance between attacks
+        a_dist=2000,
+        first_a=5000,
+        last_a=15000,
         lmax_filt_rate_h=2,
         attack_freq_limit=12,
         ng_th=-40):
         n=np.arange(N)
 
-        self.N=N
+        self.N=0
+        while self.N < max(N,last_a):
+            self.N+=H
         self.H=H
-        self.x=np.zeros(N)
-        self.x[5000:15000:2000]=1
-        self.attacks=np.zeros(N//H)
+        self.x=np.zeros(self.N)
+        self.x[first_a:last_a:a_dist]=1
+        self.attacks=np.zeros(self.N//H)
         self.thresh=np.zeros_like(self.attacks)
         self.sd=np.zeros_like(self.attacks)
 

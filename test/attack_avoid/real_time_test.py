@@ -2,9 +2,10 @@
 import numpy as np
 import time_map_tstretch
 import matplotlib.pyplot as plt
+import common
 
 # margin on either side of attack
-M = 1
+M = 16
 # analysis window length
 W = 16
 # hop size
@@ -13,7 +14,10 @@ H = 4
 R = 2*M+W+H
 
 # number of samples in test signal
-N = 24*H
+N=0
+while N < max(5+R+1+3*R+1,24*H):
+    N += H
+
 # dummy signal
 x=np.arange(N)
 x_attacks=np.zeros(N)
