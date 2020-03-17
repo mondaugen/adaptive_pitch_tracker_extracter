@@ -215,6 +215,7 @@ class attacks_from_spectral_diff_rt:
                  attack_freq_limit=5,
                  record_sd=None,
                  record_thresh=None):
+        print('attack_freq_limit',attack_freq_limit)
         self.H=H
         self.W=W
         self.ng_th_A=np.power(10,ng_th/20)

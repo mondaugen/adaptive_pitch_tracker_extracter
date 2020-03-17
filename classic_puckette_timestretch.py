@@ -154,13 +154,37 @@ class pvoc_synth:
         window_length,
         hop_size,
         # function accepting input_time returning window_length samples
-        get_samples):
-        pvoc_synth._chk_args(analysis_window,synthesis_window,window_length,hop_size)
+        get_samples=None,
+        # a function returning hop_size+window_length samples and whether or not
+        # the routine should reset (samples,reset), but does not accept input
+        # time. If we don't have reset information, return None in the reset
+        # field.
+        get_samples_no_time=None):
+        pvoc_synth._chk_args(
+        analysis_window,
+        synthesis_window,
+        window_length,
+        hop_size)
         self.analysis_window = analysis_window
         self.synthesis_window = synthesis_window
         self.window_length = window_length
         self.hop_size = hop_size
-        self.get_samples = get_samples
+        # temporary storage for input time, used with get_samples_no_time
+        self._input_time=0
+        # temporary storage for hop_size+window_length input samples, used with
+        # get_samples_no_time
+        self.tmp_input=np.zeros(hop_size+window_length)
+        if get_samples_no_time is not None:
+            # set specific get_samples function that gets from a temporary
+            # buffer obtained through get_samples_no_time
+            self.get_samples_no_time=get_samples_no_time
+            self.get_samples = lambda n: self.tmp_input[
+            int(np.round(self.hop_size+n-self._input_time)):
+            int(np.round(self.hop_size+n-self._input_time))+self.window_length]
+        else:
+            self.get_samples = get_samples
+            self.get_samples_no_time = None
+        assert(self.get_samples is not None)
         self.ola_buffer = ola(window_length,hop_size)
         self.reset_past_output()
         self.output_scaling = common.ola_shorten(
@@ -169,13 +193,21 @@ class pvoc_synth:
         if np.any(self.output_scaling == 0):
             raise ValueError
         self.output_scaling = 1./self.output_scaling
-        self.init_window = np.zeros(self.window_length,dtype=self.analysis_window.dtype)
+        self.init_window = np.zeros(self.window_length,
+        dtype=self.analysis_window.dtype)
         for h in np.arange(0,self.window_length,self.hop_size):
             a_win_section = self.analysis_window[h:]
             s_win_section = self.synthesis_window[h:]
             self.init_window[:self.window_length-h] += a_win_section*s_win_section
 
     def process(self,input_time,reset):
+        if self.get_samples_no_time is not None:
+            self.tmp_input[:],_reset=self.get_samples_no_time()
+            if _reset is not None:
+                reset=_reset
+            if reset:
+                print(input_time)
+            self._input_time=input_time
         f_input0 = self.get_samples(input_time)
         r_workspace=f_input0*self.analysis_window
         if self.z_outputH is not None:
