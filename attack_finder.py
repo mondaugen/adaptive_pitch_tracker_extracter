@@ -241,7 +241,3 @@ class attacks_from_spectral_diff_rt:
         ret = self.irl(ret)
         return ret
 
-
-
-
-

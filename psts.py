@@ -14,8 +14,11 @@ import envelopes
 import lfo
 import math
 
-def adjust_x_for_time_stretch(x,TS):
-    new_len=math.ceil(len(x)/TS)
+def adjust_x_for_time_stretch(x,TS,H):
+    new_len_=math.ceil(len(x)/TS)
+    new_len = 0
+    while new_len < new_len_:
+        new_len += H
     if new_len < len(x):
         return (x[:new_len],new_len)
     elif new_len > len(x):
@@ -57,7 +60,7 @@ def psts_const_amount(
     while N < len(x):
         N+=H
     x=np.concatenate((x,np.zeros(N-len(x))))
-    x,N=adjust_x_for_time_stretch(x,TS)
+    x,N=adjust_x_for_time_stretch(x,TS,H)
     # add dither
     x+=np.random.standard_normal(len(x))*1e-8
 

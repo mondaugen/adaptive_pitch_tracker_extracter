@@ -3,12 +3,6 @@ import numpy as np
 import time_map_tstretch
 import matplotlib.pyplot as plt
 
-# plot an arch showing where the analysis window is placed
-def plot_arch(ax,s,l,h,b=0,color='black'):
-    ax.plot([s,s],[b,b+h],color=color)
-    ax.plot([s,s+l],[b+h,b+h],color=color)
-    ax.plot([s+l,s+l],[b+h,b],color=color)
-
 # margin on either side of attack
 M = 1
 # analysis window length
@@ -45,7 +39,7 @@ plt.plot(np.arange(N),x_attacks,'.')
 h=-1
 for t,r in zip(read_times,resets):
     color = 'red' if r else 'black'
-    plot_arch(plt,t,W+H,h,color=color)
+    common.plot_arch(plt,t,W+H,h,color=color)
     h-=1
 
 plt.show()
