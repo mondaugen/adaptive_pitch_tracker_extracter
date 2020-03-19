@@ -4,6 +4,7 @@ from scipy import signal
 import common
 import spectral_difference
 import datastructures
+from itertools import accumulate
 
 def find_attacks(
 x,
@@ -243,3 +244,24 @@ class attacks_from_spectral_diff_rt:
         ret = self.irl(ret)
         return ret
 
+def event_closeness_limiter(events,min_dist):
+    """ Take a list of events and remove event times that are too close. """
+    if len(events) <= 1:
+        return events
+    events=sorted(events)
+    event0=events[0]
+    diffs=[e1-e0 for e1,e0 in zip(events[1:],events[:-1])]
+    newdiffs=[0 for _ in range(len(diffs)+1)]
+    d_i=0
+    nd_i=1
+    done = False
+    while d_i < len(diffs):
+        if newdiffs[nd_i] >= min_dist:
+            nd_i += 1
+        else:
+            newdiffs[nd_i] += diffs[d_i]
+            d_i += 1
+    if newdiffs[nd_i] >= min_dist:
+        nd_i+=1
+    ret=[event0 + e for e in accumulate(newdiffs[:nd_i])]
+    return ret

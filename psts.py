@@ -26,6 +26,7 @@ def adjust_x_for_time_stretch(x,TS,H):
         return (np.concatenate((x,np.zeros(len_diff,dtype=x.dtype))),new_len)
     return (x,new_len)
 
+# TODO this works well but we need to filter out attack times that are too close
 def psts_const_amount(
     x, # input signal
     # attack times, e.g., estimate with 
@@ -115,6 +116,7 @@ def psts_const_amount(
     return y
 
 # uses real-time method of attack estimation and avoidance
+# TODO This currently sucks
 def psts_const_amount_rt(
     x, # input signal
     # number of samples on either side of attack that a stretching analysis
@@ -136,8 +138,7 @@ def psts_const_amount_rt(
     # Gate parameters
     ADSR_ATTACK=0.1,
     ADSR_RELEASE=0.1,
-    # Time-stretch LFO parameters
-    TS=1,
+    # Time-stretch not possible in real-time
     # Pitch-shift LFO parameters
     PS=1):
 
@@ -145,12 +146,11 @@ def psts_const_amount_rt(
     while N < len(x):
         N+=H
     x=np.concatenate((x,np.zeros(N-len(x))))
-    x,N=adjust_x_for_time_stretch(x,TS,H)
     # add dither
     x+=np.random.standard_normal(len(x))*1e-8
 
     # make time-stretch signal, just constant for whole file
-    ts_sig=np.ones(N)*TS
+    ts_sig=np.ones(N)
     # make pitch-shift signal, just constant for whole file
     ps_sig=np.ones(N)*PS
     # make position signal, just 0 for whole file
@@ -177,7 +177,7 @@ def psts_const_amount_rt(
     gate_sig=np.ones(N)
 
     rs=envelopes.region_segmenter(H)
-    rtaac=time_map_tstretch.real_time_attack_avoid_controller(M,W,H)
+    rtaac=time_map_tstretch.real_time_attack_avoid_controller(M,W,H,PS)
     def _rtaac_read():
         # discard read index
         samps,_,reset=rtaac.read()

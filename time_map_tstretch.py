@@ -315,8 +315,9 @@ def compute_attack_index(a):
         return None
     return i[0]
 
+# TODO: This doesn't work at all for pitch-shifting, back to the drawing board
 class real_time_attack_avoid_controller:
-    def __init__(self,M,W,H):
+    def __init__(self,M,W,H,min_TS=1):
         # margin on either side of attack
         self.M=M
         # analysis window length
@@ -340,26 +341,50 @@ class real_time_attack_avoid_controller:
         # (because there's no room at the front to advance), so we need to shift
         # in H samples and then we'll have room to advance (because of
         # guaranteed spacing of attacks)
-        self.rb = ds.ringbuffer(2*self.R+self.H)
+        # min_TS is the lowest factor by which time could be stretched we need
+        # to know this because read might not be called for hop_size/min_TS
+        # samples because the output doesn't need it. For example if we are
+        # pitch shifting up by a factor of 4 (2 octaves), we will oversample by
+        # a factor of 4, so we need 4 times less samples (we advance time only
+        # by a quarter of the hop). All the while, samples are arriving at the
+        # input, so these need a place to go.
+        H_mult=0
+        ts_accum=0
+        while ts_accum < 1:
+            H_mult+=1
+            ts_accum+=min_TS
+        print('H_mult',H_mult)
+        rb_size=(2*self.R+H)*H_mult
+        self.rb = ds.ringbuffer(rb_size)
+        rb_attacks_size=0
+        r_accum=0
+        while r_accum < rb_size:
+            r_accum += self.R+1
+            rb_attacks_size+=1
+        print('rb_attacks_size',rb_attacks_size)
         # ringbuffer to store attack indices
-        self.rb_attacks = ds.ringbuffer(2,dtype='uint')
+        self.rb_attacks = ds.ringbuffer(rb_attacks_size,dtype='uint')
         # push R samples of "silence" (but with dither)
         self.rb.push_copy(np.random.standard_normal(self.R)*1e-6)
+        self.n_read=0
+        self.n_write=0
     def write(self,samples,attack_idx_):
         """
         if no attack, pass attack_idx_ < 0
         """
         assert(len(samples)==self.H)
         self.rb.push_copy(samples)
+        print('write head %d' % (self.w,))
         self.w += self.H
         if attack_idx_ >= 0:
             attack_idx = self.w - self.H + attack_idx_
             self.rb_attacks.push_copy(np.array([attack_idx],dtype='uint'))
     def read(self):
+        print('read head %d' % (self.r,))
         # compute region to return
         # now we advance the read head in a way that avoids any attacks
         reset=False
-        if self.rb_attacks.contents_size() > 0:
+        if (self.rb_attacks.contents_size() > 0):
             index_to_pass = self.rb_attacks.get_region(0,1)[0]
             # even if there are multiple attacks in the rb_attacks
             # ringbuffer, if this passes it is guaranteed to be a safe spot

@@ -208,6 +208,8 @@ def up_down_match(up,down):
     """
     ret=[]
     m=0
+    if len(up) == 0 or len(down) == 0:
+        return ret
     for u in up:
         while down[m] < u:
             m += 1

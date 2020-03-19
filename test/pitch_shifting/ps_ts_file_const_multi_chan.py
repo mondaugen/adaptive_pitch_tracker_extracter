@@ -13,11 +13,13 @@ N_CHANS=common.get_env('N_CHANS',default=1,conv=int)
 W=common.get_env('W',default=1024,conv=int)
 H=common.get_env('H',default=256,conv=int)
 M=common.get_env('M',default=W,conv=int)
+MIN_ATTACK_DIST=common.get_env('MIN_ATTACK_DIST',default=W+2*H,conv=int)
 ATTACK_EST_MODE=common.get_env('ATTACK_EST_MODE',default='single-channel')
 ATTACK_EST_CHAN=common.get_env('ATTACK_EST_CHAN',default=0,conv=int)
 ATTACK_EST_W=common.get_env('ATTACK_EST_W',default=W,conv=int)
 ATTACK_EST_H=common.get_env('ATTACK_EST_H',default=H,conv=int)
 METHOD=common.get_env('METHOD',default='offline')
+NG_TH=common.get_env('NG_TH',default=-60,conv=float)
 
 realtime=False
 if METHOD == 'realtime':
@@ -44,8 +46,12 @@ if not realtime:
         x_attack_est,
         W=ATTACK_EST_W,
         H=ATTACK_EST_H,
-        lmax_filt_rate=LMAX_FILT_RATE)
+        lmax_filt_rate=LMAX_FILT_RATE,
+        ng_th=NG_TH)
     attack_times=np.array([b for a,b in attack_time_pairs])
+    attack_times=attack_finder.event_closeness_limiter(
+    attack_times,
+    MIN_ATTACK_DIST)
 
 y_sigs=[]
 
@@ -72,7 +78,6 @@ for chan in range(N_CHANS):
             H=H,
             ADSR_ATTACK=common.get_env('ADSR_ATTACK',default=0.1,conv=float),
             ADSR_RELEASE=common.get_env('ADSR_RELEASE',default=0.1,conv=float),
-            TS=common.get_env('TS',default=1,conv=float),
             PS=common.get_env('PS',default=1,conv=float)))
 
 y=np.zeros(N_CHANS*max([len(_) for _ in y_sigs]))
