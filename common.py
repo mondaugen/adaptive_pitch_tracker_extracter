@@ -80,7 +80,9 @@ def region_plot(start,end,height=1,level=0,ax=None,**kwargs):
         ax.plot(x,y,**kwargs)
 
 # plot an arch showing where the analysis window is placed
-def plot_arch(ax,s,l,h,b=0,color='black'):
+def plot_arch(ax,s,l,h,b=0,color='black',print_h=None):
     ax.plot([s,s],[b,b+h],color=color)
     ax.plot([s,s+l],[b+h,b+h],color=color)
     ax.plot([s+l,s+l],[b+h,b],color=color)
+    if print_h is not None:
+        ax.text(s,b+h, print_h % (h,))

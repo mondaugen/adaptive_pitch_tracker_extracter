@@ -205,8 +205,6 @@ class pvoc_synth:
             self.tmp_input[:],_reset=self.get_samples_no_time()
             if _reset is not None:
                 reset=_reset
-            if reset:
-                print(input_time)
             self._input_time=input_time
         f_input0 = self.get_samples(input_time)
         r_workspace=f_input0*self.analysis_window

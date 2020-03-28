@@ -315,106 +315,98 @@ def compute_attack_index(a):
         return None
     return i[0]
 
-# TODO: This doesn't work at all for pitch-shifting, back to the drawing board
-class real_time_attack_avoid_controller:
-    def __init__(self,M,W,H,min_TS=1):
-        # margin on either side of attack
-        self.M=M
-        # analysis window length
-        self.W=W
-        # hop size
-        self.H=H
-        # size of safe region
-        self.R=2*M+W+H
-        # read head
-        self.r=-(M+W+H)
-        # previous read head
+def force_power_of_2(x,mode='smaller'):
+    ret=1
+    if mode == 'smaller':
+        while ret > x:
+            ret *= 0.5
+    elif mode == 'greater':
+        while ret < x:
+            ret *= 2
+    return ret
+
+class real_time_ps_attack_avoid_controller:
+    """ Avoid attacks when pitch shifting in real-time """
+    def __init__(self,
+        # chunks of size H+W are read
+        W,
+        # chunks of size H are written
+        H,
+        # maximum number of reads that can happen per a write
+        # for a pitch shifter, this is typically
+        # ceil((Pmax*H+I)/H) where Pmax is the maximum possible transposition up
+        # (e.g., Pmax=2 means an octave up) and I is the number of extra values
+        # required for interpolation (for example, cubic interpolation requires
+        # I=3 points around a point do carry out interpolation)
+        Nr,
+        # maximum number of writes that can happen per read
+        # for a pitch shifter this is typically ceil(1/Pmin) where Pmin is the
+        # maximum transposition down (e.g Pmin=0.5 means an octave down)
+        Nw):
+        assert(H>0)
+        assert(W>0)
+        assert(Nr>0)
+        assert(Nw>0)
+        # Some constants
+        # the number of hops to cover the distance of a read chunk
+        A=int(np.ceil((H+W)/H))
+        # worst case number of writes before attacks is crossed when advancing
+        # read head with this algorithm
+        B=int(np.ceil((A+2)/Nr))
+        # the number of hops that have to be in the ring buffer before the read
+        # head can start advancing
+        L=B*(Nr-1)+A
+        self.LH=L*H
+        # worst case number of hops in the ringbuffer multiplied by hop size to
+        # get worst case size of rb
+        self.QH=H*((A+1)*(Nw-1)+L+1)
+        # the ringbuffer
+        self.rb = ds.ringbuffer(self.QH)
+        self.rb.push_copy(np.random.standard_normal(H+W)*1e-6)
+        # the index of the next attack that needs to be crossed or -1 if no
+        # attack to cross
+        self.attack_idx=-1
+        # the read head
+        self.r=-(H+W)
+        # the previous read head, so we can compute how many samples to discard
         self.r_prev=self.r
-        # write head
+        # the write head
         self.w=0
-        # read head safe point
-        self.safe_point=self.r
-        # We always start in a safe region
-        self.was_safe=True
-        # ringbuffer to store samples
-        # it is this size because in the worst case, rb contains 2*R samples
-        # (because there's no room at the front to advance), so we need to shift
-        # in H samples and then we'll have room to advance (because of
-        # guaranteed spacing of attacks)
-        # min_TS is the lowest factor by which time could be stretched we need
-        # to know this because read might not be called for hop_size/min_TS
-        # samples because the output doesn't need it. For example if we are
-        # pitch shifting up by a factor of 4 (2 octaves), we will oversample by
-        # a factor of 4, so we need 4 times less samples (we advance time only
-        # by a quarter of the hop). All the while, samples are arriving at the
-        # input, so these need a place to go.
-        H_mult=0
-        ts_accum=0
-        while ts_accum < 1:
-            H_mult+=1
-            ts_accum+=min_TS
-        print('H_mult',H_mult)
-        rb_size=(2*self.R+H)*H_mult
-        self.rb = ds.ringbuffer(rb_size)
-        rb_attacks_size=0
-        r_accum=0
-        while r_accum < rb_size:
-            r_accum += self.R+1
-            rb_attacks_size+=1
-        print('rb_attacks_size',rb_attacks_size)
-        # ringbuffer to store attack indices
-        self.rb_attacks = ds.ringbuffer(rb_attacks_size,dtype='uint')
-        # push R samples of "silence" (but with dither)
-        self.rb.push_copy(np.random.standard_normal(self.R)*1e-6)
-        self.n_read=0
-        self.n_write=0
-    def write(self,samples,attack_idx_):
-        """
-        if no attack, pass attack_idx_ < 0
-        """
-        assert(len(samples)==self.H)
-        self.rb.push_copy(samples)
-        print('write head %d' % (self.w,))
+        self.H=H
+        self.W=W
+        self.advancing=False
+    def write(self,samps,attack):
+        # we wait until the rb is small enough because we need to give the
+        # ringbuffer a chance to advance right to the play head before it can
+        # ignore attacks again
+        if attack and (self.attack_idx < 0) and (self.rb.contents_size() < self.LH):
+            self.attack_idx=self.w+self.H-1
+        # otherwise attack ignored because we can only deal with one attack at a time
+        self.rb.push_copy(samps)
         self.w += self.H
-        if attack_idx_ >= 0:
-            attack_idx = self.w - self.H + attack_idx_
-            self.rb_attacks.push_copy(np.array([attack_idx],dtype='uint'))
     def read(self):
-        print('read head %d' % (self.r,))
-        # compute region to return
-        # now we advance the read head in a way that avoids any attacks
         reset=False
-        if (self.rb_attacks.contents_size() > 0):
-            index_to_pass = self.rb_attacks.get_region(0,1)[0]
-            # even if there are multiple attacks in the rb_attacks
-            # ringbuffer, if this passes it is guaranteed to be a safe spot
-            # because of the guaranteed distance between attacks
-            if (self.w - index_to_pass) > self.R:
-                # can start advancing
-                self.r += self.H
-                if self.was_safe:
-                    reset=True
-                    self.was_safe=False
-                if self.r > index_to_pass:
-                    self.was_safe=True
-                    # remove the attack we passed
-                    self.rb_attacks.advance_head(1)
+        ret=self.rb.get_region(0,self.H+self.W)
+        # advance the read head
+        if self.attack_idx < 0:
+            # no attack to pass nicely, put the read head just behind the write head
+            self.r = self.w - (self.H+self.W)
         else:
-            # if we've crossed the safe point (we've crossed the attack
-            # without smearing), then just return samples from just before
-            # the write head
-            self.r = self.w-self.M-self.W-self.H
-        # TODO: What read index do we return and when? Here we output a copy of
-        # the samples, but what if we want to avoid a copy?
-        # discard samples up to read head
+            # if there's enough room to advance do so, but by a hop size
+            if self.advancing or (self.rb.contents_size() >= self.LH):
+                self.advancing=True
+                # if we just started crossing the attack, we can reset the phases
+                if self.W <= (self.attack_idx - self.r) < (self.W+self.H):
+                    reset=True
+                self.r += self.H
+        # otherwise don't advance the read head
+        if self.r > self.attack_idx:
+            self.advancing=False
+            # reset attack_idx if we've crossed it
+            self.attack_idx = -1
+        # discard old samples
         n_discard=self.r-self.r_prev
         self.rb.advance_head(n_discard)
-        ret=self.rb.get_region(0,self.H+self.W)
         self.r_prev=self.r
-        return (ret,self.r,reset)
-    def write_read_cycle(self,samples,attack_idx_):
-        """
-        if no attack, pass attack_idx_ < 0
-        """
-        self.write(samples,attack_idx_)
-        return self.read()
+        return (ret,reset)
+                
