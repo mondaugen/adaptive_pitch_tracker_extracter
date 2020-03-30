@@ -11,7 +11,6 @@ import time_map_tstretch
 import attack_finder
 import common
 import envelopes
-import lfo
 import math
 
 def adjust_x_for_time_stretch(x,TS,H):
@@ -25,6 +24,15 @@ def adjust_x_for_time_stretch(x,TS,H):
         len_diff = new_len - len(x)
         return (np.concatenate((x,np.zeros(len_diff,dtype=x.dtype))),new_len)
     return (x,new_len)
+
+def pad_x_and_dither(x,H,amt=1e-6):
+    N=0
+    while N < len(x):
+        N+=H
+    x=np.concatenate((x,np.zeros(N-len(x))))
+    # add dither
+    x+=np.random.standard_normal(len(x))*amt
+    return (x,N)
 
 # TODO this works well but we need to filter out attack times that are too close
 def psts_const_amount(
@@ -95,7 +103,7 @@ def psts_const_amount(
     aaa=time_map_tstretch.attack_avoid_access(
         lambda t,r: pv.process(int(np.round(t)),r),
         av)
-    ps=pitch_shift.pitch_shifter(
+    psps=pitch_shift.pitch_shifter(
     aaa,
     B=H)
     adsr=envelopes.gate_to_adsr(ADSR_ATTACK*SR,1,1,ADSR_RELEASE*SR)
@@ -110,10 +118,109 @@ def psts_const_amount(
                 l=e-s
                 if st[s] > 0:
                     pv.reset_past_output()
-                    ps.set_pos_at_block_start(pos_sig[n_+s])
-                y[n_+s:n_+e]=ps.process(
+                    psps.set_pos_at_block_start(pos_sig[n_+s])
+                y[n_+s:n_+e]=psps.process(
                 ps_sig[n_+s:n_+e],ts_sig[n_+s:n_+e])*en['adsr'][s:e]
     return y
+
+# pitch shift in real-time, varying the pitch shift
+def ps_lfo_rt(
+    x, # input signal
+    ps, # pitch shift amounts
+    # time in samples for max filtering IR to fall to 0.01 of original value
+    lmax_filt_rate=16000,
+    # minimum threshold of local power for local maximum in attack estimation
+    # signal (spectral difference) to be accepted
+    ng_th=-60,
+    # type of analysis window
+    awin_type='hann',
+    # type of synthesis window
+    swin_type='hann',
+    SR=16000,
+    W=1024,
+    H=256,
+    # Gate parameters
+    ADSR_ATTACK=0.1,
+    ADSR_RELEASE=0.1,
+    # for debugging and A/B comparison, if true, no compensation is made for
+    # attacks
+    always_ignore_attack=False):
+
+    N=len(x)
+    if (len(ps) != N) or ((N % H) != 0):
+        raise ValueError
+
+    # make time-stretch signal, just constant for whole file
+    ts_sig=np.ones(N)
+    # make position signal, just 0 for whole file
+    pos_sig=np.zeros(N)
+
+    # convert lmax_filt_rate in samples to hops
+    lmax_filt_rate_h=int(np.ceil(lmax_filt_rate/H))
+
+    # the size of the safe region in which an analysis window can sit without
+    # covering any attacks
+    #R=2*M+W+H
+    # attacks can come no closer than this many hops
+    attack_freq_limit=1#int(np.ceil((R+1)/H))
+
+    # analysis object for attacks
+    afsd=attack_finder.attacks_from_spectral_diff_rt(
+    W=W,
+    H=H,
+    lmax_filt_rate=lmax_filt_rate_h,
+    attack_freq_limit=attack_freq_limit,
+    ng_th=ng_th)
+
+    # synthesize gate signal, just on the whole time
+    gate_sig=np.ones(N)
+
+    rs=envelopes.region_segmenter(H)
+
+    Pmin=np.min(ps)
+    Pmax=np.max(ps)
+    # number of extra values requested by interpolator
+    I=pitch_shift.default_get_interpolator_n_points(0)
+    # max number of reads per write when getting values for pitch shifting
+    Nr=int(np.ceil((Pmax*H+I)/H))
+    # max number of writes per read when getting values for pitch shifting
+    Nw=int(np.ceil(1/Pmin))
+
+    rtpaac=time_map_tstretch.real_time_ps_attack_avoid_controller(W,H,Nr,Nw)
+    def _rtaac_read():
+        samps,reset=rtpaac.read()
+        return (samps,reset)
+    pv=pvoc_synth(
+        signal.get_window(awin_type,W),
+        signal.get_window(swin_type,W),
+        W,
+        H,
+        get_samples_no_time=_rtaac_read)
+    psps=pitch_shift.pitch_shifter(
+    # Actually time and reset are ignored because we've specified
+    # get_samples_no_time
+    lambda t: pv.process(t,False),
+    B=H)
+    adsr=envelopes.gate_to_adsr(ADSR_ATTACK*SR,1,1,ADSR_RELEASE*SR)
+
+    y=np.zeros_like(x)
+    for n_ in range(0,N,H):
+        H_=min(N-n_,H)
+        en,st,ed,ac,sta=adsr.gate_to_adsr_env_start_end_active(gate_sig[n_:n_+H_])
+        ant,ans,ane,regs=rs.region_segmenter_update(st,ed,ac)
+        for s,e in regs:
+            if e>s:
+                l=e-s
+                if st[s] > 0:
+                    pv.reset_past_output()
+                    psps.set_pos_at_block_start(pos_sig[n_+s])
+                samps=x[n_+s:n_+e]
+                attack=afsd(samps)
+                rtpaac.write(samps,(attack > 0)and(not always_ignore_attack))
+                y[n_+s:n_+e]=psps.process(
+                ps[n_+s:n_+e],ts_sig[n_+s:n_+e])*en['adsr'][s:e]
+    return y
+
 
 # uses real-time method of attack estimation and avoidance
 def psts_const_amount_rt(
@@ -140,80 +247,21 @@ def psts_const_amount_rt(
     # attacks
     always_ignore_attack=False):
 
-    N=0
-    while N < len(x):
-        N+=H
-    x=np.concatenate((x,np.zeros(N-len(x))))
-    # add dither
-    x+=np.random.standard_normal(len(x))*1e-8
+    x,N=pad_x_and_dither(x,H,1e-8)
 
-    # make time-stretch signal, just constant for whole file
-    ts_sig=np.ones(N)
     # make pitch-shift signal, just constant for whole file
-    ps_sig=np.ones(N)*PS
-    # make position signal, just 0 for whole file
-    pos_sig=np.zeros(N)
+    ps=np.ones(N)*PS
 
-    # convert lmax_filt_rate in samples to hops
-    lmax_filt_rate_h=int(np.ceil(lmax_filt_rate/H))
-
-    # the size of the safe region in which an analysis window can sit without
-    # covering any attacks
-    #R=2*M+W+H
-    # attacks can come no closer than this many hops
-    attack_freq_limit=1#int(np.ceil((R+1)/H))
-
-    # analysis object for attacks
-    afsd=attack_finder.attacks_from_spectral_diff_rt(
-    W=W,
-    H=H,
-    lmax_filt_rate=lmax_filt_rate_h,
-    attack_freq_limit=attack_freq_limit,
-    ng_th=ng_th)
-
-    # synthesize gate signal, just on the whole time
-    gate_sig=np.ones(N)
-
-    rs=envelopes.region_segmenter(H)
-
-    # number of extra values requested by interpolator
-    I=pitch_shift.default_get_interpolator_n_points(0)
-    # max number of reads per write when getting values for pitch shifting
-    Nr=int(np.ceil((PS*H+I)/H))
-    # max number of writes per read when getting values for pitch shifting
-    Nw=int(np.ceil(1/PS))
-
-    rtpaac=time_map_tstretch.real_time_ps_attack_avoid_controller(W,H,Nr,Nw)
-    def _rtaac_read():
-        samps,reset=rtpaac.read()
-        return (samps,reset)
-    pv=pvoc_synth(
-        signal.get_window(awin_type,W),
-        signal.get_window(swin_type,W),
-        W,
-        H,
-        get_samples_no_time=_rtaac_read)
-    ps=pitch_shift.pitch_shifter(
-    # Actually time and reset are ignored because we've specified
-    # get_samples_no_time
-    lambda t: pv.process(t,False),
-    B=H)
-    adsr=envelopes.gate_to_adsr(ADSR_ATTACK*SR,1,1,ADSR_RELEASE*SR)
-
-    y=np.zeros_like(x)
-    for n_ in range(0,N,H):
-        H_=min(N-n_,H)
-        en,st,ed,ac,sta=adsr.gate_to_adsr_env_start_end_active(gate_sig[n_:n_+H_])
-        ant,ans,ane,regs=rs.region_segmenter_update(st,ed,ac)
-        for s,e in regs:
-            if e>s:
-                l=e-s
-                if st[s] > 0:
-                    pv.reset_past_output()
-                    ps.set_pos_at_block_start(pos_sig[n_+s])
-                samps=x[n_+s:n_+e]
-                attack=afsd(samps)
-                rtpaac.write(samps,(attack > 0)and(not always_ignore_attack))
-                y[n_+s:n_+e]=ps.process(
-                ps_sig[n_+s:n_+e],ts_sig[n_+s:n_+e])*en['adsr'][s:e]
-    return y
+    return ps_lfo_rt(
+        x,
+        ps,
+        lmax_filt_rate=lmax_filt_rate,
+        ng_th=ng_th,
+        awin_type=awin_type,
+        swin_type=swin_type,
+        SR=SR,
+        W=W,
+        H=H,
+        ADSR_ATTACK=ADSR_ATTACK,
+        ADSR_RELEASE=ADSR_RELEASE,
+        always_ignore_attack=always_ignore_attack)
