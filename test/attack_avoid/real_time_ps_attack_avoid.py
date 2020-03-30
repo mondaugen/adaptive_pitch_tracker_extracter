@@ -12,7 +12,7 @@ N=100*H
 # dummy signal
 x=np.arange(N)
 x_attacks=np.zeros(N)
-n_attacks=10
+n_attacks=common.get_env('N_ATTACKS',default=10,conv=lambda s: min(int(s),N))
 attack_idcs=random.sample(range(N),n_attacks)
 #attack_idcs=[180,326,377,475,490,646,650]
 #attack_idcs=[1053, 1504, 635, 125, 1080, 443, 1116, 218, 372, 1114]
@@ -52,7 +52,7 @@ for h in np.arange(0,N,H):
         failed=True
         break
     if rtpaac.rb.contents_size() > rtpaac.QH:
-        print('QH exceeded! write_n:',n_writes,'size:',rtpaac.rb.contents_size())
+        print('QH exceeded! should be:', rtpaac.QH, 'write_n:',n_writes,'size:',rtpaac.rb.contents_size())
     for _ in range(0,n_fetch,H):
         rt=rtpaac.r
         try:

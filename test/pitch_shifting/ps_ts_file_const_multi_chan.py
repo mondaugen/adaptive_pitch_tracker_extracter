@@ -20,6 +20,7 @@ ATTACK_EST_W=common.get_env('ATTACK_EST_W',default=W,conv=int)
 ATTACK_EST_H=common.get_env('ATTACK_EST_H',default=H,conv=int)
 METHOD=common.get_env('METHOD',default='offline')
 NG_TH=common.get_env('NG_TH',default=-60,conv=float)
+ALWAYS_IGNORE_ATTACKS=common.get_env('ALWAYS_IGNORE_ATTACKS',default=0,conv=int)
 
 realtime=False
 if METHOD == 'realtime':
@@ -70,15 +71,14 @@ for chan in range(N_CHANS):
     else:
         y_sigs.append(psts.psts_const_amount_rt(
             x[chan::N_CHANS],
-            # set margin to W
-            M,
             lmax_filt_rate=LMAX_FILT_RATE,
             SR=SR,
             W=W,
             H=H,
             ADSR_ATTACK=common.get_env('ADSR_ATTACK',default=0.1,conv=float),
             ADSR_RELEASE=common.get_env('ADSR_RELEASE',default=0.1,conv=float),
-            PS=common.get_env('PS',default=1,conv=float)))
+            PS=common.get_env('PS',default=1,conv=float),
+            always_ignore_attack=bool(ALWAYS_IGNORE_ATTACKS)))
 
 y=np.zeros(N_CHANS*max([len(_) for _ in y_sigs]))
 for chan,y_ in enumerate(y_sigs):

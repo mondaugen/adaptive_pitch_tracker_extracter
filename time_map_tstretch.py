@@ -359,7 +359,7 @@ class real_time_ps_attack_avoid_controller:
         self.LH=L*H
         # worst case number of hops in the ringbuffer multiplied by hop size to
         # get worst case size of rb
-        self.QH=H*((A+1)*(Nw-1)+L+1)
+        self.QH=H*((A+1)*Nw+L+1)
         # the ringbuffer
         self.rb = ds.ringbuffer(self.QH)
         self.rb.push_copy(np.random.standard_normal(H+W)*1e-6)
@@ -379,10 +379,11 @@ class real_time_ps_attack_avoid_controller:
         # we wait until the rb is small enough because we need to give the
         # ringbuffer a chance to advance right to the play head before it can
         # ignore attacks again
-        if attack and (self.attack_idx < 0) and (self.rb.contents_size() < self.LH):
+        if attack and (self.attack_idx < 0) and (self.rb.contents_size() <= self.LH):
             self.attack_idx=self.w+self.H-1
         # otherwise attack ignored because we can only deal with one attack at a time
         self.rb.push_copy(samps)
+        assert(self.rb.contents_size() < self.QH)
         self.w += self.H
     def read(self):
         reset=False
@@ -393,7 +394,7 @@ class real_time_ps_attack_avoid_controller:
             self.r = self.w - (self.H+self.W)
         else:
             # if there's enough room to advance do so, but by a hop size
-            if self.advancing or (self.rb.contents_size() >= self.LH):
+            if self.advancing or (self.rb.contents_size() > self.LH):
                 self.advancing=True
                 # if we just started crossing the attack, we can reset the phases
                 if self.W <= (self.attack_idx - self.r) < (self.W+self.H):

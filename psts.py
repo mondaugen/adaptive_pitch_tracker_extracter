@@ -119,10 +119,6 @@ def psts_const_amount(
 # TODO This currently sucks
 def psts_const_amount_rt(
     x, # input signal
-    # number of samples on either side of attack that a stretching analysis
-    # window cannot fall within (see
-    # time_map_tstretch.real_time_attack_avoid_controller)
-    M,
     # time in samples for max filtering IR to fall to 0.01 of original value
     lmax_filt_rate=16000,
     # minimum threshold of local power for local maximum in attack estimation
@@ -140,7 +136,10 @@ def psts_const_amount_rt(
     ADSR_RELEASE=0.1,
     # Time-stretch not possible in real-time
     # Pitch-shift LFO parameters
-    PS=1):
+    PS=1,
+    # for debugging and A/B comparison, if true, no compensation is made for
+    # attacks
+    always_ignore_attack=False):
 
     N=0
     while N < len(x):
@@ -161,9 +160,9 @@ def psts_const_amount_rt(
 
     # the size of the safe region in which an analysis window can sit without
     # covering any attacks
-    R=2*M+W+H
+    #R=2*M+W+H
     # attacks can come no closer than this many hops
-    attack_freq_limit=int(np.ceil((R+1)/H))
+    attack_freq_limit=1#int(np.ceil((R+1)/H))
 
     # analysis object for attacks
     afsd=attack_finder.attacks_from_spectral_diff_rt(
@@ -177,10 +176,17 @@ def psts_const_amount_rt(
     gate_sig=np.ones(N)
 
     rs=envelopes.region_segmenter(H)
-    rtaac=time_map_tstretch.real_time_attack_avoid_controller(M,W,H,PS)
+
+    # number of extra values requested by interpolator
+    I=pitch_shift.default_get_interpolator_n_points(0)
+    # max number of reads per write when getting values for pitch shifting
+    Nr=int(np.ceil((PS*H+I)/H))
+    # max number of writes per read when getting values for pitch shifting
+    Nw=int(np.ceil(1/PS))
+
+    rtpaac=time_map_tstretch.real_time_ps_attack_avoid_controller(W,H,Nr,Nw)
     def _rtaac_read():
-        # discard read index
-        samps,_,reset=rtaac.read()
+        samps,reset=rtpaac.read()
         return (samps,reset)
     pv=pvoc_synth(
         signal.get_window(awin_type,W),
@@ -207,11 +213,8 @@ def psts_const_amount_rt(
                     pv.reset_past_output()
                     ps.set_pos_at_block_start(pos_sig[n_+s])
                 samps=x[n_+s:n_+e]
-                ai=-1
                 attack=afsd(samps)
-                if attack > 0:
-                    ai=0
-                rtaac.write(samps,ai)
+                rtpaac.write(samps,(attack > 0)and(not always_ignore_attack))
                 y[n_+s:n_+e]=ps.process(
                 ps_sig[n_+s:n_+e],ts_sig[n_+s:n_+e])*en['adsr'][s:e]
     return y
