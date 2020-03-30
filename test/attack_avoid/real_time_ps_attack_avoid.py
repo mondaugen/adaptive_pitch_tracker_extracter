@@ -18,9 +18,9 @@ attack_idcs=random.sample(range(N),n_attacks)
 #attack_idcs=[1053, 1504, 635, 125, 1080, 443, 1116, 218, 372, 1114]
 x_attacks[attack_idcs]=1
 
-P=2
 Pmin=0.5
 Pmax=2 
+P=common.get_env('P',default=0.5,conv=lambda x: min(max(float(x),Pmax),Pmin))
 I=0
 Nr=np.ceil((Pmax*H+I)/H)
 Nw=np.ceil(1/Pmin)
@@ -67,7 +67,7 @@ for h in np.arange(0,N,H):
 if failed:
     print(attack_idcs)
 
-do_plot=True
+do_plot=common.get_env('DO_PLOT',default=True,conv=eval)
 if do_plot:
     plt.plot(np.arange(N),x_attacks,'.')
     last_h=0
