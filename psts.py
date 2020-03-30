@@ -116,7 +116,6 @@ def psts_const_amount(
     return y
 
 # uses real-time method of attack estimation and avoidance
-# TODO This currently sucks
 def psts_const_amount_rt(
     x, # input signal
     # time in samples for max filtering IR to fall to 0.01 of original value
