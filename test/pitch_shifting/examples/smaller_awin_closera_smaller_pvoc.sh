@@ -1,0 +1,1 @@
+SR=44100 MIN_ATTACK_DIST=$((2048+512+1)) AWIN_START=-512 AWIN_LEN=$((2048+512)) W=2048 H=512 ATTACK_EST_MODE=all-channels PYTHONPATH=. TS=0.5 LMAX_FILT_RATE=44000 IN_FILE=/tmp/ending_1ch.f64 N_CHANS=1 OUT_FILE=/tmp/ending_0.5_adjawin_closera_spv.f64 python3 test/pitch_shifting/ps_ts_file_const_multi_chan.py

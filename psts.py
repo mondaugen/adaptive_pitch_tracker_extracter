@@ -59,7 +59,12 @@ def psts_const_amount(
     # Time-stretch LFO parameters
     TS=1,
     # Pitch-shift LFO parameters
-    PS=1):
+    PS=1,
+    # record the look-up times in this file
+    look_up_times_path='/tmp/look_up_times.u32',
+    # record the reset times in this file
+    reset_times_path='/tmp/reset_times.u32',
+    ):
 
     if awin_start is None:
         awin_start=-3*H
@@ -100,8 +105,21 @@ def psts_const_amount(
         W,
         H,
         lambda n: wl.access(n))
+
+    # make way to get samples at given time from pvoc
+    look_up_times_fd=open(look_up_times_path,'w')
+    reset_times_fd=open(reset_times_path,'w')
+    def _pvoc_get_samples(t,r):
+        t=int(np.round(t))
+        # record the look up times
+        np.array([t],dtype='uint32').tofile(look_up_times_fd)
+        # if reset occurred, record this too
+        if r:
+            np.array([t],dtype='uint32').tofile(reset_times_fd)
+        return pv.process(t,r)
+
     aaa=time_map_tstretch.attack_avoid_access(
-        lambda t,r: pv.process(int(np.round(t)),r),
+        _pvoc_get_samples,
         av)
     psps=pitch_shift.pitch_shifter(
     aaa,
@@ -121,6 +139,10 @@ def psts_const_amount(
                     psps.set_pos_at_block_start(pos_sig[n_+s])
                 y[n_+s:n_+e]=psps.process(
                 ps_sig[n_+s:n_+e],ts_sig[n_+s:n_+e])*en['adsr'][s:e]
+
+    look_up_times_fd.close()
+    reset_times_fd.close()
+
     return y
 
 # pitch shift in real-time, varying the pitch shift

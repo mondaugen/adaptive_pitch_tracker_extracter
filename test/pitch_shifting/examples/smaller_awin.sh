@@ -1,0 +1,1 @@
+AWIN_START=-1024 AWIN_LEN=5120 W=4096 H=1024 ATTACK_EST_MODE=all-channels PYTHONPATH=. TS=0.5 LMAX_FILT_RATE=96000 IN_FILE=/tmp/ending.f64 N_CHANS=1 OUT_FILE=/tmp/ending_0.5_adjawin.f64 python3 test/pitch_shifting/ps_ts_file_const_multi_chan.py

@@ -21,6 +21,9 @@ ATTACK_EST_H=common.get_env('ATTACK_EST_H',default=H,conv=int)
 METHOD=common.get_env('METHOD',default='offline')
 NG_TH=common.get_env('NG_TH',default=-60,conv=float)
 ALWAYS_IGNORE_ATTACKS=common.get_env('ALWAYS_IGNORE_ATTACKS',default=0,conv=int)
+ATTACKS_OUT_FILE=common.get_env('ATTACKS_OUT_FILE',default='/tmp/attacks.u32')
+AWIN_START=common.get_env('AWIN_START',default=None,conv=int)
+AWIN_LEN=common.get_env('AWIN_LEN',default=None,conv=int)
 
 realtime=False
 if METHOD == 'realtime':
@@ -53,6 +56,7 @@ if not realtime:
     attack_times=attack_finder.event_closeness_limiter(
     attack_times,
     MIN_ATTACK_DIST)
+    np.array(attack_times,dtype='uint32').tofile(ATTACKS_OUT_FILE)
 
 y_sigs=[]
 
@@ -61,6 +65,8 @@ for chan in range(N_CHANS):
         y_sigs.append(psts.psts_const_amount(
             x[chan::N_CHANS],
             attack_times,
+            awin_start=AWIN_START,
+            awin_len=AWIN_LEN,
             SR=SR,
             W=W,
             H=H,
