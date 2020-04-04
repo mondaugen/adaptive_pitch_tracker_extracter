@@ -34,7 +34,7 @@ def pad_x_and_dither(x,H,amt=1e-6):
     x+=np.random.standard_normal(len(x))*amt
     return (x,N)
 
-# TODO this works well but we need to filter out attack times that are too close
+# you need to filter out attack times that are closer than awin_len + 1
 def psts_const_amount(
     x, # input signal
     # attack times, e.g., estimate with 

@@ -9,11 +9,11 @@ The naming convention here is similar to Intel's IPP.
 functions begin with dspm_
 then a short description of the operation (e.g., dspm_add)
 then the types, prepended optionally with v if a vector is accepted as an
-argument (a pointer), followed by the type name (e.g., f32 for 32-bit float).
+argument (a pointer), followed by the type name (e.g., f32 for 32-bit float)
 so the function dspm_add_vf32_vf32(float *srcdst, const float* src, unsigned int
 length) computes srcdst[n] += src[n] for n in [0,length) and the function
 dspm_add_vf32_vf32_vf32(const float *src0, const float *src1, float *dst,
-unsigned int length) computs dst[n] = src0[n] + src1[n] for n in [0,length).
+unsigned int length) computs dst[n] = src0[n] + src1[n] for n in [0,length)
 
 For operations requiring vectors, calling these on vectors of length zero or
 NULL pointer arguments, the results are undefined.
@@ -69,6 +69,12 @@ dspm_add_vu32_u32(unsigned int *srcdst,
                   unsigned int c);
 
 void
+dspm_add_vf32_f32_vf32(const float *src0, float src1, float *dst, unsigned int length);
+
+void
+dspm_add_vf32_vf32(float *srcdst, const float *src, unsigned int length);
+
+void
 dspm_mul_vu32_u32(unsigned int *srcdst,
                   unsigned int length,
                   unsigned int c);
@@ -85,6 +91,12 @@ dspm_abs_vz32_vf32(const float complex *src, float *dst, unsigned int length);
 void
 dspm_sub_vf32_vf32_vf32(const float *src0,
                         const float *src1,
+                        float *dst,
+                        unsigned int length);
+
+void
+dspm_sub_vf32_vu32_vf32(const float *src0,
+                        const unsigned int *src1,
                         float *dst,
                         unsigned int length);
 
@@ -110,7 +122,7 @@ struct dspm_fft_init {
     unsigned int inverse;
     /*
     This structure can be subclassed as necessary for specific implementations
-    (but then portability is compromised).
+    (but then portability is compromised)
     */
 };
 
@@ -135,5 +147,23 @@ dspm_mean_vf32_f32(const float *src, unsigned int length);
 
 void
 dspm_rev_vu32(unsigned int *srcdst, unsigned int length);
+
+void
+dspm_floor_vf32_vu32(const float *src, unsigned int *dst, unsigned int length);
+
+/* it is assumed that 0 <= i < length(src0) for all i in src1 and length(src1)
+length(dst) = length */
+void
+dspm_lookup_vf32_vu32_vf32(
+const float *src0,
+const unsigned int *src1,
+float *dst,
+unsigned int length);
+
+void
+dspm_interp1d4p_vf32_vf32_vf32(const float *xi,
+                               const float *y,
+                               float *yi,
+                               unsigned int N);
 
 #endif /* DSP_MATH_H */

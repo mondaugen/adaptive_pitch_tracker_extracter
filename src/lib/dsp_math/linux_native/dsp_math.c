@@ -102,6 +102,35 @@ dspm_sub_vf32_vf32_vf32(const float *src0,
     }
 }
 
+
+void
+dspm_sub_vf32_vu32_vf32(const float *src0,
+                        const unsigned int *src1,
+                        float *dst,
+                        unsigned int length)
+{
+    while (length--) {
+        *dst++ = *src0++ - *src1++;
+    }
+}
+
+
+void
+dspm_add_vf32_f32_vf32(const float *src0, float src1, float *dst, unsigned int length)
+{
+    while (length--) {
+        *dst++ = *src0++ + src1;
+    }
+}
+
+void
+dspm_add_vf32_vf32(float *srcdst, const float *src, unsigned int length)
+{
+    while (length--) {
+        *srcdst++ += *src;
+    }
+}
+
 void
 dspm_add_vu32_u32(unsigned int *srcdst,
                   unsigned int length,
@@ -202,7 +231,6 @@ dspm_rfft_vf32_vz32(struct dspm_rfft_vf32_vz32_cfg *cfg,
     }
 }
 
-/* assumes length > 0 */
 float
 dspm_mean_vf32_f32(const float *src, unsigned int length)
 {
@@ -211,7 +239,6 @@ dspm_mean_vf32_f32(const float *src, unsigned int length)
     return ret;
 }
 
-/* assumes length > 0 */
 void
 dspm_rev_vu32(unsigned int *srcdst, unsigned int length)
 {
@@ -223,3 +250,19 @@ dspm_rev_vu32(unsigned int *srcdst, unsigned int length)
     }
 }
 
+void
+dspm_floor_vf32_vu32(const float *src, unsigned int *dst, unsigned int length)
+{
+    while (length--) {
+        *dst++ = (unsigned int)floor(*src++);
+    }
+}
+
+void
+dspm_lookup_vf32_vu32_vf32(const float *src0, const unsigned int *src1,
+float *dst, unsigned int length)
+{
+    while (length--) {
+        *dst++ = src0[*src1++];
+    }
+}
