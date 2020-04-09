@@ -127,7 +127,7 @@ void
 dspm_add_vf32_vf32(float *srcdst, const float *src, unsigned int length)
 {
     while (length--) {
-        *srcdst++ += *src;
+        *srcdst++ += *src++;
     }
 }
 

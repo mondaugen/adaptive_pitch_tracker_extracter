@@ -2,6 +2,20 @@
 
 import numpy as np
 
+def DBGP(x,s):
+    print(s,*['%2.2f' % f for f in x[:17]])
+
+def do_muls(v0,v1,v2,c0,x):
+    x=x*v0
+    DBGP(x,'')
+    x=x*v1
+    DBGP(x,'')
+    x=x*v2
+    DBGP(x,'')
+    x=x*c0
+    DBGP(x,'')
+    return x
+
 def lookup4(x,y):
     """
     x are points to look up
@@ -24,23 +38,28 @@ def lookup4(x,y):
     f_1=f-1
     f1=f+1
     tmp=np.zeros_like(x)
-    ret=np.zeros_like(x)
-    ret[:]=y[x0]
-    for a in [f_2,f_1,f1,0.5]:
-        ret*=a
+    yi=np.zeros_like(x)
+    yi[:]=y[x0]
+    DBGP(yi,'')
+    yi=do_muls(f_2,f_1,f1,0.5,yi)
+    DBGP(yi,'')
     tmp[:]=y[x0+1]
-    for a in [f_2,f,f1,-0.5]:
-        tmp*=a
-    ret+=tmp
+    DBGP(tmp,'')
+    tmp=do_muls(f_2,f,f1,-0.5,tmp)
+    DBGP(tmp,'')
+    yi=yi+tmp
+    DBGP(yi,'')
     tmp[:]=y[x0-1]
-    for a in [f,f_1,f_2,-1/6]:
-        tmp*=a
-    ret+=tmp
+    DBGP(tmp,'')
+    tmp=do_muls(f,f_1,f_2,-1/6,tmp)
+    DBGP(tmp,'')
+    yi=yi+tmp
+    DBGP(yi,'')
     tmp[:]=y[x0+2]
-    for a in [f1,f,f_1,1/6]:
-        tmp*=a
-    ret+=tmp
-    return ret
-        
-
+    DBGP(tmp,'')
+    tmp=do_muls(f1,f,f_1,1/6,tmp)
+    DBGP(tmp,'')
+    yi=yi+tmp
+    DBGP(yi,'')
+    return yi
 

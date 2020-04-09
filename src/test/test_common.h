@@ -127,5 +127,19 @@ fail:
     return -1;
 }
     
+static inline float *
+dbgpf(float *x)
+{
+    unsigned int len = 20;
+    float *ptr = x;
+    while (len--) {
+        printf("%2.2f ", *ptr++);
+    }
+    printf("\n");
+    return x;
+}
+#define DBGPF(x) \
+    ({ printf(" "); \
+    dbgp(x); })
 
 #endif /* COMMON_H */
