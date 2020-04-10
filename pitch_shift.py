@@ -163,6 +163,19 @@ class pitch_shifter:
         ts_pos_sig=np.zeros(B+1,dtype=self.dtype)
         np.cumsum(ts_rate_sig,out=ts_pos_sig[1:])
 
+        # TODO We need to figure out how to reduce these times when addressing
+        # an array (containing a sound) of limited length. With the u24q8
+        # format, we can address an array of length of 2**24 -
+        # get_interpolator_n_points(0) (about 350 seconds at 48KHz sample rate).
+        # This is length is reasonable for our purposes: we assume that the
+        # get_samples implementation reduces the requested index modulo the
+        # length of the sound-array. However also after about 350 seconds
+        # (depending on the pitch-shift factor) the ps_pos_sig will roll-over.
+        # It is not unreasonable that this pitch-shifter might be playing
+        # through a sound (looping) for more than 5 minutes, so we need to also
+        # reduce these positions modulo the sound-array length.
+        # TODO Additionally for ts_pos_sig, because ts_rate_sig can be negative,
+        # we need to make it roll-over correctly when crossing 0.
         ps_pos_sig += self.pos_at_block_start
         ts_pos_sig += self.time_at_block_start
 
