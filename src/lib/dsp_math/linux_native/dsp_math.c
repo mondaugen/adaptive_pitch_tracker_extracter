@@ -266,3 +266,26 @@ float *dst, unsigned int length)
         *dst++ = src0[*src1++];
     }
 }
+
+void
+dspm_floor_vu24q8_vu32(const u24q8 *src,
+                       unsigned int *dst,
+                       unsigned int N)
+{
+    while (N--) {
+        *dst++ = *src++ >> 8;
+    }
+}
+
+/* note: result will be wrong if src1 contains values >= 2^24 */
+void
+dspm_sub_vu24q8_vu32_vf32(const u24q8 *src0,
+                          const unsigned int *src1,
+                          float *dst,
+                          unsigned int N)
+{
+    const float scale = 1./256.;
+    while (N--) {
+        *dst++ = (*src0++ - (*src1++ << 8))*scale;
+    }
+}

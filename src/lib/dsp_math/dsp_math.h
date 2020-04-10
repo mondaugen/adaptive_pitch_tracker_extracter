@@ -20,6 +20,10 @@ NULL pointer arguments, the results are undefined.
 
 */
 
+/* fixed-point types */
+/* unsigned with 24 integer and 8 fractional bits */
+typedef unsigned int u24q8;
+
 /* Fast floor(log2(x)) */
 static inline int
 dspm_fast_floor_log2_f32(float x)
@@ -165,5 +169,22 @@ dspm_interp1d4p_vf32_vf32_vf32(const float *xi,
                                const float *y,
                                float *yi,
                                unsigned int N);
+
+void
+dspm_interp1d4p_vu24q8_vf32_vf32(const u24q8 *xi,
+                                 const float *y,
+                                 float *yi,
+                                 unsigned int N);
+
+void
+dspm_floor_vu24q8_vu32(const u24q8 *src,
+                       unsigned int *dst,
+                       unsigned int N);
+
+void
+dspm_sub_vu24q8_vu32_vf32(const u24q8 *src0,
+                          const unsigned int *src1,
+                          float *dst,
+                          unsigned int N);
 
 #endif /* DSP_MATH_H */
