@@ -289,3 +289,24 @@ dspm_sub_vu24q8_vu32_vf32(const u24q8 *src0,
         *dst++ = (*src0++ - (*src1++ << 8))*scale;
     }
 }
+
+static inline void
+cumsum_vu32_u64_vu64(const uint32_t *src,
+                     uint64_t initial_sum,
+                     uint64_t *dst,
+                     uint32_t N)
+{
+    while (N--) {
+        initial_sum += *src++;
+        *dst++ = initial_sum;
+    }
+}
+
+void
+dspm_cumsum_vu16q16_u48q16_vu48q16(const u16q16 *src,
+                                   u48q16 initial_sum,
+                                   u48q16 *dst,
+                                   uint32_t N)
+{
+    cumsum_vu32_u64_vu64(src,initial_sum,dst,N);
+}

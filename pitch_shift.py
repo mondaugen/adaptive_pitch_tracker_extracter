@@ -77,12 +77,14 @@ class pitch_shifter:
         self.pos_at_block_start=0
 
     def set_pos_at_block_start(self,pos):
-        # TODO reduction modulo the length of the sound should be done here, too
         self.pos_at_block_start=pos
         self.time_at_block_start=pos
         self.sig_rb_idcs_valid=False
 
     def process_pos_sig(self,ps_pos_sig,ts_pos_sig):
+        # TODO In the C implementation, ps_pos_sig should have at least 16 bits
+        # of fractional precision to keep the tuning error less than 1% of a
+        # cent
 
         B=len(ps_pos_sig)-1
 
@@ -92,9 +94,6 @@ class pitch_shifter:
         if self.sig_rb_idcs_valid:
             fetch_start_idx = self.sig_rb_max_idx + 1
             # discard all values between self.sig_rb_min_idx and the first_required_idx
-            # TODO: if first_required_idx has been wrapped because of the sound's length,
-            # n_discard should be (first_required_idx - self.sig_rb_min_idx) % sound_length
-            # HOWEVER this could be problematic if the index has wrapped around multiple times
             n_discard = first_required_idx - self.sig_rb_min_idx
             self.sig_rb.advance_head(n_discard)
         else:
@@ -167,19 +166,21 @@ class pitch_shifter:
         ts_pos_sig=np.zeros(B+1,dtype=self.dtype)
         np.cumsum(ts_rate_sig,out=ts_pos_sig[1:])
 
-        # TODO We need to figure out how to reduce these times when addressing
-        # an array (containing a sound) of limited length. With the u24q8
-        # format, we can address an array of length of 2**24 -
-        # get_interpolator_n_points(0) (about 350 seconds at 48KHz sample rate).
-        # This length is reasonable for our purposes: we assume that the
+        # TODO With the u24q8 format, we can address an array of length of 2**24
+        # - get_interpolator_n_points(0) (about 350 seconds at 48KHz sample
+        # rate).  This length is reasonable for our purposes: we assume that the
         # get_samples implementation reduces the requested index modulo the
         # length of the sound-array. However also after about 350 seconds
         # (depending on the pitch-shift factor) the ps_pos_sig will roll-over.
         # It is not unreasonable that this pitch-shifter might be playing
         # through a sound (looping) for more than 5 minutes, so we need to also
-        # reduce these positions modulo the sound-array length.
-        # TODO Additionally for ts_pos_sig, because ts_rate_sig can be negative,
-        # we need to make it roll-over correctly when crossing 0.
+        # reduce these positions modulo the sound-array length.  In the C
+        # implementation, we will have ps_pos_sig be in u48q16 format and
+        # ts_pos_sig in s48q16 format. Before interpolation takes place we
+        # subtract from the data-point x-positions and the looked up x positions
+        # to put the values in a reasonable range whose maximum index fits in
+        # u24q8. This slight increase in computation makes it so don't need to
+        # worry about roll over for almost a century
         ps_pos_sig += self.pos_at_block_start
         ts_pos_sig += self.time_at_block_start
 
