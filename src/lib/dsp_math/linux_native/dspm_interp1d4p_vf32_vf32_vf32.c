@@ -17,7 +17,7 @@ const float *v1,
 const float *v2,
 float c0,
 float *x,
-unsigned int N)
+uint32_t N)
 {
     dspm_mul_vf32_vf32_vf32(x,v0,x,N);
     dspm_mul_vf32_vf32_vf32(x,v1,x,N);
@@ -29,9 +29,9 @@ void
 dspm_interp1d4p_vf32_vf32_vf32(const float *xi,
                                const float *y,
                                float *yi,
-                               unsigned int N)
+                               uint32_t N)
 {
-    unsigned int x0[N];
+    uint32_t x0[N];
     float f_2[N],
           f_1[N],
           f[N],

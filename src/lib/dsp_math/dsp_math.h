@@ -11,10 +11,10 @@ functions begin with dspm_
 then a short description of the operation (e.g., dspm_add)
 then the types, prepended optionally with v if a vector is accepted as an
 argument (a pointer), followed by the type name (e.g., f32 for 32-bit float)
-so the function dspm_add_vf32_vf32(float *srcdst, const float* src, unsigned int
+so the function dspm_add_vf32_vf32(float *srcdst, const float* src, uint32_t
 length) computes srcdst[n] += src[n] for n in [0,length) and the function
 dspm_add_vf32_vf32_vf32(const float *src0, const float *src1, float *dst,
-unsigned int length) computs dst[n] = src0[n] + src1[n] for n in [0,length)
+uint32_t length) computs dst[n] = src0[n] + src1[n] for n in [0,length)
 
 For operations requiring vectors, calling these on vectors of length zero or
 NULL pointer arguments, the results are undefined.
@@ -31,7 +31,7 @@ typedef uint64_t u48q16;
 static inline int
 dspm_fast_floor_log2_f32(float x)
 {
-    unsigned int *ux = (unsigned int*)&x;
+    uint32_t *ux = (uint32_t*)&x;
     /* Extracts exponent from IEEE 754 floating point number */
     int exp = ((*ux>>23)&0xff) - 127;
     return exp;
@@ -41,7 +41,7 @@ dspm_fast_floor_log2_f32(float x)
 static inline float
 dspm_fast_log2_aprox_frac_f32(float x)
 {
-    unsigned int *ux = (unsigned int*)&x;
+    uint32_t *ux = (uint32_t*)&x;
     /* (*ux&0x7fffff)**(2**-23) */
     float frac = (*ux&0x7fffff)*1.1920928955078125e-07;
     return frac;
@@ -51,82 +51,82 @@ void
 dspm_mul_vf32_vf32_vf32(const float *src0,
                         const float *src1,
                         float *dst,
-                        unsigned int length);
+                        uint32_t length);
 
 void
 dspm_mul_vf32_f32(float *srcdst,
                   float src1,
-                  unsigned int length);
+                  uint32_t length);
 
 void
 dspm_neg_vf32(float *srcdst,
-              unsigned int length);
+              uint32_t length);
 
 float
 dspm_max_vf32(const float *src,
-              unsigned int length);
+              uint32_t length);
 
-unsigned int
-dspm_max_vu32(const unsigned int *src,
-              unsigned int length);
-
-void
-dspm_add_vu32_u32(unsigned int *srcdst,
-                  unsigned int length,
-                  unsigned int c);
+uint32_t
+dspm_max_vu32(const uint32_t *src,
+              uint32_t length);
 
 void
-dspm_add_vf32_f32_vf32(const float *src0, float src1, float *dst, unsigned int length);
+dspm_add_vu32_u32(uint32_t *srcdst,
+                  uint32_t length,
+                  uint32_t c);
 
 void
-dspm_add_vf32_vf32(float *srcdst, const float *src, unsigned int length);
+dspm_add_vf32_f32_vf32(const float *src0, float src1, float *dst, uint32_t length);
 
 void
-dspm_mul_vu32_u32(unsigned int *srcdst,
-                  unsigned int length,
-                  unsigned int c);
+dspm_add_vf32_vf32(float *srcdst, const float *src, uint32_t length);
 
 void
-dspm_abs_vf32(float *srcdst, unsigned int length);
+dspm_mul_vu32_u32(uint32_t *srcdst,
+                  uint32_t length,
+                  uint32_t c);
 
 void
-dspm_abs_vz32(float complex *srcdst, unsigned int length);
+dspm_abs_vf32(float *srcdst, uint32_t length);
 
 void
-dspm_abs_vz32_vf32(const float complex *src, float *dst, unsigned int length);
+dspm_abs_vz32(float complex *srcdst, uint32_t length);
+
+void
+dspm_abs_vz32_vf32(const float complex *src, float *dst, uint32_t length);
 
 void
 dspm_sub_vf32_vf32_vf32(const float *src0,
                         const float *src1,
                         float *dst,
-                        unsigned int length);
+                        uint32_t length);
 
 void
 dspm_sub_vf32_vu32_vf32(const float *src0,
-                        const unsigned int *src1,
+                        const uint32_t *src1,
                         float *dst,
-                        unsigned int length);
+                        uint32_t length);
 
 void
 dspm_clip_below_vf32_f32(float *srcdst,
                          float lb,
-                         unsigned int length);
+                         uint32_t length);
 
 /* Note that this is not compensated summation */
 float
-dspm_sum_vf32(const float *src, unsigned int length);
+dspm_sum_vf32(const float *src, uint32_t length);
 
 /* Assumes d is non-zero */
 void
 dspm_div_vf32_f32(float *srcdst,
                   float d,
-                  unsigned int length);
+                  uint32_t length);
 
 struct dspm_fft_init {
     /* The number of real values */
-    unsigned int length;
+    uint32_t length;
     /* non-zero if inverse transform, zero if forward transform */
-    unsigned int inverse;
+    uint32_t inverse;
     /*
     This structure can be subclassed as necessary for specific implementations
     (but then portability is compromised)
@@ -150,45 +150,45 @@ dspm_rfft_vf32_vz32(struct dspm_rfft_vf32_vz32_cfg *cfg,
                     float complex *freq);
 
 float
-dspm_mean_vf32_f32(const float *src, unsigned int length);
+dspm_mean_vf32_f32(const float *src, uint32_t length);
 
 void
-dspm_rev_vu32(unsigned int *srcdst, unsigned int length);
+dspm_rev_vu32(uint32_t *srcdst, uint32_t length);
 
 void
-dspm_floor_vf32_vu32(const float *src, unsigned int *dst, unsigned int length);
+dspm_floor_vf32_vu32(const float *src, uint32_t *dst, uint32_t length);
 
 /* it is assumed that 0 <= i < length(src0) for all i in src1 and length(src1)
 length(dst) = length */
 void
 dspm_lookup_vf32_vu32_vf32(
 const float *src0,
-const unsigned int *src1,
+const uint32_t *src1,
 float *dst,
-unsigned int length);
+uint32_t length);
 
 void
 dspm_interp1d4p_vf32_vf32_vf32(const float *xi,
                                const float *y,
                                float *yi,
-                               unsigned int N);
+                               uint32_t N);
 
 void
 dspm_interp1d4p_vu24q8_vf32_vf32(const u24q8 *xi,
                                  const float *y,
                                  float *yi,
-                                 unsigned int N);
+                                 uint32_t N);
 
 void
 dspm_floor_vu24q8_vu32(const u24q8 *src,
-                       unsigned int *dst,
-                       unsigned int N);
+                       uint32_t *dst,
+                       uint32_t N);
 
 void
 dspm_sub_vu24q8_vu32_vf32(const u24q8 *src0,
-                          const unsigned int *src1,
+                          const uint32_t *src1,
                           float *dst,
-                          unsigned int N);
+                          uint32_t N);
 
 /* computes dst[0] = initial_sum + src[0], dst[1] = initial_sum + src[0] +
 src[1], etc. */
@@ -196,6 +196,6 @@ void
 dspm_cumsum_vu16q16_u48q16_vu48q16(const u16q16 *src,
                                    u48q16 initial_sum,
                                    u48q16 *dst,
-                                   unsigned int N);
+                                   uint32_t N);
 
 #endif /* DSP_MATH_H */

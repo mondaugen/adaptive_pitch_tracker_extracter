@@ -12,7 +12,7 @@ void
 dspm_mul_vf32_vf32_vf32(const float *src0,
                         const float *src1,
                         float *dst,
-                        unsigned int length)
+                        uint32_t length)
 {
     while (length--) {
         *dst++ = *src0++ * *src1++;
@@ -22,7 +22,7 @@ dspm_mul_vf32_vf32_vf32(const float *src0,
 void
 dspm_mul_vf32_f32(float *srcdst,
                   float src1,
-                  unsigned int length)
+                  uint32_t length)
 {
     while (length--) {
         *srcdst++ *= src1;
@@ -31,17 +31,17 @@ dspm_mul_vf32_f32(float *srcdst,
 
 void
 dspm_neg_vf32(float *srcdst,
-              unsigned int length)
+              uint32_t length)
 {
     /* Negation of IEEE floating point involves flipping highest-bit */
     while (length--) {
-        *(unsigned int*)srcdst++ ^= 0x80000000;
+        *(uint32_t*)srcdst++ ^= 0x80000000;
     }
 }
 
 float
 dspm_max_vf32(const float *src,
-              unsigned int length)
+              uint32_t length)
 {
     float ret = *src++;
     length--;
@@ -52,11 +52,11 @@ dspm_max_vf32(const float *src,
     return ret;
 }
 
-unsigned int
-dspm_max_vu32(const unsigned int *src,
-              unsigned int length)
+uint32_t
+dspm_max_vu32(const uint32_t *src,
+              uint32_t length)
 {
-    unsigned int ret = *src++;
+    uint32_t ret = *src++;
     length--;
     while (length--) {
         ret = *src > ret ? *src : ret;
@@ -66,7 +66,7 @@ dspm_max_vu32(const unsigned int *src,
 }
 
 void
-dspm_abs_vf32(float *srcdst, unsigned int length)
+dspm_abs_vf32(float *srcdst, uint32_t length)
 {
     while (length--) {
         *srcdst = fabsf(*srcdst);
@@ -75,7 +75,7 @@ dspm_abs_vf32(float *srcdst, unsigned int length)
 }
 
 void
-dspm_abs_vz32(float complex *srcdst, unsigned int length)
+dspm_abs_vz32(float complex *srcdst, uint32_t length)
 {
     while (length--) {
         *srcdst = cabsf(*srcdst);
@@ -84,7 +84,7 @@ dspm_abs_vz32(float complex *srcdst, unsigned int length)
 }
 
 void
-dspm_abs_vz32_vf32(const float complex *src, float *dst, unsigned int length)
+dspm_abs_vz32_vf32(const float complex *src, float *dst, uint32_t length)
 {
     while (length--) {
         *dst++ = cabsf(*src++);
@@ -95,7 +95,7 @@ void
 dspm_sub_vf32_vf32_vf32(const float *src0,
                         const float *src1,
                         float *dst,
-                        unsigned int length)
+                        uint32_t length)
 {
     while (length--) {
         *dst++ = *src0++ - *src1++;
@@ -105,9 +105,9 @@ dspm_sub_vf32_vf32_vf32(const float *src0,
 
 void
 dspm_sub_vf32_vu32_vf32(const float *src0,
-                        const unsigned int *src1,
+                        const uint32_t *src1,
                         float *dst,
-                        unsigned int length)
+                        uint32_t length)
 {
     while (length--) {
         *dst++ = *src0++ - *src1++;
@@ -116,7 +116,7 @@ dspm_sub_vf32_vu32_vf32(const float *src0,
 
 
 void
-dspm_add_vf32_f32_vf32(const float *src0, float src1, float *dst, unsigned int length)
+dspm_add_vf32_f32_vf32(const float *src0, float src1, float *dst, uint32_t length)
 {
     while (length--) {
         *dst++ = *src0++ + src1;
@@ -124,7 +124,7 @@ dspm_add_vf32_f32_vf32(const float *src0, float src1, float *dst, unsigned int l
 }
 
 void
-dspm_add_vf32_vf32(float *srcdst, const float *src, unsigned int length)
+dspm_add_vf32_vf32(float *srcdst, const float *src, uint32_t length)
 {
     while (length--) {
         *srcdst++ += *src++;
@@ -132,9 +132,9 @@ dspm_add_vf32_vf32(float *srcdst, const float *src, unsigned int length)
 }
 
 void
-dspm_add_vu32_u32(unsigned int *srcdst,
-                  unsigned int length,
-                  unsigned int c)
+dspm_add_vu32_u32(uint32_t *srcdst,
+                  uint32_t length,
+                  uint32_t c)
 {
     while (length--) {
         *srcdst++ += c;
@@ -142,9 +142,9 @@ dspm_add_vu32_u32(unsigned int *srcdst,
 }
 
 void
-dspm_mul_vu32_u32(unsigned int *srcdst,
-                  unsigned int length,
-                  unsigned int c)
+dspm_mul_vu32_u32(uint32_t *srcdst,
+                  uint32_t length,
+                  uint32_t c)
 {
     while (length--) {
         *srcdst++ *= c;
@@ -154,7 +154,7 @@ dspm_mul_vu32_u32(unsigned int *srcdst,
 void
 dspm_clip_below_vf32_f32(float *srcdst,
                          float lb,
-                         unsigned int length)
+                         uint32_t length)
 {
     while (length--) {
         *srcdst = *srcdst < lb ? lb : *srcdst;
@@ -164,7 +164,7 @@ dspm_clip_below_vf32_f32(float *srcdst,
 
 /* Note that this is not compensated summation */
 float
-dspm_sum_vf32(const float *src, unsigned int length)
+dspm_sum_vf32(const float *src, uint32_t length)
 {
     float ret = 0;
     while (length--) {
@@ -177,7 +177,7 @@ dspm_sum_vf32(const float *src, unsigned int length)
 void
 dspm_div_vf32_f32(float *srcdst,
                   float d,
-                  unsigned int length)
+                  uint32_t length)
 {
     while (length--) {
         *srcdst++ /= d;
@@ -186,7 +186,7 @@ dspm_div_vf32_f32(float *srcdst,
 
 struct dspm_rfft_vf32_vz32_cfg {
     kiss_fftr_cfg cfg;
-    unsigned int inverse;
+    uint32_t inverse;
 };
 
 void
@@ -232,7 +232,7 @@ dspm_rfft_vf32_vz32(struct dspm_rfft_vf32_vz32_cfg *cfg,
 }
 
 float
-dspm_mean_vf32_f32(const float *src, unsigned int length)
+dspm_mean_vf32_f32(const float *src, uint32_t length)
 {
     float ret = dspm_sum_vf32(src, length);
     ret /= length;
@@ -240,9 +240,9 @@ dspm_mean_vf32_f32(const float *src, unsigned int length)
 }
 
 void
-dspm_rev_vu32(unsigned int *srcdst, unsigned int length)
+dspm_rev_vu32(uint32_t *srcdst, uint32_t length)
 {
-    unsigned int beg = 0, end = length - 1;
+    uint32_t beg = 0, end = length - 1;
     while (beg < (length>>1)) {
         SWAP(srcdst[beg],srcdst[end]);
         beg++;
@@ -251,16 +251,16 @@ dspm_rev_vu32(unsigned int *srcdst, unsigned int length)
 }
 
 void
-dspm_floor_vf32_vu32(const float *src, unsigned int *dst, unsigned int length)
+dspm_floor_vf32_vu32(const float *src, uint32_t *dst, uint32_t length)
 {
     while (length--) {
-        *dst++ = (unsigned int)floor(*src++);
+        *dst++ = (uint32_t)floor(*src++);
     }
 }
 
 void
-dspm_lookup_vf32_vu32_vf32(const float *src0, const unsigned int *src1,
-float *dst, unsigned int length)
+dspm_lookup_vf32_vu32_vf32(const float *src0, const uint32_t *src1,
+float *dst, uint32_t length)
 {
     while (length--) {
         *dst++ = src0[*src1++];
@@ -269,8 +269,8 @@ float *dst, unsigned int length)
 
 void
 dspm_floor_vu24q8_vu32(const u24q8 *src,
-                       unsigned int *dst,
-                       unsigned int N)
+                       uint32_t *dst,
+                       uint32_t N)
 {
     while (N--) {
         *dst++ = *src++ >> 8;
@@ -280,9 +280,9 @@ dspm_floor_vu24q8_vu32(const u24q8 *src,
 /* note: result will be wrong if src1 contains values >= 2^24 */
 void
 dspm_sub_vu24q8_vu32_vf32(const u24q8 *src0,
-                          const unsigned int *src1,
+                          const uint32_t *src1,
                           float *dst,
-                          unsigned int N)
+                          uint32_t N)
 {
     const float scale = 1./256.;
     while (N--) {
