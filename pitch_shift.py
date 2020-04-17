@@ -77,6 +77,7 @@ class pitch_shifter:
         self.pos_at_block_start=0
 
     def set_pos_at_block_start(self,pos):
+        # TODO reduction modulo the length of the sound should be done here, too
         self.pos_at_block_start=pos
         self.time_at_block_start=pos
         self.sig_rb_idcs_valid=False
@@ -91,6 +92,9 @@ class pitch_shifter:
         if self.sig_rb_idcs_valid:
             fetch_start_idx = self.sig_rb_max_idx + 1
             # discard all values between self.sig_rb_min_idx and the first_required_idx
+            # TODO: if first_required_idx has been wrapped because of the sound's length,
+            # n_discard should be (first_required_idx - self.sig_rb_min_idx) % sound_length
+            # HOWEVER this could be problematic if the index has wrapped around multiple times
             n_discard = first_required_idx - self.sig_rb_min_idx
             self.sig_rb.advance_head(n_discard)
         else:
@@ -167,7 +171,7 @@ class pitch_shifter:
         # an array (containing a sound) of limited length. With the u24q8
         # format, we can address an array of length of 2**24 -
         # get_interpolator_n_points(0) (about 350 seconds at 48KHz sample rate).
-        # This is length is reasonable for our purposes: we assume that the
+        # This length is reasonable for our purposes: we assume that the
         # get_samples implementation reduces the requested index modulo the
         # length of the sound-array. However also after about 350 seconds
         # (depending on the pitch-shift factor) the ps_pos_sig will roll-over.

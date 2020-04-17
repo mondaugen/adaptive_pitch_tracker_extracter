@@ -1,6 +1,7 @@
 #ifndef DSP_MATH_H
 #define DSP_MATH_H 
 
+#include <stdint.h>
 #include <complex.h>
 
 /*
@@ -22,7 +23,9 @@ NULL pointer arguments, the results are undefined.
 
 /* fixed-point types */
 /* unsigned with 24 integer and 8 fractional bits */
-typedef unsigned int u24q8;
+typedef uint32_t u24q8;
+/* unsigned with 48 integer and 16 fractional bits */
+typedef uint64_t u48q16;
 
 /* Fast floor(log2(x)) */
 static inline int
@@ -186,5 +189,13 @@ dspm_sub_vu24q8_vu32_vf32(const u24q8 *src0,
                           const unsigned int *src1,
                           float *dst,
                           unsigned int N);
+
+/* computes dst[0] = initial_sum + src[0], dst[1] = initial_sum + src[0] +
+src[1], etc. */
+void
+dspm_cumsum_vu16q16_u48q16_vu48q16(const u16q16 *src,
+                                   u48q16 initial_sum,
+                                   u48q16 *dst,
+                                   unsigned int N);
 
 #endif /* DSP_MATH_H */
