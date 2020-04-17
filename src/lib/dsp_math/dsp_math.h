@@ -28,12 +28,12 @@ typedef uint32_t u24q8;
 typedef uint64_t u48q16;
 
 /* Fast floor(log2(x)) */
-static inline int
+static inline int32_t
 dspm_fast_floor_log2_f32(float x)
 {
     uint32_t *ux = (uint32_t*)&x;
     /* Extracts exponent from IEEE 754 floating point number */
-    int exp = ((*ux>>23)&0xff) - 127;
+    int32_t exp = ((*ux>>23)&0xff) - 127;
     return exp;
 }
 
