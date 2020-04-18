@@ -1,3 +1,6 @@
 [submodule "src/lib/kissfft"]
 	path = src/lib/kissfft
 	url = git@github.com:mborgerding/kissfft.git
+[submodule "src/lib/arm/CMSIS_5"]
+	path = src/lib/arm/CMSIS_5
+	url = git@github.com:ARM-software/CMSIS_5.git
