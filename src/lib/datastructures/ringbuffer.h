@@ -53,4 +53,7 @@ rngbuf_memcpy(
     unsigned int length,
     char *dest);
 
+int
+rngbuf_reset(struct rngbuf *rb);
+
 #endif /* RINGBUFFER_H */

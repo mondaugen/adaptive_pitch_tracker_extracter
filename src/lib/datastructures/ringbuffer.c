@@ -176,3 +176,8 @@ rngbuf_memcpy(
     return 0;
 }
     
+int
+rngbuf_reset(struct rngbuf *rb)
+{
+    return rngbuf_advance_head(rb,rngbuf_contents_size(rb));
+}

@@ -24,8 +24,12 @@ NULL pointer arguments, the results are undefined.
 /* fixed-point types */
 /* unsigned with 24 integer and 8 fractional bits */
 typedef uint32_t u24q8;
+/* signed with 24 integer and 8 fractional bits */
+typedef int32_t s24q8;
 /* unsigned with 48 integer and 16 fractional bits */
 typedef uint64_t u48q16;
+/* signed with 48 integer and 16 fractional bits */
+typedef int64_t s48q16;
 
 /* Fast floor(log2(x)) */
 static inline int32_t
@@ -197,5 +201,17 @@ dspm_cumsum_vu16q16_u48q16_vu48q16(const u16q16 *src,
                                    u48q16 initial_sum,
                                    u48q16 *dst,
                                    uint32_t N);
+
+struct dspm_2dline_s48q16 {
+    /* y = m*(x-x0) + b */
+    s48q16 x0;
+    s48q16 m;
+    s48q16 b;
+};
+
+struct dspm_2dline_s48q16 dspm_2dline_s48q16_points(s48q16 x0,
+                                                    s48q16 y0,
+                                                    s48q16 x1,
+                                                    s48q16 y1);
 
 #endif /* DSP_MATH_H */

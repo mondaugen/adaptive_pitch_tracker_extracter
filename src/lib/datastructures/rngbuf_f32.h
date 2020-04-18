@@ -39,6 +39,10 @@ rngbuf_f32_shift_in(
     const float *values,
     unsigned int nvalues);
 
+int
+rngbuf_f32_advance_head(struct rngbuf_f32 *rb,
+                        unsigned int n);
+
 /*
 Copy values out of the float buffer from start and extending for length into
 dest.

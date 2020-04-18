@@ -310,3 +310,29 @@ dspm_cumsum_vu16q16_u48q16_vu48q16(const u16q16 *src,
 {
     cumsum_vu32_u64_vu64(src,initial_sum,dst,N);
 }
+
+struct dspm_2dline_s48q16
+dspm_2dline_s48q16_points(s48q16 x0,
+        s48q16 y0,
+        s48q16 x1,
+        s48q16 y1)
+{
+    struct dspm_2dline_s48q16 ret = {
+        .x0 = x0;
+        .m = ((y2-y1)<<16)/(x1-x0);
+        .b = y1;
+    };
+}
+
+void
+dspm_2dline_s48q16_lookup_vs48q16(const struct dspm_2dline_s48q16 *restrict line,
+                                  s48q16 *restrict x,
+                                  uint32_t N)
+{
+    while (N--) {
+        /* y = m*(x - x0) + y */
+        *x = ((line->m * (x - line->x0)) >> 16) + line->y;
+        x++;
+    }
+}
+
