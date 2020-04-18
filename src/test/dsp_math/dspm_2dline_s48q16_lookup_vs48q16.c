@@ -7,11 +7,11 @@ int main (void)
 {
     const char input_path[] = "dspm_2dline_s48q16_lookup_vs48q16_input.s48q16",
                output_path[] = "dspm_2dline_s48q16_lookup_vs48q16_output.s48q16";
-    struct dspm_2dline_s48q16 line = 
-        dspm_2dline_s48q16_points(-10<<16,
-            10<<16,
-            10<<16,
-            20<<16);
+    s48q16 x0 = atol(getenv_default("X0","-10"))<<16,
+           y0 = atol(getenv_default("Y0","10"))<<16,
+           x1 = atol(getenv_default("X1","10"))<<16,
+           y1 = atol(getenv_default("Y1","20"))<<16;
+    struct dspm_2dline_s48q16 line = dspm_2dline_s48q16_points(x0,y0,x1,y0);
     s48q16 *input = file_to_array(input_path,0);
     long input_length = get_file_length_path(input_path)/sizeof(s48q16);
     dspm_2dline_s48q16_lookup_vs48q16(&line,
