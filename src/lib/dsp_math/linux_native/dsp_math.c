@@ -318,10 +318,11 @@ dspm_2dline_s48q16_points(s48q16 x0,
         s48q16 y1)
 {
     struct dspm_2dline_s48q16 ret = {
-        .x0 = x0;
-        .m = ((y2-y1)<<16)/(x1-x0);
-        .b = y1;
+        .x0 = x0,
+        .m = ((y1-y0)<<16)/(x1-x0),
+        .b = y0,
     };
+    return ret;
 }
 
 void
@@ -331,7 +332,7 @@ dspm_2dline_s48q16_lookup_vs48q16(const struct dspm_2dline_s48q16 *restrict line
 {
     while (N--) {
         /* y = m*(x - x0) + y */
-        *x = ((line->m * (x - line->x0)) >> 16) + line->y;
+        *x = ((line->m * (*x - line->x0)) >> 16) + line->b;
         x++;
     }
 }

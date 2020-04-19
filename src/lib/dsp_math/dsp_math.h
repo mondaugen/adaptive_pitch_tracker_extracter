@@ -22,6 +22,8 @@ NULL pointer arguments, the results are undefined.
 */
 
 /* fixed-point types */
+/* undefined with 16 integer and 16 fractional bits */
+typedef uint32_t u16q16;
 /* unsigned with 24 integer and 8 fractional bits */
 typedef uint32_t u24q8;
 /* signed with 24 integer and 8 fractional bits */
@@ -213,5 +215,10 @@ struct dspm_2dline_s48q16 dspm_2dline_s48q16_points(s48q16 x0,
                                                     s48q16 y0,
                                                     s48q16 x1,
                                                     s48q16 y1);
+
+void
+dspm_2dline_s48q16_lookup_vs48q16(const struct dspm_2dline_s48q16 *restrict line,
+                                  s48q16 *restrict x,
+                                  uint32_t N);
 
 #endif /* DSP_MATH_H */
