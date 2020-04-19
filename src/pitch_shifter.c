@@ -109,12 +109,13 @@ pitch shift.
 */
 static void
 process_pos_sig(struct pitch_shifter *self,
-                const u48q16 *ps_pos_sig,
-                const  u48q16 *ts_pos_sig,
+                u48q16 *ps_pos_sig,
+                u48q16 *ts_pos_sig,
                 float *y)
 {
     int64_t first_required_idx, last_required_idx, fetch_start_idx;
-    uint32_t n_discard;
+    uint32_t n_discard, n_fetch_times, n;
+    s48q16 fetch_time;
     self->interpolator_range(ps_pos_sig[0],ps_pos_sig[-2],
     &first_required_idx,&last_required_idx);
 
@@ -136,9 +137,34 @@ process_pos_sig(struct pitch_shifter *self,
     n_fetch_vals = last_required_idx - fetch_start_idx + 1
 
     /* linear interpolation giving the look up times from the signal indices */
-    fetch_time_interpolator=interpolate.interp1d(
-        [ps_pos_sig[0],ps_pos_sig[-1]],
-        [ts_pos_sig[0],ts_pos_sig[-1]],
-        fill_value='extrapolate')
-
+    struct dspm_2dline_s48q16
+    fetch_time_interpolator=dspm_2dline_s48q16_points(
+    ps_pos_sig[0],ts_pos_sig[0],ps_pos_sig[-1],ts_pos_sig[-1]);
+    
+    while (fetch_start_idx < last_required_idx) { 
+        fetch_time = fetch_start_idx << 16;
+        dspm_2dline_s48q16_lookup_vs48q16(&fetch_time_interpolator,
+                                          &fetch_time,
+                                          1);
+        const float *samples = self->get_samples(fetch_time,self->get_samples_aux);
+        rngbuf_f32_push_copy(self->sig_rb, samples, self->B);
+        fetch_start_idx += self->B;
+        self->sig_rb_max_idx += self->B;
+    }
+    /* get the signal result by interpolating */
+    /* interpolator assumes domain is 0 to N - 1 */
+    /* the question is: is it better when subtracting first_required_idx from
+    ps_pos_sig to convert it to u24q8 (this would entail allocating space
+    (negligible) and a subtraction) or to write a cubic interpolation routine
+    using u48q16 indexing (for this computing the integer and fractional parts
+    involves a 64-bit subtraction and multiply), I think former is better. 
+    TODO: Check the conversion from q format integers to floats*/
+    self->interpolator(
+    signal_interpolator=self.get_interpolator(
+        np.arange(first_required_idx,last_required_idx+1,1),
+        self.sig_rb.get_region(0,last_required_idx-first_required_idx+1))
+    y=signal_interpolator(ps_pos_sig[:-1])
+    self.time_at_block_start = ts_pos_sig[-1]
+    self.pos_at_block_start = ps_pos_sig[-1]
+    return y
 }

@@ -119,6 +119,7 @@ class pitch_shifter:
             self.sig_rb.push_copy(x)
             fetch_start_idx += self.B
             self.sig_rb_max_idx += self.B
+        # TODO why is this made true here?
         self.sig_rb_idcs_valid = True
         
         # get the signal result by interpolating

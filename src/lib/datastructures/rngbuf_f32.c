@@ -154,8 +154,8 @@ rngbuf_f32_where_values(
 int
 rngbuf_f32_push_copy(
 struct rngbuf_f32 *fb,
-unsigned int n,
-const float *values)
+const float *values,
+unsigned int n)
 {
     return rngbuf_push_copy((struct rngbuf *)fb,
            (char *)values, n*sizeof(float));

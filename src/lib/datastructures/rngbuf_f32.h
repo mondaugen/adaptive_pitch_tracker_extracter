@@ -12,7 +12,7 @@ rngbuf_f32_new(unsigned int size);
 struct rngbuf_f32_where_val { unsigned int n; float f; }; 
 
 int
-rngbuf_f32_push_copy(struct rngbuf_f32 *fb, unsigned int n, const float *values);
+rngbuf_f32_push_copy(struct rngbuf_f32 *fb, const float *values, unsigned int n);
 
 int
 rngbuf_f32_lookup(struct rngbuf_f32 *fb, unsigned int n, float *dest);

@@ -284,6 +284,7 @@ dspm_sub_vu24q8_vu32_vf32(const u24q8 *src0,
                           float *dst,
                           uint32_t N)
 {
+    /* NOTE: For ARM, use 'VCVT.U32 r0, r1, #8' in assembly */
     const float scale = 1./256.;
     while (N--) {
         *dst++ = (*src0++ - (*src1++ << 8))*scale;
