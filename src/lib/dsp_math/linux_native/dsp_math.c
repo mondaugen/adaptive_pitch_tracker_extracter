@@ -277,18 +277,128 @@ dspm_floor_vu24q8_vu32(const u24q8 *src,
     }
 }
 
+void
+dspm_floor_vu16q16_vu32(const u16q16 *src,
+                       uint32_t *dst,
+                       uint32_t N)
+{
+    while (N--) {
+        *dst++ = *src++ >> 16;
+    }
+}
+
+void
+dspm_cvt_vu24q8_vf32(const u24q8 *src,
+                     float *dst,
+                     uint32_t N)
+{
+    /* NOTE: For ARM, use 'VCVT.U32 r0, r1, #8' in assembly */
+    const float scale = 1./256.;
+    while (N--) {
+        *dst++ = *src++ * scale;
+    }
+}
+
+void
+dspm_cvt_vu16q16_vf32(const u16q16 *src,
+                     float *dst,
+                     uint32_t N)
+{
+    /* NOTE: For ARM, use 'VCVT.U32 r0, r1, #16' in assembly */
+    const float scale = 1./65536.;
+    while (N--) {
+        *dst++ = *src++ * scale;
+    }
+}
+
 /* note: result will be wrong if src1 contains values >= 2^24 */
+void
+dspm_sub_vu24q8_vu32_vu24q8(const u24q8 *src0,
+                     const uint32_t *src1,
+                     u24q8 *dst,
+                     uint32_t N)
+{
+    while (N--) {
+        *dst++ = *src0++ - (*src1++ << 8);
+    }
+}
+
+/* note: result will be wrong if src1 contains values >= 2^16 */
+void
+dspm_sub_vu16q16_vu32_vu16q16(const u16q16 *src0,
+                     const uint32_t *src1,
+                     u16q16 *dst,
+                     uint32_t N)
+{
+    while (N--) {
+        *dst++ = *src0++ - (*src1++ << 16);
+    }
+}
+
+/*
+The difference between *src1 and the integer part of *src0 is limited to
+2**16
+*/
+void
+dspm_sub_vu48q16_vs64_vu32q8(const u48q16 *src0,
+                             const int64_t *src1,
+                             u24q8 *dst,
+                             uint32_t N)
+{
+    while (N--) {
+        *dst++ =  ((u24q8)(*src0++ - (*src1++ << 16)) * 0x00000100) >> 16;
+    }
+}
+
+/*
+The difference between *src1 and the integer part of *src0 is limited to
+2**16
+*/
+void
+dspm_sub_vu48q16_vs64_vu16q16(const u48q16 *src0,
+                             const int64_t *src1,
+                             u16q16 *dst,
+                             uint32_t N)
+{
+    while (N--) {
+        *dst++ =  (u16q16)(*src0++ - (*src1++ << 16));
+    }
+}
+
+/*
+The difference between src1 and the integer part of *src0 is limited to
+2**16
+*/
+void
+dspm_sub_vu48q16_s64_vu16q16(const u48q16 *src0,
+                             int64_t src1,
+                             u16q16 *dst,
+                             uint32_t N)
+{
+    src1 <<= 16;
+    while (N--) {
+        *dst++ =  (u16q16)(*src0++ - src1);
+    }
+}
+
 void
 dspm_sub_vu24q8_vu32_vf32(const u24q8 *src0,
                           const uint32_t *src1,
                           float *dst,
                           uint32_t N)
 {
-    /* NOTE: For ARM, use 'VCVT.U32 r0, r1, #8' in assembly */
-    const float scale = 1./256.;
-    while (N--) {
-        *dst++ = (*src0++ - (*src1++ << 8))*scale;
-    }
+    dspm_sub_vu24q8_vu32_vu24q8(src0,src1,(u24q8*)dst,N);
+    dspm_cvt_vu24q8_vf32((u24q8*)dst,dst,N);
+}
+
+void
+dspm_sub_vu16q16_vu32_vf32(const u16q16 *src0,
+                           const uint32_t *src1,
+                           float *dst,
+                           uint32_t N)
+{
+    dspm_sub_vu16q16_vu32_vu16q16(src0,src1,(u16q16*)dst,N);
+    dspm_cvt_vu16q16_vf32((u16q16*)dst,dst,N);
 }
 
 static inline void

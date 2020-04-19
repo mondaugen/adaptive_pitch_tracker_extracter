@@ -186,7 +186,18 @@ dspm_interp1d4p_vu24q8_vf32_vf32(const u24q8 *xi,
                                  uint32_t N);
 
 void
+dspm_interp1d4p_vu16q16_vf32_vf32(const u16q16 *xi,
+                                  const float *y,
+                                  float *yi,
+                                  uint32_t N);
+
+void
 dspm_floor_vu24q8_vu32(const u24q8 *src,
+                       uint32_t *dst,
+                       uint32_t N);
+
+void
+dspm_floor_vu16q16_vu32(const u16q16 *src,
                        uint32_t *dst,
                        uint32_t N);
 

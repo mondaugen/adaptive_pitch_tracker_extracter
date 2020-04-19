@@ -13,7 +13,7 @@ struct pitch_shifter {
     float ps_min;
     float ps_max;
     uint32_t B;
-    void (*interpolator)(const u24q8 *xi,
+    void (*interpolator)(const u16q16 *xi,
                          const float *y,
                          float *yi,
                          uint32_t N,
@@ -32,22 +32,26 @@ struct pitch_shifter {
 static int check_pitch_shifter_config(struct pitch_shifter_config *config)
 {
     /*
-    We restrict ps_max to 12 octaves.
-    B must at least be limited by the (2^32 - 1)/config->ps_max because that
-    is the maxmimum size of a ring buffer and we look up at most
-    B*config->ps_max per processing block, so the most that could be discarded
-    is B*config->ps_max. Therefore limiting B to 2^16 should be safe.
+    We restrict ps_max to 3 octaves.
+    B*ps_max must at least be limited by 2**16 because we use u16q16 as a
+    relative position index and we look up at most B*config->ps_max per
+    processing block, so the most that could be discarded is B*config->ps_max.
+    Therefore we limit B to 2**16/ps_max. Don't forget the interpolator might
+    want some extra values, so that's why we limit to 3 octaves, not 4.
     */
     if (!config) { return -1; }
     if (!config->get_samples) { return -2; }
     if (config->ps_min <= 0) { return -3; }
     if ((config->ps_max < config->ps_min)
         || (config->ps_max <= 0)
-        || (config->ps_max > (1 << 12)) { return -4; }
-    if ((config->B > (1 << 16)) || (config->B <= 0)) { return -5; }
+        || (config->ps_max > (1 << 3))) { return -4; }
     if (!config->interpolator) { return -6; }
     if (!config->interpolator_range) { return -7; }
     if (!config->interpolator_n_points) { return -8; }
+    if ((config->interpolator_n_points(config->B*config->ps_max,
+         config->interpolator_aux) > (1 << 16)) || (config->B <= 0)) {
+         return -5;
+    }
     return 0;
 }
 
@@ -110,12 +114,13 @@ pitch shift.
 static void
 process_pos_sig(struct pitch_shifter *self,
                 u48q16 *ps_pos_sig,
-                u48q16 *ts_pos_sig,
-                float *y)
+                s48q16 *ts_pos_sig,
+                float *yi)
 {
     int64_t first_required_idx, last_required_idx, fetch_start_idx;
     uint32_t n_discard, n_fetch_times, n;
     s48q16 fetch_time;
+    u16q16 local_ps_pos_sig[self->B];
     self->interpolator_range(ps_pos_sig[0],ps_pos_sig[-2],
     &first_required_idx,&last_required_idx);
 
@@ -151,20 +156,25 @@ process_pos_sig(struct pitch_shifter *self,
         fetch_start_idx += self->B;
         self->sig_rb_max_idx += self->B;
     }
-    /* get the signal result by interpolating */
+    /* offset by first_required_idx to get a local index signal */
+    dspm_sub_vu48q16_s64_vu16q16(ps_pos_sig,
+                                 first_required_idx,
+                                 local_ps_pos_sig,
+                                 self->B);
+    /* get the required values */
+    float y[last_required_idx-first_required_idx+1];
+    rngbuf_f32_memcpy(
+        self->sig_rb,
+        0,
+        last_required_idx-first_required_idx+1,
+        y);
     /* interpolator assumes domain is 0 to N - 1 */
-    /* the question is: is it better when subtracting first_required_idx from
-    ps_pos_sig to convert it to u24q8 (this would entail allocating space
-    (negligible) and a subtraction) or to write a cubic interpolation routine
-    using u48q16 indexing (for this computing the integer and fractional parts
-    involves a 64-bit subtraction and multiply), I think former is better. 
-    TODO: Check the conversion from q format integers to floats*/
-    self->interpolator(
-    signal_interpolator=self.get_interpolator(
-        np.arange(first_required_idx,last_required_idx+1,1),
-        self.sig_rb.get_region(0,last_required_idx-first_required_idx+1))
-    y=signal_interpolator(ps_pos_sig[:-1])
-    self.time_at_block_start = ts_pos_sig[-1]
-    self.pos_at_block_start = ps_pos_sig[-1]
+    self->interpolator(local_ps_pos_sig,
+                       y,
+                       yi,
+                       self->B,
+                       self->interpolator_aux);
+    self->time_at_block_start = ts_pos_sig[self->B];
+    self->pos_at_block_start = ps_pos_sig[self->B];
     return y
 }

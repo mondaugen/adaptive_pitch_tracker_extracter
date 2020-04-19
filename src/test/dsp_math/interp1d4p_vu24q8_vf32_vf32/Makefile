@@ -1,4 +1,4 @@
-.PHONY: do_test clean
+.PHONY: do_test clean build_libdsp_math
 
 R=$(dir $(firstword $(MAKEFILE_LIST)))
 
@@ -11,12 +11,12 @@ do_test: $(R)/gen_test_data.py \
 
 $(R)/bin/do_interp: $(R)/do_interp.c \
 		src/test/test_common.h \
-		src/lib/dsp_math/libdsp_math.a
+		build_libdsp_math
 	cc -g -Isrc/test -Isrc/lib/dsp_math -Lsrc/lib/dsp_math \
 		$(filter %.c,$^) -o $@ -ldsp_math -lm
 
-src/lib/dsp_math/libdsp_math.a:
-	$(MAKE) -C $(dir $@)
+build_libdsp_math:
+	$(MAKE) -C src/lib/dsp_math
 
 clean:
 	rm -f $(R)/bin/*
