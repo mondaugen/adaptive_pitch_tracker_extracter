@@ -215,6 +215,11 @@ dspm_cumsum_vu16q16_u48q16_vu48q16(const u16q16 *src,
                                    u48q16 *dst,
                                    uint32_t N);
 
+dspm_cumsum_vs16q16_s48q16_vs48q16(const s16q16 *src,
+                                   s48q16 initial_sum,
+                                   s48q16 *dst,
+                                   uint32_t N);
+
 struct dspm_2dline_s48q16 {
     /* y = m*(x-x0) + b */
     s48q16 x0;
@@ -231,5 +236,29 @@ void
 dspm_2dline_s48q16_lookup_vs48q16(const struct dspm_2dline_s48q16 *restrict line,
                                   s48q16 *restrict x,
                                   uint32_t N);
+
+void
+dspm_cvt_vu24q8_vf32(const u24q8 *src,
+                     float *dst,
+                     uint32_t N);
+
+void
+dspm_cvt_vu16q16_vf32(const u16q16 *src,
+                     float *dst,
+                     uint32_t N);
+
+/* results are undefined if src is negative or greater than 2^16 */
+void
+dspm_cvt_vf32_vu16q16(const float *src,
+                      u16q16 *dst,
+                      uint32_t N);
+
+/* For each element, puts the element or the constant, whichever is smaller. Can
+be used to clip values to some upper boundary */
+dspm_min_vu16q16_u16q16(u16q16 *srcdst, u16q16 c, uint32_t N);
+
+/* For each element, puts the element or the constant, whichever is greater. Can
+be used to clip values to some lower boundary */
+dspm_max_vu16q16_u16q16(u16q16 *srcdst, u16q16 c, uint32_t N);
 
 #endif /* DSP_MATH_H */

@@ -10,23 +10,23 @@ struct pitch_shifter {
     int64_t sig_rb_max_idx;
     const float *(*get_samples)(const u48q16 sample_index, void *aux);
     void *get_samples_aux;
-    float ps_min;
-    float ps_max;
+    u16q16 ps_min;
+    u16q16 ps_max;
     uint32_t B;
     void (*interpolator)(const u16q16 *xi,
                          const float *y,
                          float *yi,
                          uint32_t N,
                          void *aux);
-    void (*interpolator_range)(const u48q16 pos_first,
-                               const u48q16 pos_last,
+    void (*interpolator_range)(u48q16 pos_first,
+                               u48q16 pos_last,
                                int64_t* req_first,
                                int64_t* req_last,
                                void* aux);
     uint32_t (*interpolator_n_points)(uint32_t N, void* aux);
     void *interpolator_aux;
     s48q16 time_at_block_start;
-    s48q16 pos_at_block_start;
+    u48q16 pos_at_block_start;
 };
 
 static int check_pitch_shifter_config(struct pitch_shifter_config *config)
@@ -55,6 +55,14 @@ static int check_pitch_shifter_config(struct pitch_shifter_config *config)
     return 0;
 }
 
+static inline u16q16
+float_to_u16q16(float f)
+{
+    u16q16 ret;
+    dspm_cvt_vf32_vu16q16(&f, &ret, 1);
+    return ret;
+}
+
 struct pitch_shifter *
 pitch_shifter_new(struct pitch_shifter_config *config)
 {
@@ -80,14 +88,14 @@ pitch_shifter_new(struct pitch_shifter_config *config)
     // This is the index of the value at index
     // self.sig_rb.contents_size() - 1 in the ringbuffer
     self->sig_rb_max_idx = -1;
-    self->get_samples = get_samples;
-    self->get_samples_aux = get_samples_aux;
-    self->ps_min = ps_min;
-    self->ps_max = ps_max;
+    self->get_samples = config->get_samples;
+    self->get_samples_aux = config->get_samples_aux;
+    self->ps_min = float_to_u16q16(config->ps_min);
+    self->ps_max = float_to_u16q16(config->ps_max);
     self->B = B;
-    self->interpolator=interpolator;
-    self->interpolator_range=interpolator_range;
-    self->interpolator_aux=interpolator_aux;
+    self->interpolator=config->interpolator;
+    self->interpolator_range=config->interpolator_range;
+    self->interpolator_aux=config->interpolator_aux;
     self->time_at_block_start=0;
     self->pos_at_block_start=0;
 fail:
@@ -177,4 +185,35 @@ process_pos_sig(struct pitch_shifter *self,
     self->time_at_block_start = ts_pos_sig[self->B];
     self->pos_at_block_start = ps_pos_sig[self->B];
     return y
+}
+
+/* 
+returns self->B samples of the signal (obtained through get_samples)
+pitch-shifted according to ps_rate_sig and time-stretched according to
+ts_rate_sig.
+puts result in yi
+yi, ps_rate_sig and ts_rate_sig must have length self->B
+*/
+void
+pitch_shifter_process(struct pitch_shifter *self
+                      const u16q16 *ps_rate_sig,
+                      const s16q16 *ts_rate_sig,
+                      float *yi)
+{
+    /* limit pitch shift amount */
+    dspm_min_vu16q16_u16q16(ps_rate_sig,self->ps_max,self->B);
+    dspm_max_vu16q16_u16q16(ps_rate_sig,self->ps_min,self->B);
+    u48q16 ps_pos_sig[self->B+1];
+    s48q16 ts_pos_sig[self->B+1];
+    ps_pos_sig[0] = self->pos_at_block_start;
+    dspm_cumsum_vu16q16_u48q16_vu48q16(ps_rate_sig,
+                                       self->pos_at_block_start,
+                                       &ps_pos_sig[1],
+                                       self->B);
+    ts_pos_sig[0] = self->time_at_block_start;
+    dspm_cumsum_vs16q16_s48q16_vs48q16(ts_rate_sig,
+                                       self->pos_at_block_start,
+                                       &ts_pos_sig[1],
+                                       self->B);
+    process_pos_sig(self,ps_pos_sig,ts_pos_sig,yi);
 }

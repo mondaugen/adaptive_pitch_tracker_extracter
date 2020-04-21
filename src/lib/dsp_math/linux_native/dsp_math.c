@@ -292,7 +292,7 @@ dspm_cvt_vu24q8_vf32(const u24q8 *src,
                      float *dst,
                      uint32_t N)
 {
-    /* NOTE: For ARM, use 'VCVT.U32 r0, r1, #8' in assembly */
+    /* NOTE: For ARM, use 'VCVT.U32.F32 r0, r1, #8' in assembly */
     const float scale = 1./256.;
     while (N--) {
         *dst++ = *src++ * scale;
@@ -304,10 +304,23 @@ dspm_cvt_vu16q16_vf32(const u16q16 *src,
                      float *dst,
                      uint32_t N)
 {
-    /* NOTE: For ARM, use 'VCVT.U32 r0, r1, #16' in assembly */
+    /* NOTE: For ARM, use 'VCVT.U32.F32 r0, r1, #16' in assembly */
     const float scale = 1./65536.;
     while (N--) {
         *dst++ = *src++ * scale;
+    }
+}
+
+/* results are undefined if src is negative or greater than 2^16 */
+void
+dspm_cvt_vf32_vu16q16(const float *src,
+                      u16q16 *dst,
+                      uint32_t N)
+{
+    /* NOTE: For ARM, use 'VCVT.F32.U32 r0, r1, #16' in assembly */
+    const uint32_t scale = (1<<16);
+    while (N--) {
+        *dst++ = (u16q16)(*src++ * scale);
     }
 }
 
@@ -422,6 +435,27 @@ dspm_cumsum_vu16q16_u48q16_vu48q16(const u16q16 *src,
     cumsum_vu32_u64_vu64(src,initial_sum,dst,N);
 }
 
+static inline void
+cumsum_vs32_s64_vs64(const uint32_t *src,
+                     uint64_t initial_sum,
+                     uint64_t *dst,
+                     uint32_t N)
+{
+    while (N--) {
+        initial_sum += *src++;
+        *dst++ = initial_sum;
+    }
+}
+
+void
+dspm_cumsum_vs16q16_s48q16_vs48q16(const s16q16 *src,
+                                   s48q16 initial_sum,
+                                   s48q16 *dst,
+                                   uint32_t N)
+{
+    cumsum_vs32_s64_vs64(src,initial_sum,dst,N);
+}
+
 struct dspm_2dline_s48q16
 dspm_2dline_s48q16_points(s48q16 x0,
         s48q16 y0,
@@ -448,3 +482,20 @@ dspm_2dline_s48q16_lookup_vs48q16(const struct dspm_2dline_s48q16 *restrict line
     }
 }
 
+/* For each element, puts the element or the constant, whichever is smaller. Can
+be used to clip values to some upper boundary */
+dspm_min_vu16q16_u16q16(u16q16 *srcdst, u16q16 c, uint32_t N)
+{
+    while (N--) {
+        *srcdst++ = *srcdst < c ? *srcdst : c;
+    }
+}
+
+/* For each element, puts the element or the constant, whichever is greater. Can
+be used to clip values to some lower boundary */
+dspm_max_vu16q16_u16q16(u16q16 *srcdst, u16q16 c, uint32_t N)
+{
+    while (N--) {
+        *srcdst++ = *srcdst > c ? *srcdst : c;
+    }
+}
