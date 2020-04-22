@@ -1,7 +1,8 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include "pitch_shifter.h"
+#include "ringbuffer.h"
 #include "rngbuf_f32.h"
-#include "dsp_math.h"
 
 struct pitch_shifter {
     struct rngbuf_f32 *sig_rb;
@@ -28,6 +29,9 @@ struct pitch_shifter {
     s48q16 time_at_block_start;
     u48q16 pos_at_block_start;
 };
+
+uint32_t
+pitch_shifter_B(struct pitch_shifter *ps) { return ps->B; }
 
 static int check_pitch_shifter_config(struct pitch_shifter_config *config)
 {
@@ -75,9 +79,10 @@ pitch_shifter_new(struct pitch_shifter_config *config)
     // The most values that could be requested are
     // ceil((B*ps_max+get_interpolator_n_points(B))/B)*B
     tmp=config->B*config->ps_max+
-        config->get_interpolator_n_points(B,config->interpolator_aux);
-    while sig_rb_size < tmp:
-        sig_rb_size += config->B
+        config->interpolator_n_points(config->B,config->interpolator_aux);
+    while (sig_rb_size < tmp) {
+        sig_rb_size += config->B;
+    }
     self->sig_rb = rngbuf_f32_new(sig_rb_size);
     if (!self->sig_rb) { goto fail; }
     // These values are invalid until after the first call to process
@@ -92,12 +97,13 @@ pitch_shifter_new(struct pitch_shifter_config *config)
     self->get_samples_aux = config->get_samples_aux;
     self->ps_min = float_to_u16q16(config->ps_min);
     self->ps_max = float_to_u16q16(config->ps_max);
-    self->B = B;
+    self->B = config->B;
     self->interpolator=config->interpolator;
     self->interpolator_range=config->interpolator_range;
     self->interpolator_aux=config->interpolator_aux;
     self->time_at_block_start=0;
     self->pos_at_block_start=0;
+    return self;
 fail:
     if (self) {
         if (self->sig_rb) { rngbuf_f32_free(self->sig_rb); }
@@ -106,7 +112,7 @@ fail:
     return NULL;
 }
 
-void pitch_shifter_set_position_at_block_start(u48q16 position)
+void pitch_shifter_set_position_at_block_start(struct pitch_shifter *self, u48q16 position)
 {
     self->pos_at_block_start = position;
     self->time_at_block_start = position;
@@ -126,11 +132,11 @@ process_pos_sig(struct pitch_shifter *self,
                 float *yi)
 {
     int64_t first_required_idx, last_required_idx, fetch_start_idx;
-    uint32_t n_discard, n_fetch_times, n;
+    uint32_t n_discard, n_fetch_vals, n;
     s48q16 fetch_time;
     u16q16 local_ps_pos_sig[self->B];
     self->interpolator_range(ps_pos_sig[0],ps_pos_sig[-2],
-    &first_required_idx,&last_required_idx);
+    &first_required_idx,&last_required_idx,self->interpolator_aux);
 
     if (self->sig_rb_idcs_valid) {
         /* self->sig_rb_max_idx's minimum value is -1 */
@@ -141,18 +147,18 @@ process_pos_sig(struct pitch_shifter *self,
     } else {
         rngbuf_reset((struct rngbuf *)self->sig_rb);
         fetch_start_idx = first_required_idx;
-        /* start here so the accumlated value is correct (see the while loop below) */
+        /* start here so the accumulated value is correct (see the while loop below) */
         self->sig_rb_max_idx = fetch_start_idx - 1;
         self->sig_rb_idcs_valid = 1;
     }
-    self.sig_rb_min_idx = first_required_idx
+    self->sig_rb_min_idx = first_required_idx;
 
-    n_fetch_vals = last_required_idx - fetch_start_idx + 1
+    n_fetch_vals = last_required_idx - first_required_idx + 1;
 
     /* linear interpolation giving the look up times from the signal indices */
     struct dspm_2dline_s48q16
     fetch_time_interpolator=dspm_2dline_s48q16_points(
-    ps_pos_sig[0],ts_pos_sig[0],ps_pos_sig[-1],ts_pos_sig[-1]);
+    ps_pos_sig[0],ts_pos_sig[0],ps_pos_sig[self->B],ts_pos_sig[self->B]);
     
     while (fetch_start_idx < last_required_idx) { 
         fetch_time = fetch_start_idx << 16;
@@ -170,7 +176,7 @@ process_pos_sig(struct pitch_shifter *self,
                                  local_ps_pos_sig,
                                  self->B);
     /* get the required values */
-    float y[last_required_idx-first_required_idx+1];
+    float y[n_fetch_vals];
     rngbuf_f32_memcpy(
         self->sig_rb,
         0,
@@ -184,7 +190,15 @@ process_pos_sig(struct pitch_shifter *self,
                        self->interpolator_aux);
     self->time_at_block_start = ts_pos_sig[self->B];
     self->pos_at_block_start = ps_pos_sig[self->B];
-    return y
+}
+
+void
+pitch_shifter_clamp_ps_rate_sig(struct pitch_shifter *self,
+u16q16 *ps_rate_sig, uint32_t length)
+{
+    /* limit pitch shift amount */
+    dspm_min_vu16q16_u16q16(ps_rate_sig,self->ps_max,length);
+    dspm_max_vu16q16_u16q16(ps_rate_sig,self->ps_min,length);
 }
 
 /* 
@@ -193,16 +207,15 @@ pitch-shifted according to ps_rate_sig and time-stretched according to
 ts_rate_sig.
 puts result in yi
 yi, ps_rate_sig and ts_rate_sig must have length self->B
+ps_rate_sig must be between self->ps_min and self->ps_max (.e.g, use
+pitch_shifter_clamp_ps_rate_sig)
 */
 void
-pitch_shifter_process(struct pitch_shifter *self
+pitch_shifter_process(struct pitch_shifter *self,
                       const u16q16 *ps_rate_sig,
                       const s16q16 *ts_rate_sig,
                       float *yi)
 {
-    /* limit pitch shift amount */
-    dspm_min_vu16q16_u16q16(ps_rate_sig,self->ps_max,self->B);
-    dspm_max_vu16q16_u16q16(ps_rate_sig,self->ps_min,self->B);
     u48q16 ps_pos_sig[self->B+1];
     s48q16 ts_pos_sig[self->B+1];
     ps_pos_sig[0] = self->pos_at_block_start;

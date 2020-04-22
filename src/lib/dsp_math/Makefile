@@ -1,3 +1,5 @@
+.PHONY: clean
+
 INCLUDE=-I.
 CFLAGS=-g
 DEPS=dsp_math.h
@@ -29,3 +31,6 @@ endif
 
 $(objects) : $(src_dir)/%.o : $(src_dir)/%.c $(DEPS)
 	$(CC) $(INCLUDE) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -f libdsp_math.a $(objects)

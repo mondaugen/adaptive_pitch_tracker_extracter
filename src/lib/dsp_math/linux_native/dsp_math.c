@@ -484,6 +484,7 @@ dspm_2dline_s48q16_lookup_vs48q16(const struct dspm_2dline_s48q16 *restrict line
 
 /* For each element, puts the element or the constant, whichever is smaller. Can
 be used to clip values to some upper boundary */
+void
 dspm_min_vu16q16_u16q16(u16q16 *srcdst, u16q16 c, uint32_t N)
 {
     while (N--) {
@@ -493,6 +494,7 @@ dspm_min_vu16q16_u16q16(u16q16 *srcdst, u16q16 c, uint32_t N)
 
 /* For each element, puts the element or the constant, whichever is greater. Can
 be used to clip values to some lower boundary */
+void
 dspm_max_vu16q16_u16q16(u16q16 *srcdst, u16q16 c, uint32_t N)
 {
     while (N--) {

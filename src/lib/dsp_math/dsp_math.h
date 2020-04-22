@@ -22,7 +22,9 @@ NULL pointer arguments, the results are undefined.
 */
 
 /* fixed-point types */
-/* undefined with 16 integer and 16 fractional bits */
+/* signed with 16 integer and 16 fractional bits */
+typedef int32_t s16q16;
+/* unsigned with 16 integer and 16 fractional bits */
 typedef uint32_t u16q16;
 /* unsigned with 24 integer and 8 fractional bits */
 typedef uint32_t u24q8;
@@ -207,6 +209,28 @@ dspm_sub_vu24q8_vu32_vf32(const u24q8 *src0,
                           float *dst,
                           uint32_t N);
 
+void
+dspm_sub_vu48q16_vs64_vu16q16(const u48q16 *src0,
+                             const int64_t *src1,
+                             u16q16 *dst,
+                             uint32_t N);
+
+/*
+The difference between src1 and the integer part of *src0 is limited to
+2**16
+*/
+void
+dspm_sub_vu48q16_s64_vu16q16(const u48q16 *src0,
+                             int64_t src1,
+                             u16q16 *dst,
+                             uint32_t N);
+
+void
+dspm_sub_vu16q16_vu32_vf32(const u16q16 *src0,
+                           const uint32_t *src1,
+                           float *dst,
+                           uint32_t N);
+
 /* computes dst[0] = initial_sum + src[0], dst[1] = initial_sum + src[0] +
 src[1], etc. */
 void
@@ -215,6 +239,7 @@ dspm_cumsum_vu16q16_u48q16_vu48q16(const u16q16 *src,
                                    u48q16 *dst,
                                    uint32_t N);
 
+void
 dspm_cumsum_vs16q16_s48q16_vs48q16(const s16q16 *src,
                                    s48q16 initial_sum,
                                    s48q16 *dst,
@@ -255,10 +280,12 @@ dspm_cvt_vf32_vu16q16(const float *src,
 
 /* For each element, puts the element or the constant, whichever is smaller. Can
 be used to clip values to some upper boundary */
+void
 dspm_min_vu16q16_u16q16(u16q16 *srcdst, u16q16 c, uint32_t N);
 
 /* For each element, puts the element or the constant, whichever is greater. Can
 be used to clip values to some lower boundary */
+void
 dspm_max_vu16q16_u16q16(u16q16 *srcdst, u16q16 c, uint32_t N);
 
 #endif /* DSP_MATH_H */

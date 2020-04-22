@@ -5,3 +5,4 @@ extensions/build/*
 gmon.out
 tags
 *.a
+*.d
