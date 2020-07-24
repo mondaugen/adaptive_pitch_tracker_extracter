@@ -15,9 +15,9 @@ This repository seeks to provide the following functionality:
 ## Python implementations
 
 The initial implementations have been done in Python for prototyping purposes.
-    
+
 - time-stretch:
-    - see `pvoc_synth` from `classic_puckette_timestretch.py` 
+    - see `pvoc_synth` from `classic_puckette_timestretch.py`
 - pitch-shift:
     - see `pitch_shifter` in `pitch_shift.py`
 - attack preservation
@@ -40,3 +40,32 @@ applications.
 - ADSR:
     see `src/adsr_envelopes.{c,h}` for implementation and
     `src/test/note_region_segmenter/test_adsr.c` for a test / example.
+
+## Compiling
+
+This repo uses `git submodules` so after you've cloned and checked out the
+branch you are working on, don't forget to do:
+
+```bash
+git submodule init
+git submodule update
+```
+
+There are `Makefiles` in various subfolders to build parts of the project. Some
+should be run from the root directory, but this is deprecated and included only
+for reference: i.e. to build the `src/test/bin/adsr_envelopes_test` executable
+you'd have to run
+
+```bash
+make -f src/test/Makefile src/test/bin/adsr_envelopes_test
+```
+
+The supported way now is to have the `Makefile` refer to files relative to the
+folder it is in, as to make recursive runs of `make` easier to maintain. E.g.,
+to build the `bin/simple_sine_ps` executable, you'd run
+
+```bash
+(cd src/pitch_shifter/test/ && make bin/simple_sine_ps)
+```
+
+(the parentheses are so you don't stay in the directory you changed to).
