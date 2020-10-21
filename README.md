@@ -32,6 +32,10 @@ NOTE: You can see how these all come together in
     see `gate_to_time_advance` in `envelopes.py` and
     `test/enveloping/gate_to_time_advance.py`
 
+## Python Examples
+
+See for instance `test/pitch_shifting/examples/stretch_monk.sh`.
+
 ## C implementations
 
 This is the next step, and the goal is to make these performant for use in

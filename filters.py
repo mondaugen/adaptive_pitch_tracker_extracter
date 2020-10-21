@@ -3,6 +3,9 @@ from scipy import signal, interpolate
 import common
 import subprocess
 
+def swap(a,b):
+    return b,a
+
 def a_to_r(a):
     """ Convert feedback filter coefficients to reflection coefficients. This assumes you
     include the coefficient for y[n], where it divides all the coefficients by
@@ -68,6 +71,65 @@ def b_a_to_r_c(b,a):
     A=r_to_A(r)
     c=b_A_to_c(b,A)
     return (r,c)
+
+# burg and burg2 give good estimate of coefficients, but I don't know how to
+# interpret the error signal because it does not match the original signal
+# filtered by the FIR given by the coefficients
+def burg(x,p):
+    """
+    The Burg algorithm
+    returns the p reflection coefficients and the pth forward prediction error
+    (the error signal), estimated from signal x using Burg's method.
+    """
+    N=len(x)
+    temp1=x
+    temp2=x
+    gamma=np.zeros(p,dtype=x.dtype)
+    for j in range(p):
+        eplus = temp1[1:]
+        eminus = temp2[:-1]
+        gamma[j] = (-2*np.sum(np.conj(eminus)*eplus)
+            / (np.sum(np.conj(eplus)*eplus)+np.sum(np.conj(eminus)*eminus)))
+        temp1 = eplus + gamma[j] * eminus
+        temp2 = eminus + np.conj(gamma[j])*eplus
+    return gamma, eplus, eminus
+
+def burg2(x,p):
+    N=len(x)
+    x=np.concatenate((np.zeros(p),x))
+    temp1=x
+    temp2=x
+    gamma=np.zeros(p,dtype=x.dtype)
+    for j in range(p):
+        eplus = temp1[1:]
+        eminus = temp2[:-1]
+        gamma[j] = (-2*np.sum(np.conj(eminus)*eplus)
+            / (np.sum(np.conj(eplus)*eplus)+np.sum(np.conj(eminus)*eminus)))
+        temp1 = eplus + gamma[j] * eminus
+        temp2 = eminus + np.conj(gamma[j])*eplus
+    return gamma, eplus, eminus
+
+# This gives an interpretable error signal but the coefficient estimates are very poor
+def burgN(x,p):
+    N=len(x)
+    ej_1p=np.zeros(N)
+    ejp  =np.zeros(N)
+    ej_1m=np.zeros(N)
+    ejm=np.zeros(N)
+    G=np.zeros(p)
+    E=np.zeros(p)
+    ej_1p[:]=x
+    ej_1m[1:]=x[:-1]
+    for j in range(p):
+        G[j] = 2*np.sum(ej_1p*np.conj(ej_1m)) / np.sum(np.abs(ej_1p)**2+np.abs(ej_1m)**2)
+        ejp[:] = ej_1p + G[j] * ej_1m
+        ejm[1:] = ej_1m[:-1] + np.conj(G[j]) * ej_1p[:-1]
+        ejmN = ej_1m[-1] + np.conj(G[j]) * ej_1p[-1]
+        ejp,ej_1p = swap(ejp,ej_1p)
+        ejm,ej_1m = swap(ejm,ej_1m)
+    return G,ej_1p,ej_1m,E
+
+
 
 def lattice_filter_proc(x,R,C):
     """
@@ -193,7 +255,7 @@ class filter_interp_table:
                 self.C[:,-1]=c_nulling
                 self.R[:,0]=r_unity
                 self.C[:,0]=c_unity
-                
+
         self.R_interp=interpolate.interp1d(
             self.design_f,
             self.R,

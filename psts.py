@@ -37,7 +37,7 @@ def pad_x_and_dither(x,H,amt=1e-6):
 # you need to filter out attack times that are closer than awin_len + 1
 def psts_const_amount(
     x, # input signal
-    # attack times, e.g., estimate with 
+    # attack times, e.g., estimate with
     # attack_time_pairs=attack_finder.attacks_from_spectral_diff(x,
     # lmax_filt_rate=LMAX_FILT_RATE)
     # attack_times=np.array([b for a,b in attack_time_pairs])
@@ -64,6 +64,7 @@ def psts_const_amount(
     look_up_times_path='/tmp/look_up_times.u32',
     # record the reset times in this file
     reset_times_path='/tmp/reset_times.u32',
+    always_ignore_attack=False,
     ):
 
     if awin_start is None:
@@ -87,11 +88,17 @@ def psts_const_amount(
     pos_sig=np.zeros(N)
 
     # make attack avoider
-    av=time_map_tstretch.attack_avoider(
-        attack_times,
-        awin_start,
-        awin_len,
-        H)
+    if always_ignore_attack:
+        class dummy_av:
+            def adjust(self,t):
+                return t,False
+        av=dummy_av()
+    else:
+        av=time_map_tstretch.attack_avoider(
+            attack_times,
+            awin_start,
+            awin_len,
+            H)
 
     # synthesize gate signal, just on the whole time
     gate_sig=np.ones(N)
@@ -180,6 +187,7 @@ def ps_lfo_rt(
     # convert lmax_filt_rate in samples to hops
     lmax_filt_rate_h=int(np.ceil(lmax_filt_rate/H))
 
+    # TODO: Cleanup
     # the size of the safe region in which an analysis window can sit without
     # covering any attacks
     #R=2*M+W+H

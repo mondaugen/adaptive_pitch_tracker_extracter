@@ -1,4 +1,4 @@
-.PHONY: run_pvoc_calc_n_blocks_test
+.PHONY: run_pvoc_calc_n_blocks_test run_gal_f32_test
 
 src/test/bin/kiss_fft_example : src/test/kissfft_example.c \
                                 src/lib/kissfft/kiss_fft.c \
@@ -50,6 +50,31 @@ src/test/bin/lattice_filter_proc : src/test/lattice_filter_proc.c \
                                        src/lib/lattice_filter_f32/routines_linux_native.c
 	$(CC) -g -Isrc -Isrc/test $^ -o $@
 
+src/test/bin/gal_f32.o : src/lib/gal_f32/routines_linux_native.c src/gal_f32.h
+	$(CC) -c -g -fpic -Isrc $< -o $@
+
+src/test/bin/gal_f32_test : src/test/gal/gal_f32_test.c \
+							src/test/bin/gal_f32.o \
+							src/gal_f32.h
+	$(CC) -g -fpic -Isrc src/test/gal/gal_f32_test.c \
+		src/test/bin/gal_f32.o \
+		-o $@
+
+src/test/bin/lib_gal_f32.so : src/test/bin/gal_f32.o
+	gcc -shared -o $@ $^
+
+run_gal_f32_test : src/test/gal/gal_f32.py \
+				   src/test/gal/gal_f32_test.py \
+				   src/test/bin/lib_gal_f32.so
+	LD_LIBRARY_PATH=src/test/bin/ \
+	PYTHONPATH=src/test/gal/ python3 src/test/gal/gal_f32_test.py
+
+run_gal_f32_est_R : src/test/gal/gal_f32.py \
+				   src/test/gal/gal_f32_est_R.py \
+				   src/test/bin/lib_gal_f32.so
+	LD_LIBRARY_PATH=src/test/bin/ \
+	PYTHONPATH=.:src/test/gal/ python3 src/test/gal/gal_f32_est_R.py
+
 src/test/bin/adsr_envelopes_test : src/test/adsr_envelopes_test.c \
     src/adsr_envelopes.c \
     src/adsr_envelopes_attack_table/adsr_envelopes_attack_table.o \
@@ -62,7 +87,7 @@ src/test/bin/adsr_envelopes_test : src/test/adsr_envelopes_test.c \
 
 src/adsr_envelopes_attack_table/adsr_envelopes_attack_table.o : \
     src/adsr_envelopes_attack_table/Makefile \
-    src/adsr_envelopes_attack_table/generate_attack_table.py 
+    src/adsr_envelopes_attack_table/generate_attack_table.py
 	cd src/adsr_envelopes_attack_table/ && $(MAKE)
 
 src/adsr_envelopes_decay_coeff_table/adsr_envelopes_decay_coeff_table.o : \

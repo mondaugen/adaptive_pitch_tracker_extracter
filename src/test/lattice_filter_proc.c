@@ -33,7 +33,7 @@ int main (void)
     if (P<=0) { ret = gen_err_msg("Bad P"); goto fail; }
 
     f_in = fopen(in_path,"r");
-    if (!f_in) { ret = gen_err_msg("Error opening intput file"); goto fail; }
+    if (!f_in) { ret = gen_err_msg("Error opening input file"); goto fail; }
 
     f_out = fopen(out_path,"w");
     if (!f_out) { ret = gen_err_msg("Error opening output file"); goto fail; }

@@ -6,3 +6,5 @@ gmon.out
 tags
 *.a
 *.d
+*.o
+*.so

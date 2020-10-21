@@ -73,7 +73,8 @@ for chan in range(N_CHANS):
             ADSR_ATTACK=common.get_env('ADSR_ATTACK',default=0.1,conv=float),
             ADSR_RELEASE=common.get_env('ADSR_RELEASE',default=0.1,conv=float),
             TS=common.get_env('TS',default=1,conv=float),
-            PS=common.get_env('PS',default=1,conv=float)))
+            PS=common.get_env('PS',default=1,conv=float),
+            always_ignore_attack=bool(ALWAYS_IGNORE_ATTACKS)))
     else:
         y_sigs.append(psts.psts_const_amount_rt(
             x[chan::N_CHANS],
