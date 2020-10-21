@@ -46,7 +46,6 @@ fail:
 void
 gal_f32_process(struct gal_f32 *g, struct gal_f32_proc *p)
 {
-    /* TODO p->opt |= gal_f32_opts_ESTIMATE_MU not yet implemented */
     unsigned int n, j;
     float ep_j_1_n, ep_j_n, *tmp;
     for (n = 0; n < p->N; n++) {
@@ -59,6 +58,14 @@ gal_f32_process(struct gal_f32 *g, struct gal_f32_proc *p)
                TODO: use pointer arithmetic to save address computation */
             g->R[j-1] = p->R[n*g->P + j - 1] = g->R[j-1] - p->mu[j-1] * (ep_j_n *
                 conj(g->em_n_1_j[j]) + conj(g->em_n_j[j]) * ep_j_1_n);
+            if (p->opt |= gal_f32_opts_ESTIMATE_MU) {
+                p->D[j-1] = p->lambda * p->D[j-1] + (1 - p->lambda) * (
+                    ep_j_n * ep_j_n + g->em_n_1_j[j] * g->em_n_1_j[j]
+                );
+                /* Avoid divide by 0 */
+                p->mu[j - 1] = p->beta / (p->D[j-1] + 1e-6);
+                //printf("%f ", p->D[j-1]);
+            }
             ep_j_1_n = ep_j_n;
         }
         /* Store final stage */

@@ -17,26 +17,29 @@ class gal_f32_proc(Structure):
     ("_mu",POINTER(c_float)),
     ("_beta",c_float),
     ("_l",c_float),
+    ("_D",POINTER(c_float)),
     #TODO: Can we properly represent an enum?
     ("_opt", c_uint),
     ("_N",c_uint)
     ]
-    def __init__(self,x,mu):
+    def __init__(self,x,mu,opt=0,beta=0,l=0):
         # initialize the pointers using numpy ctypes
         self.x=x.astype('float32')
         self.ep=np.zeros(len(x),dtype='float32')
         self.em=np.zeros(len(x),dtype='float32')
         self.R=np.zeros((len(x),len(mu)),dtype='float32')
         self.mu=mu.astype('float32')
+        self.D=np.ones(len(mu),dtype='float32')
         super().__init__(
             x_in=self.x.ctypes.data_as(POINTER(c_float)),
             _ep=self.ep.ctypes.data_as(POINTER(c_float)),
             _em=self.em.ctypes.data_as(POINTER(c_float)),
             _R=self.R.ctypes.data_as(POINTER(c_float)),
             _mu=self.mu.ctypes.data_as(POINTER(c_float)),
-            _beta=0,
-            _l=0,
-            _opt=0,
+            _beta=beta,
+            _l=l,
+            _D=self.D.ctypes.data_as(POINTER(c_float)),
+            _opt=opt,
             _N=len(x)
         )
 

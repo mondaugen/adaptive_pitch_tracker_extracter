@@ -14,7 +14,7 @@ y=signal.lfilter([1],a,x)
 
 mu=np.ones(P)*1e-5
 gal=gal_f32.gal_f32(P)
-galp=gal_f32.gal_f32_proc(y,mu)
+galp=gal_f32.gal_f32_proc(y,mu,opt=(1<<0),beta=1e-3,l=1e-1)
 gal.proc(galp)
 
 fig,ax=plt.subplots(1,1)
@@ -22,4 +22,5 @@ for p in range(P):
     ax.plot(n,galp.R[:,p],label="r_%d" %(p,))
 ax.legend()
 ax.set_ylim(-1,1)
+ax.set_xlim(0,N-1)
 plt.show()

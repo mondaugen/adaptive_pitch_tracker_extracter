@@ -30,6 +30,8 @@ struct gal_f32_proc {
     float *mu;
     float beta;
     float lambda;
+    /* Normalization coefficients, length P */
+    float *D;
     enum gal_f32_opts opt;
     unsigned int N;
 };
