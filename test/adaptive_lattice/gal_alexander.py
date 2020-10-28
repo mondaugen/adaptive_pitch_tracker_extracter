@@ -2,7 +2,7 @@ import numpy as np
 # Gradient adaptive lattice filter as described in Adaptive Signal Processing by
 # Alexander p. 106
 
-def ngal(x,P,alpha=0.01,beta=0.01,normalize=True):
+def ngal(x,P,alpha=0.01,beta=0.01,normalize=True,init_K=None):
     # Produces P refelection coefficients
     N=len(x)
     # allocate memory
@@ -16,6 +16,8 @@ def ngal(x,P,alpha=0.01,beta=0.01,normalize=True):
     D[0,:]=1
     # reflection coefficients
     K=np.zeros((N+1,P))
+    if init_K is not None:
+        K[0,:]=init_K
     Ef[1:N+1,0]=x
     Eb[1:N+1,0]=x
     for n in range(1,N+1):
