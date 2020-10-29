@@ -11,36 +11,32 @@ class gal_f32_init(Structure):
 class gal_f32_proc(Structure):
     _fields_ = [
     ("x_in",POINTER(c_float)),
-    ("_ep",POINTER(c_float)),
-    ("_em",POINTER(c_float)),
+    ("_Ef",POINTER(c_float)),
+    ("_Eb",POINTER(c_float)),
     ("_R",POINTER(c_float)),
-    ("_mu",POINTER(c_float)),
     ("_beta",c_float),
-    ("_l",c_float),
+    ("_alpha",c_float),
     ("_D",POINTER(c_float)),
-    #TODO: Can we properly represent an enum?
+    ("_N",c_uint),
     ("_opt", c_uint),
-    ("_N",c_uint)
     ]
-    def __init__(self,x,mu,opt=0,beta=0,l=0):
+    def __init__(self,x,P,opt=0,beta=0.001,alpha=0.001):
         # initialize the pointers using numpy ctypes
         self.x=x.astype('float32')
-        self.ep=np.zeros(len(x),dtype='float32')
-        self.em=np.zeros(len(x),dtype='float32')
-        self.R=np.zeros((len(x),len(mu)),dtype='float32')
-        self.mu=mu.astype('float32')
-        self.D=np.ones(len(mu),dtype='float32')
+        self.Ef=np.zeros(len(x),dtype='float32')
+        self.Eb=np.zeros(len(x),dtype='float32')
+        self.R=np.zeros((len(x),P),dtype='float32')
+        self.D=np.ones((len(x),P),dtype='float32')
         super().__init__(
             x_in=self.x.ctypes.data_as(POINTER(c_float)),
-            _ep=self.ep.ctypes.data_as(POINTER(c_float)),
-            _em=self.em.ctypes.data_as(POINTER(c_float)),
+            _Ef=self.Ef.ctypes.data_as(POINTER(c_float)),
+            _Eb=self.Eb.ctypes.data_as(POINTER(c_float)),
             _R=self.R.ctypes.data_as(POINTER(c_float)),
-            _mu=self.mu.ctypes.data_as(POINTER(c_float)),
             _beta=beta,
-            _l=l,
+            _alpha=alpha,
             _D=self.D.ctypes.data_as(POINTER(c_float)),
+            _N=len(x),
             _opt=opt,
-            _N=len(x)
         )
 
 

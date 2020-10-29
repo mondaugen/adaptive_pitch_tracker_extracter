@@ -155,6 +155,16 @@ def lattice_filter_proc(x,R,C):
     y=np.fromfile(out_file_name,dtype='float32')
     return y
 
+def iir_lattice_filter_proc(x,R):
+    # TODO This doesn't work, let's make one that does
+    P = len(R)
+    b = np.zeros
+    b[0] = 1
+    c = b_A_to_c(b)
+    C = np.zeros((P+1,len(x)))
+    C[:P,:]=c
+    return lattice_filter_proc(x,R,C)
+
 class filter_interp_table:
 
     def __init__(self,

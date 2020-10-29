@@ -4,7 +4,7 @@ from scipy import signal
 import filters
 import matplotlib.pyplot as plt
 
-N=2000
+N=200000
 n=np.arange(N)
 R=np.array([0.6,-0.6,0.6])
 P=len(R)
@@ -14,7 +14,7 @@ y=signal.lfilter([1],a,x)
 
 mu=np.ones(P)*1e-5
 gal=gal_f32.gal_f32(P)
-galp=gal_f32.gal_f32_proc(y,mu,opt=(1<<0),beta=1e-2,l=1e-1)
+galp=gal_f32.gal_f32_proc(y,P,opt=(1<<0),beta=1e-3,alpha=1e-3)
 gal.proc(galp)
 
 fig,ax=plt.subplots(1,1)

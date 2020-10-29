@@ -19,21 +19,22 @@ struct gal_f32_proc {
     const float *x_in;
     /* The forward error signal, i.e., the output of the adaptive FIR filter,
     length N */
-    float *ep;
+    float *Ef;
     /* The backward error signal, length N */
-    float *em;
-    /* The estimated reflection coefficients, length N*P */
+    float *Eb;
+    /* The estimated reflection coefficients, length N*P (N x P)*/
     float *R;
-    /* The gradient descent coefficients, length P. If opt has ESTIMATE_MU set,
-    then memory for these must still be provided but they will be estimated from
-    beta and lambda below. Otherwise beta and lambda are ignored */
-    float *mu;
+    /* The gradient step size */
     float beta;
-    float lambda;
-    /* Normalization coefficients, length P */
+    /* The normalization coefficient (D[n]) smoothing  parameter. This controls
+    a weighted average between D[n-1] and the instantaneous power S[n] of the
+    forward and backward error signals, calculated as
+    D[n] = (1 - alpha) * D[n-1] + alpha * S[n] */
+    float alpha;
+    /* The normalization coefficients, length N*P (N x P) */
     float *D;
-    enum gal_f32_opts opt;
     unsigned int N;
+    enum gal_f32_opts opt;
 };
 
 extern void
