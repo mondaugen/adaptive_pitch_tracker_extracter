@@ -67,7 +67,7 @@ def local_rms_rt(x):
     ret=np.sqrt(np.mean(x**2))
     return ret
 
-def local_max(x,one_sided_max='right'):
+def local_max(x,one_sided_max='right',K=1):
     """
     for vectors only
     one_sided_max controls what happens if a point is equal to one of its adjacent points
@@ -75,22 +75,27 @@ def local_max(x,one_sided_max='right'):
     if 'left', then a point >= to a point to its left is a candidate for a local maximum
     if 'none', then a point must be > than both points
     if 'both', then a point only needs to be >= than both points
+    K is a scalar that can allow testing if a maximum is K times greater than
+    the next value
     """
     if one_sided_max == 'right':
         gtr=x[:-1]>=x[1:]
-        gtl=x[1:]>x[:-1]
+        gtl=x[1:]>(K*x[:-1])
     elif one_sided_max == 'left':
-        gtr=x[:-1]>x[1:]
+        gtr=x[:-1]>(K*x[1:])
         gtl=x[1:]>=x[:-1]
     elif one_sided_max == 'none':
-        gtr=x[:-1]>x[1:]
-        gtl=x[1:]>x[:-1]
+        gtr=x[:-1]>(K*x[1:])
+        gtl=x[1:]>(K*x[:-1])
     elif one_sided_max == 'both':
         gtr=x[:-1]>=x[1:]
         gtl=x[1:]>=x[:-1]
     gtr=np.concatenate((gtr,np.zeros((1),dtype='bool')),axis=0)
     gtl=np.concatenate((np.zeros((1),dtype='bool'),gtl),axis=0)
     return np.where(gtr&gtl)[0]
+
+def local_min(x,one_sided_max='right',K=1):
+    return local_max(-x,one_sided_max=one_sided_max,K=K)
 
 _concat=np.concatenate
 one_sided_max_funs=dict(
@@ -104,7 +109,7 @@ class local_max_rt:
         self.max_fun=one_sided_max_funs[one_sided_max]
         self.x=np.zeros(3)
     def __call__(self,x):
-        # x cannot be array, just signal number
+        # x cannot be array, just single number
         self.x[-1]=x
         ret = (0,self.x[-2])
         if self.max_fun(self.x):
@@ -218,13 +223,30 @@ def up_down_match(up,down):
         ret.append((u,down[m]))
     return ret
 
-def local_max_mat(x):
-    """ for matrices, finds the local maxima within the columns """
-    gtr=np.concatenate((x[:-1,:]>=x[1:,:],
+def local_max_mat(x,compare_de=None,compare_d=None,indices=True):
+    """
+    for matrices, finds the local maxima within the columns
+    compare_d and compare_de can be passed to change the behaviour of the
+    maximum. The defaults work like local_max with one_sided_max='right'.
+    If indices is false, then the matrix of booleans is returned.  This is
+    so the results can be combined with other booleans (such as finding
+    local maximum of a 2d array)
+    """
+    def _compare_de(a,b):
+        return a >= b
+    if compare_de is None:
+        compare_de = _compare_de
+    def _compare_d(a,b):
+        return a > b
+    if compare_d is None:
+        compare_d = _compare_d
+    gtr=np.concatenate((compare_de(x[:-1,:],x[1:,:]),
         np.zeros((1,x.shape[1]),dtype='bool')),axis=0)
     gtl=np.concatenate((np.zeros((1,x.shape[1]),dtype='bool'),
-        x[1:,:]>x[:-1,:]),axis=0)
-    return np.where(gtr&gtl)
+        compare_d(x[1:,:],x[:-1,:])),axis=0)
+    if indices:
+        return np.where(gtr&gtl)
+    return gtr&gtl
 
 def filtered_local_max(x,H,W,a):
     """
@@ -265,4 +287,4 @@ class impulse_rate_limiter:
         if self.t > 0:
             self.t -= 1
         return ret
-            
+

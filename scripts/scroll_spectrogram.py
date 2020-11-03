@@ -49,11 +49,11 @@ def run(data):
     ax.plot(xdata,y[:N_FFT//2],label="%f" % (t,))
     ax.legend()
 
-#Writer = animation.writers['ffmpeg']
-#writer = Writer(fps=15)
+Writer = animation.writers['ffmpeg']
+writer = Writer(fps=15)
 
 ani = animation.FuncAnimation(fig, run, data_gen, blit=False, interval=200,
                               repeat=False, init_func=init)
 
-#ani.save('/tmp/spec.mp4',writer=writer)
-plt.show()
+ani.save('/tmp/spec.mp4',writer=writer)
+#plt.show()
