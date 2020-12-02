@@ -52,38 +52,38 @@ def dft_hill_climb(x,v_k,K=10,mu=0.01,newton=False):
             v_k = v_k + mu * dft_bin_pow_dv(x,v_k)
         v_ks[k] = v_k
         pows[k] = dft_bin_pow(x,v_k)
-    print(v_ks)
-    print(pows)
     return v_ks, pows
 
-N=256
-Fs=16e3
-f0=1000
-f_k=1025
-v0=f0/Fs
-v1=1100/Fs
-v_k=f_k/Fs
-# frequency oversampling factor
-fos=32
-n=np.arange(0,N,1/fos)
-v=n/N
-w=get_padded_window('hann',N,fos)
-x_=np.exp(j*2*np.pi*v0*n*fos)+np.random.standard_normal(N*fos)*3
-x_+=np.exp(j*2*np.pi*v1*n*fos)
-x=x_*w
-X=np.abs(np.fft.fft(x))**2
-X_k=dft_bin_pow(x,v_k)
-print('v_k',v_k)
-print('X_k',X_k)
-# Gradient ascent works not bad. This update would occur every sample, remember.
-# However, why does mu have to be so small? We need to scale a variable somewhere.
-v_ks,X_ks=dft_hill_climb(x,v_k,K=30,mu=1e-10)
-# TODO: newton doesn't work that well...
-#v_ks,X_ks=dft_hill_climb(x,v_k,K=30,mu=0.03,newton=True)
+if __name__ == '__main__':
+    N=256
+    Fs=16e3
+    f0=1000
+    f_k=1025
+    v0=f0/Fs
+    v1=1100/Fs
+    v_k=f_k/Fs
+    # frequency oversampling factor
+    fos=32
+    n=np.arange(0,N,1/fos)
+    v=n/N
+    w=get_padded_window('hann',N,fos)
+    w/=np.sum(w)
+    x_=np.exp(j*2*np.pi*v0*n*fos)+np.random.standard_normal(N*fos)*3
+    x_+=np.exp(j*2*np.pi*v1*n*fos)
+    x=x_*w
+    X=np.abs(np.fft.fft(x))**2
+    X_k=dft_bin_pow(x,v_k)
+    print('v_k',v_k)
+    print('X_k',X_k)
+    # Gradient ascent works not bad. This update would occur every sample, remember.
+    # However, why does mu have to be so small? We need to scale a variable somewhere.
+    v_ks,X_ks=dft_hill_climb(x,v_k,K=30,mu=1e-6)
+    # TODO: newton doesn't work that well...
+    #v_ks,X_ks=dft_hill_climb(x,v_k,K=30,mu=0.03,newton=True)
 
-plt.plot(v,X)
-plt.plot(v_k,X_k,'.',label='start')
-plt.plot(v_ks,X_ks)
-plt.plot(v_ks[-1],X_ks[-1],'.',label='end')
-plt.legend()
-plt.show()
+    plt.plot(v,X)
+    plt.plot(v_k,X_k,'.',label='start')
+    plt.plot(v_ks,X_ks)
+    plt.plot(v_ks[-1],X_ks[-1],'.',label='end')
+    plt.legend()
+    plt.show()
