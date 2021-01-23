@@ -265,3 +265,11 @@ def event_closeness_limiter(events,min_dist):
         nd_i+=1
     ret=[event0 + e for e in accumulate(newdiffs[:nd_i])]
     return ret
+
+def est_autocorr(x):
+    """ Estimate autocorrelation by inverse transforming the powerspectrum """
+    X=np.fft.fft(x)
+    S=X*np.conj(X)
+    r=np.fft.ifft(S)
+    return r
+

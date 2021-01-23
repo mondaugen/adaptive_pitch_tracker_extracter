@@ -23,11 +23,15 @@ class iir_avg_rt:
         y,self.v_1=signal.lfilter(self.b,self.a,x,zi=self.v_1)
         return y
 
-def spectral_diff(x,H,W,window_type):
+def spectral_diff(x,H,W,window_type,bin_weights=None):
     w=signal.get_window(window_type,W)
     x_framed=common.frame(x,H,W)*w[:,None]
     X_framed=np.fft.rfft(x_framed,axis=0)/np.sum(W)
     xd_abs=np.abs(X_framed)
+    if bin_weights is not None:
+        # bin_weights may have been supplied assuming a full spectrum, so it is
+        # truncated here to make the multiplication work
+        xd_abs*=bin_weights[:xd_abs.shape[0],None]
     sd=xd_abs[:,1:]-xd_abs[:,:-1]
     sd[sd<0]=0
     sd=np.sum(sd,axis=0)

@@ -23,6 +23,13 @@ def frame(x,hop_size,window_size):
                           writeable=False)
     return ret
 
+def frame_times(len_x,H,W):
+    """ Get the sample times of the beginning of each hop when framing """
+    # Right now a hack is used some day maybe we'll actually do a calculation
+    fake_x=np.ones(len_x)
+    fake_x_framed=frame(fake_x,H,W)
+    return np.arange(fake_x_framed.shape[1])*H
+
 def ola_shorten(x,H):
     """
     Make a signal of length H by taking consecutive sections of x of length H
