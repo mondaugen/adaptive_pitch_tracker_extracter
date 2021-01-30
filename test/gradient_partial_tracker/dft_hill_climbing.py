@@ -27,6 +27,13 @@ def dft_bin_pow_dv(x,v):
     dX=dft_bin_dv(x,v)
     return np.real(X*np.conj(dX)+np.conj(X)*dX)
 
+def dft_bin_log_pow_dv(x,v,thresh_to_zero=1e-4):
+    X=dft_bin(x,v)
+    dX=dft_bin_dv(x,v)
+    if np.abs(X) < thresh_to_zero:
+        return 0
+    return np.real(X*np.conj(dX)+np.conj(X)*dX)/np.real(X*np.conj(X))
+
 def dft_bin_pow_d2v(x,v):
     X=dft_bin(x,v)
     dX=dft_bin_dv(x,v)
@@ -43,6 +50,7 @@ def get_padded_window(name,N,os=1):
     return w
 
 def dft_hill_climb(x,v_k,K=10,mu=0.01,newton=False):
+    # works not great ?
     v_ks = np.zeros(K)
     pows = np.zeros(K)
     for k in range(K):
@@ -53,6 +61,40 @@ def dft_hill_climb(x,v_k,K=10,mu=0.01,newton=False):
         v_ks[k] = v_k
         pows[k] = dft_bin_pow(x,v_k)
     return v_ks, pows
+
+def adaptive_ghc_slow(x,v_k,w,mu=1e-6,max_step=1/16000):
+    # Slow version of adaptive peak tracking using gradient
+    # Max step is specified in normalized frequency (default 1 Hz at 16KHz Fs)
+    buf=np.zeros_like(w)
+    buf[1:]=x[:len(buf)-1]
+    v_ks = np.zeros_like(x[len(buf)-1:])
+    Xs = np.zeros_like(x[len(buf)-1:],dtype='complex128')
+    grad = np.zeros_like(x[len(buf)-1:])
+    for n, xn in enumerate(x[len(buf)-1:]):
+        buf[:-1] = buf[1:]
+        buf[-1] = xn
+        grad[n]=dft_bin_pow_dv(buf*w,v_k)
+        v_k = v_k + np.clip(mu * grad[n],-max_step,max_step)
+        v_ks[n] = v_k
+        Xs[n] = dft_bin(buf*w,v_k)
+    return v_ks, Xs, grad
+
+def adaptive_ghc_slow_log_pow(x,v_k,w,mu=1e-6,max_step=float('inf')):
+    # Slow version of adaptive peak tracking using gradient of log power-spectrum
+    # Max step is specified in normalized frequency (default 1 Hz at 16KHz Fs)
+    buf=np.zeros_like(w)
+    buf[1:]=x[:len(buf)-1]
+    v_ks = np.zeros_like(x[len(buf)-1:])
+    Xs = np.zeros_like(x[len(buf)-1:],dtype='complex128')
+    grad = np.zeros_like(x[len(buf)-1:])
+    for n, xn in enumerate(x[len(buf)-1:]):
+        buf[:-1] = buf[1:]
+        buf[-1] = xn
+        grad[n]=dft_bin_log_pow_dv(buf*w,v_k)
+        v_k = v_k + np.clip(mu * grad[n],-max_step,max_step)
+        v_ks[n] = v_k
+        Xs[n] = dft_bin(buf*w,v_k)
+    return v_ks, Xs, grad
 
 if __name__ == '__main__':
     N=256

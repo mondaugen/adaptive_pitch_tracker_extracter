@@ -7,6 +7,7 @@ import os
 from spectral_difference import local_max, local_max_mat, spectral_diff
 import common
 from peak_finder import find_peaks
+import dft_hill_climbing as dhc
 
 envget=os.environ.get
 
@@ -40,6 +41,29 @@ SD_BIN_WEIGHT=float(envget('SD_BIN_WEIGHT','inf'))
 PEAK_K=float(envget('PEAK_K','2'))
 # An absolute value a peak must exceed to be considered a peak
 PEAK_T=float(envget('PEAK_T','1e-5'))
+# Enable/disable (1/0) partial tracking
+PTRACK=int(envget('PTRACK','0'))
+# Partial tracking starting time in seconds (will be rounded to nearest sample)
+PTRACK_T0=float(envget('PTRACK_T0','0'))
+# Partial tracking duration
+PTRACK_DUR=float(envget('PTRACK_DUR','0.5'))
+# Partial tracking starting frequency (will be divided by Fs to get normalized frequency)
+PTRACK_F0=float(envget('PTRACK_F0','1000'))
+# Partial tracking gradient ascent step size
+PTRACK_MU=float(envget('PTRACK_MU','1e-8'))
+# Partial tracking maximum step size in Hz
+PTRACK_MAX_STEP=float(envget('PTRACK_MAX_STEP','1'))
+# Partial tracking window type
+PTRACK_WINTYPE=envget('PTRACK_WINTYPE','hann')
+# Partial tracking window length
+PTRACK_WINLEN=int(envget('PTRACK_WINLEN','4096'))
+# If true, tries to remove partial from original sound and plots spectrogram
+PTRACK_REMOVE=int(envget('PTRACK_REMOVE','0'))
+# Where to write the partial to
+PTRACK_OUT=envget('PTRACK_OUT','/tmp/ptrack_out.f64')
+# Where to write the audio with the removed partial to
+PTRACK_REMOVED_OUT=envget('PTRACK_REMOVED_OUT','/tmp/ptrack_removed_out.f64')
+
 
 x=np.fromfile(INFILE,SAMPTYPE)
 
@@ -47,18 +71,26 @@ N=len(x)
 n=np.arange(N)
 t=n/FS
 
-fig,ax=plt.subplots(4,1)
-sd_ax,sg_ax,slider_ax,psd_ax=ax
+fig,ax=plt.subplots(6,1)
+sd_ax,sg_ax,slider_ax,psd_ax,ptrack_grad_ax,ptrack_extracted=ax
 
-S,f,t_spec,_=sg_ax.specgram(x,window=signal.get_window('blackmanharris',NFFT), NFFT=NFFT,noverlap=NFFT-HFFT,Fs=FS,scale=SSCALE,mode='magnitude')
+ylim=(FMIN,FMAX)
+def do_specgram(ax_,x_):
+    ret = ax_.specgram(x_,
+                window=signal.get_window('blackmanharris',NFFT),
+                NFFT=NFFT,noverlap=NFFT-HFFT,Fs=FS,
+                scale=SSCALE,mode='magnitude')
+    ax_.set_ylim(ylim)
+    ax_.set_yscale(YSCALE)
+    return ret
+
+S,f,t_spec,_=do_specgram(sg_ax,x)
+
 if LMAX:
     lmax_r,lmax_c=local_max_2d(S,thresh=1e-6)
     sg_ax.scatter(t_spec[lmax_c],f[lmax_r],c='red',s=1)
 
 
-ylim=(FMIN,FMAX)
-sg_ax.set_ylim(ylim)
-sg_ax.set_yscale(YSCALE)
 
 if PLOT_SD:
     bin_weights=None
@@ -75,19 +107,45 @@ if PLOT_SD:
 else:
     sd_ax.plot(t,x)
 
+if PTRACK:
+    # Partial tracking
+    # Track partial using supplied start and end times and starting frequency
+    ptrack_n0=int(round(PTRACK_T0*FS))
+    ptrack_n1=ptrack_n0+int(round(PTRACK_DUR*FS))
+    ptrack_v0=PTRACK_F0/FS
+    ptrack_w=signal.get_window(PTRACK_WINTYPE,PTRACK_WINLEN)
+    # Normalize window
+    ptrack_w/=np.sum(ptrack_w)
+    # TODO: How to incorporate this time offset with the phase estimate in Xs?
+    ptrack_t=(np.arange(ptrack_n0,ptrack_n1)+PTRACK_WINLEN*0.5)/FS
+    # also add window's length of samples so we have an analysis for every t in
+    # the specified range
+    v_ks,Xs,grad=dhc.adaptive_ghc_slow_log_pow(x[ptrack_n0:ptrack_n1+PTRACK_WINLEN-1],ptrack_v0,
+                                       ptrack_w,mu=PTRACK_MU,
+                                       max_step=PTRACK_MAX_STEP/FS)
+    sg_ax.plot([PTRACK_T0],[PTRACK_F0],'r.')
+    sg_ax.plot(ptrack_t,v_ks*FS,lw=1)
+    ptrack_grad_ax.plot(ptrack_t,np.log(np.abs(grad)))
+    ptrack_extracted.plot(ptrack_t,np.real(Xs))
+    Xs_out=np.real(Xs).copy()
+    common.normalize(Xs_out).tofile(PTRACK_OUT)
+    if PTRACK_REMOVE:
+        fig_ptrack,ax_ptrack=plt.subplots(1,1)
+        x_no_partial=np.zeros_like(x)
+        x_no_partial[:] = x
+        x_no_partial[ptrack_n0:ptrack_n1] -= 2*np.real(Xs)
+        do_specgram(ax_ptrack,x_no_partial)
+        ax_ptrack.set_ylim([PTRACK_F0-100,PTRACK_F0+100])
+        ax_ptrack.set_xlim([PTRACK_T0,PTRACK_T0+PTRACK_DUR])
+        common.normalize(np.real(x_no_partial)).tofile(PTRACK_REMOVED_OUT)
+
+
 # Vertical line showing current frame shown in power-spectrum window
 t_HFFT=HFFT/FS
 tmp=sg_ax.get_ylim()
 ylims=[tmp[0],tmp[0],tmp[1],tmp[1]]
 # Store the line so we can move it with the slider
 frame_line=sg_ax.axvline(0)
-
-# Figure 2 shows the power spectral density of the selected frame
-psd_ax.plot(f,dB(S[:,0]))
-psd_ax.set_ylim([-100,dB(S.max())])
-# If specgram has log-scaled y axis, then PSD has log-scaled x-axis
-psd_ax.set_xlim(ylim)
-psd_ax.set_xscale(YSCALE)
 
 # Slider to choose a frame
 sframe=Slider(slider_ax,'Frame (s)',0,t_spec.max(),valinit=0,valstep=t_HFFT)
@@ -104,6 +162,7 @@ def update_frame_line(val):
     # If specgram has log-scaled y axis, then PSD has log-scaled x-axis
     psd_ax.set_xlim(ylim)
     psd_ax.set_xscale(YSCALE)
+update_frame_line(0)
 sframe.on_changed(update_frame_line)
 
 xlim=(TMIN,TMAX)
