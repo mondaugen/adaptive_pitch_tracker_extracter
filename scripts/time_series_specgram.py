@@ -71,8 +71,8 @@ N=len(x)
 n=np.arange(N)
 t=n/FS
 
-fig,ax=plt.subplots(6,1)
-sd_ax,sg_ax,slider_ax,psd_ax,ptrack_grad_ax,ptrack_extracted=ax
+fig,ax=plt.subplots(7,1)
+sd_ax,sg_ax,slider_ax,psd_ax,ptrack_grad_ax,ptrack_extracted_ax,ptrack_mag_ax=ax
 
 ylim=(FMIN,FMAX)
 def do_specgram(ax_,x_):
@@ -126,7 +126,11 @@ if PTRACK:
     sg_ax.plot([PTRACK_T0],[PTRACK_F0],'r.')
     sg_ax.plot(ptrack_t,v_ks*FS,lw=1)
     ptrack_grad_ax.plot(ptrack_t,np.log(np.abs(grad)))
-    ptrack_extracted.plot(ptrack_t,np.real(Xs))
+    ptrack_grad_ax.set_title('log gradient')
+    ptrack_extracted_ax.plot(ptrack_t,np.real(Xs))
+    ptrack_extracted_ax.set_title('extracted partial')
+    ptrack_mag_ax.plot(ptrack_t,np.abs(Xs))
+    ptrack_mag_ax.set_title('extracted partial amplitude')
     Xs_out=np.real(Xs).copy()
     common.normalize(Xs_out).tofile(PTRACK_OUT)
     if PTRACK_REMOVE:
