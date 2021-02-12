@@ -137,7 +137,7 @@ if PTRACK:
     # also add window's length of samples so we have an analysis for every t in
     # the specified range
     # TODO use vector of v0 to track multiple simultaneously
-    v_ks,Xs,grad=dhc.adaptive_ghc_slow_log_pow_v(x[ptrack_n0:ptrack_n1+PTRACK_WINLEN-1],ptrack_v0,
+    v_ks,Xs,grad=dhc.adaptive_ghc_slow_log_pow_v(x[ptrack_n0:ptrack_n1+PTRACK_WINLEN-1].astype('complex128'),ptrack_v0,
                                        ptrack_w,mu=PTRACK_MU,
                                        max_step=PTRACK_MAX_STEP/FS)
     sg_ax.plot(np.ones_like(ptrack_v0)*PTRACK_T0,
