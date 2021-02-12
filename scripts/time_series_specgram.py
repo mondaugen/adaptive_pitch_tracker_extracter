@@ -48,7 +48,9 @@ PTRACK_T0=float(envget('PTRACK_T0','0'))
 # Partial tracking duration
 PTRACK_DUR=float(envget('PTRACK_DUR','0.5'))
 # Partial tracking starting frequency (will be divided by Fs to get normalized frequency)
-PTRACK_F0=float(envget('PTRACK_F0','1000'))
+# Can also be the string 'auto' in which case the frequencies will be chosen
+# using peak picking at time T0
+PTRACK_F0=envget('PTRACK_F0','1000')
 # Partial tracking gradient ascent step size
 PTRACK_MU=float(envget('PTRACK_MU','1e-8'))
 # Partial tracking maximum step size in Hz
@@ -63,6 +65,10 @@ PTRACK_REMOVE=int(envget('PTRACK_REMOVE','0'))
 PTRACK_OUT=envget('PTRACK_OUT','/tmp/ptrack_out.f64')
 # Where to write the audio with the removed partial to
 PTRACK_REMOVED_OUT=envget('PTRACK_REMOVED_OUT','/tmp/ptrack_removed_out.f64')
+# Where to write the partial frequency to
+PTRACK_F0_OUT=envget('PTRACK_F0_OUT','/tmp/ptrack_f0_out.f64')
+# Where to write the partial amplitude to
+PTRACK_A_OUT=envget('PTRACK_A_OUT','/tmp/ptrack_a_out.f64')
 
 
 x=np.fromfile(INFILE,SAMPTYPE)
@@ -112,18 +118,30 @@ if PTRACK:
     # Track partial using supplied start and end times and starting frequency
     ptrack_n0=int(round(PTRACK_T0*FS))
     ptrack_n1=ptrack_n0+int(round(PTRACK_DUR*FS))
-    ptrack_v0=PTRACK_F0/FS
+    if PTRACK_F0 == 'auto':
+        # find frequencies by peak picking
+        x_local=x[ptrack_n0:ptrack_n0+NFFT]
+        dum_fig,dum_ax=plt.subplots()
+        S_local,f_local,_,_=do_specgram(dum_ax,x_local)
+        peaks,_,_,_,_,_=find_peaks(S_local[:,0],K=PEAK_K,T=PEAK_T)
+        print("tracking %d peaks" % (len(peaks,)))
+        ptrack_v0=f_local[peaks]/FS
+    else:
+        ptrack_v0=PTRACK_F0/FS
     ptrack_w=signal.get_window(PTRACK_WINTYPE,PTRACK_WINLEN)
     # Normalize window
     ptrack_w/=np.sum(ptrack_w)
     # TODO: How to incorporate this time offset with the phase estimate in Xs?
+    # Seems to not be necessary
     ptrack_t=(np.arange(ptrack_n0,ptrack_n1)+PTRACK_WINLEN*0.5)/FS
     # also add window's length of samples so we have an analysis for every t in
     # the specified range
-    v_ks,Xs,grad=dhc.adaptive_ghc_slow_log_pow(x[ptrack_n0:ptrack_n1+PTRACK_WINLEN-1],ptrack_v0,
+    # TODO use vector of v0 to track multiple simultaneously
+    v_ks,Xs,grad=dhc.adaptive_ghc_slow_log_pow_v(x[ptrack_n0:ptrack_n1+PTRACK_WINLEN-1],ptrack_v0,
                                        ptrack_w,mu=PTRACK_MU,
                                        max_step=PTRACK_MAX_STEP/FS)
-    sg_ax.plot([PTRACK_T0],[PTRACK_F0],'r.')
+    sg_ax.plot(np.ones_like(ptrack_v0)*PTRACK_T0,
+               ptrack_v0*FS,'r.')
     sg_ax.plot(ptrack_t,v_ks*FS,lw=1)
     ptrack_grad_ax.plot(ptrack_t,np.log(np.abs(grad)))
     ptrack_grad_ax.set_title('log gradient')
@@ -131,15 +149,22 @@ if PTRACK:
     ptrack_extracted_ax.set_title('extracted partial')
     ptrack_mag_ax.plot(ptrack_t,np.abs(Xs))
     ptrack_mag_ax.set_title('extracted partial amplitude')
-    Xs_out=np.real(Xs).copy()
+    if Xs.shape[1] == 1:
+        # Right now you can't save multiple partial tracks
+        # TODO make work for multiple tracks
+        np.abs(Xs).tofile(PTRACK_A_OUT)
+        v_ks.tofile(PTRACK_F0_OUT)
+    Xs_out=np.sum(np.real(Xs).copy(),axis=1)
     common.normalize(Xs_out).tofile(PTRACK_OUT)
     if PTRACK_REMOVE:
         fig_ptrack,ax_ptrack=plt.subplots(1,1)
         x_no_partial=np.zeros_like(x)
         x_no_partial[:] = x
-        x_no_partial[ptrack_n0:ptrack_n1] -= 2*np.real(Xs)
+        x_no_partial[ptrack_n0:ptrack_n1] -= 2*np.sum(np.real(Xs),axis=1)
         do_specgram(ax_ptrack,x_no_partial)
-        ax_ptrack.set_ylim([PTRACK_F0-100,PTRACK_F0+100])
+        min_f0=ptrack_v0.min()
+        max_f0=ptrack_v0.max()
+        ax_ptrack.set_ylim([min_f0-100,max_f0+100])
         ax_ptrack.set_xlim([PTRACK_T0,PTRACK_T0+PTRACK_DUR])
         common.normalize(np.real(x_no_partial)).tofile(PTRACK_REMOVED_OUT)
 
