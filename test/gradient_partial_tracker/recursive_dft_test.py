@@ -41,13 +41,13 @@ class rec_dft_sumcos:
                 p=ap_k+1
                 p_v=(p/self.N+coef*v)
                 Ap[ap_k] = (np.exp(coef*j*2*np.pi*p_v)*ap
-                    + 0.5*wp*(np.exp(-coef*j*2*np.pi*p_v*(self.N-1))*x 
+                    + wp*(np.exp(-coef*j*2*np.pi*p_v*(self.N-1))*x 
                         - np.exp(coef*j*2*np.pi*p_v)*self.buf[-self.N]))
         # shift in the current x and shift out self.buf[-N]
         self.buf[1:]=self.buf[:-1]
         self.buf[-1]=x
         # compute current DFT value
-        Xv=self.A0+np.sum(self.Ap_plus+self.Ap_minus,axis=0)
+        Xv=self.A0+0.5*np.sum(self.Ap_plus+self.Ap_minus,axis=0)
         return Xv
 
 if __name__ == '__main__':
@@ -69,8 +69,8 @@ if __name__ == '__main__':
     Xv=np.concatenate([rec_def.update(x_,v)[:,None] for x_ in x],axis=1)
     print('Xv_slow.shape',Xv_slow.shape)
     print('Xv.shape',Xv.shape)
-    Xvs=Xv_slow[:,:10].T
-    Xvf=Xv[:,:10].T
+    Xvs=Xv_slow[:,500:510].T
+    Xvf=Xv[:,500:510].T
     print('Xv_slow:',Xvs)
     print('Xv:',Xvf)
     print('Xv_slow/Xv:',np.abs(Xvs/Xvf))
