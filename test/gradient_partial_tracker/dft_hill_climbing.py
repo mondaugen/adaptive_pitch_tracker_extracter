@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt
+from exp_approx_line import exp_approx_line_coeffs
 
 j=complex('j')
 
@@ -16,6 +17,31 @@ def dft_bin_dv(x,v):
     N=len(x)
     x_=x*-j*2*np.pi*np.arange(N)
     return dft_bin(x_,v)
+
+class dft_bin_dv_approx:
+    """
+    Approximate the derivative using the product of the signal and an
+    exponential that approximates the ramp. This is to see how well the
+    derivative could work in a recursive implementation.
+    """
+    def __init__(self,N,err_max):
+        """
+        N is 1 more than the maximum value of the ramp.
+        err_max is roughly the maximum error tolerated.
+        """
+        self.N=N
+        alpha, beta, gamma, s0, s1 = exp_approx_line_coeffs(N,N,err_max)
+        self.alpha=alpha
+        self.beta=beta
+        self.gamma=gamma
+        self.s0=s0
+        self.s1=s1
+        self.approx_ramp=-j*2*np.pi*(np.exp(self.alpha*np.arange(self.N)+self.beta)
+                            +self.gamma)
+    def __call__(self,x,v):
+        """ x must have length N """
+        x_=x*self.approx_ramp
+        return dft_bin(x_,v)
     
 def dft_bin_d2v(x,v):
     N=len(x)
@@ -31,7 +57,7 @@ def dft_bin_pow_dv(x,v):
     dX=dft_bin_dv(x,v)
     return np.real(X*np.conj(dX)+np.conj(X)*dX)
 
-def dft_bin_log_pow_dv(x,v,thresh_to_zero=1e-4):
+def dft_bin_log_pow_dv(x,v,thresh_to_zero=1e-4,exp_dv=False):
     # thresh_to_zero forces the derivative to be zero if the magnitude of the
     # DFT at bin centred on v is too small. This is to avoid wild gradients
     # due to low-powered noise which should actually be considered silence.
@@ -44,6 +70,26 @@ def dft_bin_log_pow_dv(x,v,thresh_to_zero=1e-4):
         if np.abs(X) < thresh_to_zero:
             return 0
     return ret
+
+class dft_bin_log_pow_exp_dv:
+    # thresh_to_zero forces the derivative to be zero if the magnitude of the
+    # DFT at bin centred on v is too small. This is to avoid wild gradients
+    # due to low-powered noise which should actually be considered silence.
+    # Like dft_bin_log_pow_dv but the ramp multiplying the signal to estimate the
+    # power spectrum derivative is generated with an exponential and so is
+    # approximate (but faster to compute for recursive implementations)
+    def __init__(self,N,err_max):
+        self.dft_bin_dv = dft_bin_dv_approx(N,err_max)
+    def __call__(self,x,v,thresh_to_zero=1e-4):
+        X=dft_bin(x,v)
+        dX=self.dft_bin_dv(x,v)
+        ret = np.real(X*np.conj(dX)+np.conj(X)*dX)/np.real(X*np.conj(X))
+        if len(np.shape(X)) > 0:
+            ret[np.abs(X) < thresh_to_zero] = 0
+        else:
+            if np.abs(X) < thresh_to_zero:
+                return 0
+        return ret
 
 def dft_bin_pow_d2v(x,v):
     X=dft_bin(x,v)
@@ -111,8 +157,11 @@ def adaptive_ghc_slow_log_pow(x,v_k,w,mu=1e-6,max_step=float('inf')):
         Xs[n] = dft_bin(buf*w,v_k)
     return v_ks, Xs, grad
 
-def adaptive_ghc_slow_log_pow_v(x,v_k,w,mu=1e-6,max_step=float('inf')):
+def adaptive_ghc_slow_log_pow_v(x,v_k,w,mu=1e-6,max_step=float('inf'),
+                                exp_dv=False,err_max=1e-4,verbose=False):
     # The same as adaptive_ghc_slow_log_pow but v_k can be a vector
+    # if exp_dv is true, use ramp approximated by exponential to estimate derivative
+    # err_max is a parameter for computing this ramp approximation
     buf=np.zeros_like(w)
     buf[1:]=x[:len(buf)-1]
     N_v=len(v_k)
@@ -120,10 +169,17 @@ def adaptive_ghc_slow_log_pow_v(x,v_k,w,mu=1e-6,max_step=float('inf')):
     v_ks = np.zeros((N_ret,N_v))
     Xs = np.zeros((N_ret,N_v),dtype='complex128')
     grad = np.zeros((N_ret,N_v))
+    grad_compute=dft_bin_log_pow_dv
+    if verbose:
+        print("exp_dv:",exp_dv)
+    if exp_dv:
+        if verbose:
+            print("Using ramp-approximating exponential, err_max=%e."%(err_max,))
+        grad_compute=dft_bin_log_pow_exp_dv(len(buf),err_max)
     for n, xn in enumerate(x[len(buf)-1:]):
         buf[:-1] = buf[1:]
         buf[-1] = xn
-        cur_grad=dft_bin_log_pow_dv(buf*w,v_k)
+        cur_grad=grad_compute(buf*w,v_k)
         grad[n]=cur_grad
         v_k = v_k + np.clip(mu * grad[n],-max_step,max_step)
         v_ks[n] = v_k
