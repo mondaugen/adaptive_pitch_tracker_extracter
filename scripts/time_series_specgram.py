@@ -19,6 +19,14 @@ def local_max_2d(x,thresh=1e-5):
 def dB(x):
     return 20*np.log10(x)
 
+def get_window_coefficients(name):
+    if name == 'hann':
+        return np.array([0.5,-0.5])
+    if name == 'blackmanharris':
+        return np.array([0.35875,0.48829,0.14128,0.01168])
+    else:
+        raise ValueError("Unsupported window %s" % (name,))
+
 INFILE=envget('INFILE','/tmp/in.f32')
 FS=float(envget('FS','16000'))
 NFFT=int(envget('NFFT','2048'))
@@ -69,11 +77,10 @@ PTRACK_REMOVED_OUT=envget('PTRACK_REMOVED_OUT','/tmp/ptrack_removed_out.f64')
 PTRACK_F0_OUT=envget('PTRACK_F0_OUT','/tmp/ptrack_f0_out.f64')
 # Where to write the partial amplitude to
 PTRACK_A_OUT=envget('PTRACK_A_OUT','/tmp/ptrack_a_out.f64')
-# If truthy, derivative is computed using ramp approximated by exponential
-PTRACK_EXP_DV=int(envget('PTRACK_EXP_DV','0'))
 # If PTRACK_EXP_DV is truthy, this specifies the maximum error of the
 # ramp-approximating exponential
 PTRACK_EXP_DV_ERR_MAX=float(envget('PTRACK_EXP_DV_ERR_MAX','1e-4'))
+PTRACK_A_LOG=int(envget('PTRACK_A_LOG','0'))
 
 x=np.fromfile(INFILE,SAMPTYPE)
 
@@ -132,21 +139,22 @@ if PTRACK:
         ptrack_v0=f_local[peaks]/FS
     else:
         ptrack_v0=np.array([float(PTRACK_F0)/FS])
-    ptrack_w=signal.get_window(PTRACK_WINTYPE,PTRACK_WINLEN)
+    ptrack_wp=get_window_coefficients(PTRACK_WINTYPE)
     # Normalize window
-    ptrack_w/=np.sum(ptrack_w)
+    ptrack_wp/=(ptrack_wp[0]*PTRACK_WINLEN)
     # TODO: How to incorporate this time offset with the phase estimate in Xs?
     # Seems to not be necessary
     ptrack_t=(np.arange(ptrack_n0,ptrack_n1)+PTRACK_WINLEN*0.5)/FS
     # also add window's length of samples so we have an analysis for every t in
     # the specified range
     # TODO use vector of v0 to track multiple simultaneously
-    v_ks,Xs,grad=dhc.adaptive_ghc_slow_log_pow_v(x[ptrack_n0:ptrack_n1+PTRACK_WINLEN-1],ptrack_v0,
-                                       ptrack_w,mu=PTRACK_MU,
+    v_ks,Xs,grad=dhc.adaptive_ghc_recsumcos_log_pow_v(x[ptrack_n0:ptrack_n1+PTRACK_WINLEN-1],
+                                       ptrack_v0,
+                                       ptrack_wp,
+                                       PTRACK_WINLEN,
+                                       mu=PTRACK_MU,
                                        max_step=PTRACK_MAX_STEP/FS,
-                                       exp_dv=bool(PTRACK_EXP_DV),
-                                       err_max=PTRACK_EXP_DV_ERR_MAX,
-                                       verbose=True)
+                                       ramp_err_max=PTRACK_EXP_DV_ERR_MAX)
     sg_ax.plot(np.ones_like(ptrack_v0)*PTRACK_T0,
                ptrack_v0*FS,'r.')
     sg_ax.plot(ptrack_t,v_ks*FS,lw=1)
@@ -154,7 +162,10 @@ if PTRACK:
     ptrack_grad_ax.set_title('log gradient')
     ptrack_extracted_ax.plot(ptrack_t,np.real(Xs))
     ptrack_extracted_ax.set_title('extracted partial')
-    ptrack_mag_ax.plot(ptrack_t,np.abs(Xs))
+    if PTRACK_A_LOG:
+        ptrack_mag_ax.plot(ptrack_t,20*np.log10(np.abs(Xs)))
+    else:
+        ptrack_mag_ax.plot(ptrack_t,np.abs(Xs))
     ptrack_mag_ax.set_title('extracted partial amplitude')
     if Xs.shape[1] == 1:
         # Right now you can't save multiple partial tracks

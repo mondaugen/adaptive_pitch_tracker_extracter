@@ -2,6 +2,7 @@ import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt
 from exp_approx_line import exp_approx_line_coeffs
+from recursive_dft import rec_dv_dft_sumcos
 
 j=complex('j')
 
@@ -90,6 +91,13 @@ class dft_bin_log_pow_exp_dv:
             if np.abs(X) < thresh_to_zero:
                 return 0
         return ret
+
+def xs_dvxs_log_pow_dv(X,dX,thresh_to_zero=1e-4):
+    """ Given the fourier transform and its derivative w.r.t. frequency, return the derivative of the log-power spectrum w.r.t frequency.
+    """
+    ret = np.real(X*np.conj(dX)+np.conj(X)*dX)/np.real(X*np.conj(X))
+    ret[np.abs(X) < thresh_to_zero] = 0
+    return ret
 
 def dft_bin_pow_d2v(x,v):
     X=dft_bin(x,v)
@@ -184,6 +192,44 @@ def adaptive_ghc_slow_log_pow_v(x,v_k,w,mu=1e-6,max_step=float('inf'),
         v_k = v_k + np.clip(mu * grad[n],-max_step,max_step)
         v_ks[n] = v_k
         Xs[n] = dft_bin(buf*w,v_k)
+    return v_ks, Xs, grad
+
+def adaptive_ghc_recsumcos_log_pow_v(x,v_k,wp,Nw,mu=1e-6,max_step=float('inf'),
+                                     ramp_err_max=1e-4,grad_step_warmup=True):
+    """
+    Tracks partials using a recursively updated adaptive gradient algorithm.
+    x is the signal whose partials it tracks.
+    v_k is a vector containing the initial (normalized) frequency estimates (0.5
+    is the half the sample rate).
+    wp is a vector containing the sum-of-cosines coefficients. For example, for
+    the Hann window, you would provide [0.5,-0.5].
+    Nw is the length of the sum-of-cosines window.
+    mu is the gradient scalar for the gradient ascent algorithm.
+    max_step is the maximum absolute step size.
+    ramp_err_max is qualitatively the maximum error tolerated for the
+    ramp-approximating exponential. In practice it actually depends on Nw.
+    grad_step_warmup, if true, means that the v_k will not be updated using the
+    gradient step until Nw samples have been processed. This is to prevent using
+    gradients that occur due to the transition from silence to signal for early
+    steps. In this case, the length of Xv and dvXv will be len(x) - Nw + 1.
+    """
+    N_v=len(v_k)
+    xv_dvxv_computer=rec_dv_dft_sumcos(Nw,wp,N_v,max_err=ramp_err_max)
+    N_ret=len(x)
+    if grad_step_warmup:
+        for n, xn in enumerate(x[:Nw-1]):
+            _,_=xv_dvxv_computer.update(xn,v_k)
+            N_ret -= 1
+    v_ks = np.zeros((N_ret,N_v))
+    Xs = np.zeros((N_ret,N_v),dtype='complex128')
+    grad = np.zeros((N_ret,N_v))
+    for n, xn in enumerate(x[-N_ret:]):
+        Xv,dvXv=xv_dvxv_computer.update(xn,v_k)
+        cur_grad=xs_dvxs_log_pow_dv(Xv,dvXv)
+        grad[n]=cur_grad
+        v_k = v_k + np.clip(mu * grad[n],-max_step,max_step)
+        v_ks[n] = v_k
+        Xs[n] = Xv
     return v_ks, Xs, grad
 
 if __name__ == '__main__':
