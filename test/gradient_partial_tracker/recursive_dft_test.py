@@ -23,7 +23,7 @@ class rec_dft_sumcos:
         self.A0=np.zeros(self.N_v,dtype='complex128')
         self.Ap_plus=np.zeros((self.P-1,self.N_v),dtype='complex128')
         self.Ap_minus=np.zeros((self.P-1,self.N_v),dtype='complex128')
-    def update(self,x,v):
+    def compute_dft(self,x,v):
         """
         Compute the next DFT centred on bin v. Generally v should be the same or
         close for every call for the result to be correct or close to correct.
@@ -43,11 +43,18 @@ class rec_dft_sumcos:
                 Ap[ap_k] = (np.exp(coef*j*2*np.pi*p_v)*ap
                     + wp*(np.exp(-coef*j*2*np.pi*p_v*(self.N-1))*x 
                         - np.exp(coef*j*2*np.pi*p_v)*self.buf[-self.N]))
-        # shift in the current x and shift out self.buf[-N]
-        self.buf[1:]=self.buf[:-1]
-        self.buf[-1]=x
         # compute current DFT value
         Xv=self.A0+0.5*np.sum(self.Ap_plus+self.Ap_minus,axis=0)
+        return Xv
+    def shift_in(self,x):
+        # shift in the current x and shift out self.buf[-N]
+        # in faster implementation this would be done using a delay line or ring
+        # buffer
+        self.buf[1:]=self.buf[:-1]
+        self.buf[-1]=x
+    def update(self,x,v):
+        Xv=self.compute_dft(x,v)
+        self.shift_in(x)
         return Xv
 
 if __name__ == '__main__':

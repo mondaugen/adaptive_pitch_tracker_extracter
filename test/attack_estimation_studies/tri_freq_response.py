@@ -2,16 +2,10 @@ import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt
 import common
+from attack_finder import est_autocorr
 
 # This should give a Fourier transform with a frequency spectrum that is
 # entirely real, starts at 1 and goes to 0 at 0.5 the sample rate
-
-def est_autocorr(x):
-    """ Estimate autocorrelation by inverse transforming the powerspectrum """
-    X=np.fft.fft(x)
-    S=X*np.conj(X)
-    r=np.fft.ifft(X)
-    return r
 
 N=common.get_env('N',default=512,conv=int)
 n=np.arange(N)
