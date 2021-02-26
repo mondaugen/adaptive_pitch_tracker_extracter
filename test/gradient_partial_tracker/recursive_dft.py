@@ -41,17 +41,17 @@ class rec_dft_sumcos:
         # everywhere 1 for p=0, so the there is one update equation for P=0 and
         # 2*(self.P-1) for the remaining self.P-1 coefficients
         self.A0=(np.exp(j*2*np.pi*v)*self.A0 
-                + self.wp[0]*(np.exp(-j*2*np.pi*v*(self.N-1))*x 
+                + (np.exp(-j*2*np.pi*v*(self.N-1))*x 
                     - np.exp(j*2*np.pi*v)*self.buf[-self.N]))
         for Ap, coef in zip([self.Ap_plus,self.Ap_minus],[-1,1]):
-            for ap_k, (ap, wp) in enumerate(zip(Ap,self.wp[1:])):
+            for ap_k, ap in enumerate(Ap):
                 p=ap_k+1
                 p_v=(p/self.N+coef*v)
                 Ap[ap_k] = (np.exp(coef*j*2*np.pi*p_v)*ap
-                    + wp*(np.exp(-coef*j*2*np.pi*p_v*(self.N-1))*x 
+                    + (np.exp(-coef*j*2*np.pi*p_v*(self.N-1))*x 
                         - np.exp(coef*j*2*np.pi*p_v)*self.buf[-self.N]))
         # compute current DFT value
-        Xv=self.A0+0.5*np.sum(self.Ap_plus+self.Ap_minus,axis=0)
+        Xv=self.wp[0]*self.A0+0.5*np.sum(self.wp[1:,None]*(self.Ap_plus+self.Ap_minus),axis=0)
         return Xv
     def shift_in(self,x):
         # shift in the current x and shift out self.buf[-N]
@@ -90,20 +90,21 @@ class rec_dv_dft_sumcos(rec_dft_sumcos):
         derivative w.r.t. v of Xv at each bin in v.
         """
         self.B0_hat = (np.exp(-(self.alpha - j*2*np.pi*v))*self.B0_hat
-            + self.wp[0]*np.exp(self.beta)*(
+            + np.exp(self.beta)*(
                 np.exp((self.N-1)*(self.alpha-j*2*np.pi*v))*x
                 - np.exp(-(self.alpha-j*2*np.pi*v))*self.buf[-self.N]))
         for Bp, coef in zip([self.Bp_hat_plus,self.Bp_hat_minus],[1,-1]):
-            for bp_k, (bp, wp) in enumerate(zip(Bp,self.wp[1:])):
+            for bp_k, bp in enumerate(Bp):
                 p=bp_k+1
                 p_v=(coef*p/self.N-v)
                 Bp[bp_k] = (np.exp(-(self.alpha + j*2*np.pi*p_v))*bp
-                    + wp*np.exp(self.beta)*(
+                    + np.exp(self.beta)*(
                         np.exp((self.N-1)*(self.alpha+j*2*np.pi*p_v))*x
                         - np.exp(-(self.alpha+j*2*np.pi*p_v))*self.buf[-self.N]))
-        dvXv=(self.B0_hat + self.gamma*self.A0) + 0.5*np.sum(
-            self.Bp_hat_plus + self.gamma * self.Ap_plus
-            + self.Bp_hat_minus + self.gamma * self.Ap_minus,axis=0)
+        dvXv=self.wp[0]*(self.B0_hat + self.gamma*self.A0) + 0.5*np.sum(
+            self.wp[1:,None]*(self.Bp_hat_plus + self.Bp_hat_minus 
+            + self.gamma * self.Ap_plus
+            + self.gamma * self.Ap_minus),axis=0)
         return -j*2*np.pi*dvXv
     def update(self,x,v):
         Xv=self.compute_dft(x,v)
