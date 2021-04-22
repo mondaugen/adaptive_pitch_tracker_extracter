@@ -52,7 +52,7 @@ PEAK_T=float(envget('PEAK_T','1e-5'))
 # Enable/disable (1/0) partial tracking
 PTRACK=int(envget('PTRACK','0'))
 # Choose the partial tracking method
-PTRACK_METHOD=envget('PTRACK_METHOD','recursive')
+PTRACK_METHOD=envget('PTRACK_METHOD','classic')
 # Partial tracking starting time in seconds (will be rounded to nearest sample)
 PTRACK_T0=float(envget('PTRACK_T0','0'))
 # Partial tracking duration
@@ -144,7 +144,16 @@ if PTRACK:
     else:
         ptrack_v0=np.array([float(PTRACK_F0)/FS])
     x_ptrack=x[ptrack_n0:ptrack_n1+PTRACK_WINLEN-1]
+    # Time-domain window used with 'classic' and 'hop' methods
+    ptrack_w=signal.get_window(PTRACK_WINTYPE,PTRACK_WINLEN)
+    # Normalize window
+    ptrack_w/=np.sum(ptrack_w)
+    if PTRACK_METHOD == 'classic':
+        print('Using "classic" method for partial tracking.')
+        v_ks,Xs,grad=dhc.adaptive_ghc_slow_log_pow_v(x_ptrack,ptrack_v0,ptrack_w,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS)
+        ptrack_t=(np.arange(ptrack_n0,ptrack_n1)+PTRACK_WINLEN*0.5)/FS
     if PTRACK_METHOD == 'recursive':
+        print('Using "recursive" method for partial tracking.')
         ptrack_wp=get_window_coefficients(PTRACK_WINTYPE)
         # Normalize window
         ptrack_wp/=(ptrack_wp[0]*PTRACK_WINLEN)
