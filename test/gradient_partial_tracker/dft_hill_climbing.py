@@ -232,6 +232,55 @@ def adaptive_ghc_recsumcos_log_pow_v(x,v_k,wp,Nw,mu=1e-6,max_step=float('inf'),
         Xs[n] = Xv
     return v_ks, Xs, grad
 
+def adaptive_ghc_hop_log_pow_v(x,v_k,w,H,mu=1e-6,max_step=float('inf'),verbose=False, harmonic_lock=False,grad_step_warmup=True):
+    """
+    Tracks partials starting at initial estimates in v_k and updating them using
+    a gradient ascent algorithm.
+    x is the signal to extract partials from
+    v_k are the original frequency estimates in normalized frequency
+    w is the window applied to the data records.
+    H is the hop size. Chunks of length len(w) are taken from x every H samples.
+    mu is the gradient multiplier.
+    max_step is an absolute limit on the step size.
+    verbose, if True, outputs information to the console.
+    harmonic_lock, if True, updates the adpative estimates of v_k using the
+                   average gradient. It assumes v_k are sorted in ascending
+                   order and correspond to an harmonic series. The gradient is
+                   computed by taking the average of all the gradients computed
+                   at each v_k and adding this, multiplied by mu and the
+                   harmonic number, to each v_k. That way if v_k is a harmonic
+                   series, v_k+1 will also be a harmonic series. This is useful
+                   for tracking harmonic sounds that are thought to have a
+    grad_step_warmup, if True, means that the v_k will not be updated using the
+                   gradient step until Nw samples have been processed. This is
+                   to prevent using gradients that occur due to the transition
+                   from silence to signal for early steps.
+    """
+    Nw=len(w)
+    assert(H <= Nw)
+    buf=np.zeros_like(w)
+    N_v=len(v_k)
+    N_ret=len(x[:len(x)-Nw:H])
+    v_ks = np.zeros((N_ret,N_v))
+    Xs = np.zeros((N_ret,N_v),dtype='complex128')
+    grad = np.zeros((N_ret,N_v))
+    grad_compute=dft_bin_log_pow_dv
+    if harmonic_lock:
+        raise NotImplementedError
+    for n, _ in enumerate(x[:len(x)-Nw:H]):
+        buf[:-H] = buf[H:]
+        buf[-H:] = x[n:n+H]
+        cur_grad=grad_compute(buf*w,v_k)
+        if grad_step_warmup and n*H < Nw:
+            cur_grad[:]=0
+        grad[n]=cur_grad
+        v_k = v_k + np.clip(mu * grad[n],-max_step,max_step)
+        v_ks[n] = v_k
+        Xs[n] = dft_bin(buf*w,v_k)
+    return v_ks, Xs, grad
+
+    
+
 if __name__ == '__main__':
     N=256
     Fs=16e3

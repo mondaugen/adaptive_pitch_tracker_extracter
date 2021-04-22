@@ -51,6 +51,8 @@ PEAK_K=float(envget('PEAK_K','2'))
 PEAK_T=float(envget('PEAK_T','1e-5'))
 # Enable/disable (1/0) partial tracking
 PTRACK=int(envget('PTRACK','0'))
+# Choose the partial tracking method
+PTRACK_METHOD=envget('PTRACK_METHOD','recursive')
 # Partial tracking starting time in seconds (will be rounded to nearest sample)
 PTRACK_T0=float(envget('PTRACK_T0','0'))
 # Partial tracking duration
@@ -67,6 +69,8 @@ PTRACK_MAX_STEP=float(envget('PTRACK_MAX_STEP','1'))
 PTRACK_WINTYPE=envget('PTRACK_WINTYPE','hann')
 # Partial tracking window length
 PTRACK_WINLEN=int(envget('PTRACK_WINLEN','4096'))
+# Partial tracking hop size (applies only to certain algorithms)
+PTRACK_H=int(envget('PTRACK_H','1024'))
 # If true, tries to remove partial from original sound and plots spectrogram
 PTRACK_REMOVE=int(envget('PTRACK_REMOVE','0'))
 # Where to write the partial to
@@ -139,22 +143,31 @@ if PTRACK:
         ptrack_v0=f_local[peaks]/FS
     else:
         ptrack_v0=np.array([float(PTRACK_F0)/FS])
-    ptrack_wp=get_window_coefficients(PTRACK_WINTYPE)
-    # Normalize window
-    ptrack_wp/=(ptrack_wp[0]*PTRACK_WINLEN)
+    x_ptrack=x[ptrack_n0:ptrack_n1+PTRACK_WINLEN-1]
+    if PTRACK_METHOD == 'recursive':
+        ptrack_wp=get_window_coefficients(PTRACK_WINTYPE)
+        # Normalize window
+        ptrack_wp/=(ptrack_wp[0]*PTRACK_WINLEN)
+        # also add window's length of samples so we have an analysis for every t in
+        # the specified range
+        # TODO use vector of v0 to track multiple simultaneously
+        v_ks,Xs,grad=dhc.adaptive_ghc_recsumcos_log_pow_v(x_ptrack,
+                                           ptrack_v0,
+                                           ptrack_wp,
+                                           PTRACK_WINLEN,
+                                           mu=PTRACK_MU,
+                                           max_step=PTRACK_MAX_STEP/FS,
+                                           ramp_err_max=PTRACK_EXP_DV_ERR_MAX)
+        ptrack_t=(np.arange(ptrack_n0,ptrack_n1)+PTRACK_WINLEN*0.5)/FS
+    elif PTRACK_METHOD == 'hop':
+        print('Using "hop" method for partial tracking.')
+        ptrack_w=signal.get_window(PTRACK_WINTYPE,PTRACK_WINLEN)
+        # Normalize window
+        ptrack_w/=np.sum(ptrack_w)
+        v_ks,Xs,grad=dhc.adaptive_ghc_hop_log_pow_v(x_ptrack,ptrack_v0,ptrack_w,PTRACK_H,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS,verbose=False,harmonic_lock=False)
     # TODO: How to incorporate this time offset with the phase estimate in Xs?
     # Seems to not be necessary
-    ptrack_t=(np.arange(ptrack_n0,ptrack_n1)+PTRACK_WINLEN*0.5)/FS
-    # also add window's length of samples so we have an analysis for every t in
-    # the specified range
-    # TODO use vector of v0 to track multiple simultaneously
-    v_ks,Xs,grad=dhc.adaptive_ghc_recsumcos_log_pow_v(x[ptrack_n0:ptrack_n1+PTRACK_WINLEN-1],
-                                       ptrack_v0,
-                                       ptrack_wp,
-                                       PTRACK_WINLEN,
-                                       mu=PTRACK_MU,
-                                       max_step=PTRACK_MAX_STEP/FS,
-                                       ramp_err_max=PTRACK_EXP_DV_ERR_MAX)
+        ptrack_t=(np.arange(ptrack_n0,ptrack_n1,PTRACK_H)+PTRACK_WINLEN*0.5)/FS
     sg_ax.plot(np.ones_like(ptrack_v0)*PTRACK_T0,
                ptrack_v0*FS,'r.')
     sg_ax.plot(ptrack_t,v_ks*FS,lw=1)
@@ -175,6 +188,8 @@ if PTRACK:
     Xs_out=np.sum(np.real(Xs).copy(),axis=1)
     common.normalize(Xs_out).tofile(PTRACK_OUT)
     if PTRACK_REMOVE:
+        if PTRACK_METHOD == 'hop':
+            raise NotImplementedError
         fig_ptrack,ax_ptrack=plt.subplots(1,1)
         x_no_partial=np.zeros_like(x)
         x_no_partial[:] = x
