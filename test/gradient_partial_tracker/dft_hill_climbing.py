@@ -269,7 +269,7 @@ def adaptive_ghc_hop_log_pow_v(x,v_k,w,H,mu=1e-6,max_step=float('inf'),verbose=F
         raise NotImplementedError
     for n, _ in enumerate(x[:len(x)-Nw:H]):
         buf[:-H] = buf[H:]
-        buf[-H:] = x[n:n+H]
+        buf[-H:] = x[H*n:H*(n+1)]
         cur_grad=grad_compute(buf*w,v_k)
         if grad_step_warmup and n*H < Nw:
             cur_grad[:]=0

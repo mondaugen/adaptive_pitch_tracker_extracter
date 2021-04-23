@@ -152,7 +152,7 @@ if PTRACK:
         print('Using "classic" method for partial tracking.')
         v_ks,Xs,grad=dhc.adaptive_ghc_slow_log_pow_v(x_ptrack,ptrack_v0,ptrack_w,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS)
         ptrack_t=(np.arange(ptrack_n0,ptrack_n1)+PTRACK_WINLEN*0.5)/FS
-    if PTRACK_METHOD == 'recursive':
+    elif PTRACK_METHOD == 'recursive':
         print('Using "recursive" method for partial tracking.')
         ptrack_wp=get_window_coefficients(PTRACK_WINTYPE)
         # Normalize window
@@ -170,13 +170,12 @@ if PTRACK:
         ptrack_t=(np.arange(ptrack_n0,ptrack_n1)+PTRACK_WINLEN*0.5)/FS
     elif PTRACK_METHOD == 'hop':
         print('Using "hop" method for partial tracking.')
-        ptrack_w=signal.get_window(PTRACK_WINTYPE,PTRACK_WINLEN)
-        # Normalize window
-        ptrack_w/=np.sum(ptrack_w)
         v_ks,Xs,grad=dhc.adaptive_ghc_hop_log_pow_v(x_ptrack,ptrack_v0,ptrack_w,PTRACK_H,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS,verbose=False,harmonic_lock=False)
+    else:
+        raise Exception("Unknown PTRACK_METHOD %s" % (PTRACK_METHOD,))
     # TODO: How to incorporate this time offset with the phase estimate in Xs?
     # Seems to not be necessary
-        ptrack_t=(np.arange(ptrack_n0,ptrack_n1,PTRACK_H)+PTRACK_WINLEN*0.5)/FS
+        ptrack_t=(np.arange(ptrack_n0,ptrack_n1-1,PTRACK_H)+PTRACK_WINLEN*0.5)/FS
     sg_ax.plot(np.ones_like(ptrack_v0)*PTRACK_T0,
                ptrack_v0*FS,'r.')
     sg_ax.plot(ptrack_t,v_ks*FS,lw=1)
