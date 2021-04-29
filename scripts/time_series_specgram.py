@@ -61,6 +61,8 @@ PTRACK_DUR=float(envget('PTRACK_DUR','0.5'))
 # Can also be the string 'auto' in which case the frequencies will be chosen
 # using peak picking at time T0
 PTRACK_F0=envget('PTRACK_F0','1000')
+# changes how PTRACK_F0 is interpreted, if 'harmonics', an array of frequencies corresponding to the harmonics all the way to half the sample rate are generated
+PTRACK_F0_MODE=envget('PTRACK_F0_MODE','single')
 # Partial tracking gradient ascent step size
 PTRACK_MU=float(envget('PTRACK_MU','1e-8'))
 # Partial tracking maximum step size in Hz
@@ -71,6 +73,8 @@ PTRACK_WINTYPE=envget('PTRACK_WINTYPE','hann')
 PTRACK_WINLEN=int(envget('PTRACK_WINLEN','4096'))
 # Partial tracking hop size (applies only to certain algorithms)
 PTRACK_H=int(envget('PTRACK_H','1024'))
+# If harmonic locking should be done
+PTRACK_HARM_LOCK=bool(int(envget('PTRACK_HARM_LOCK','0')))
 # If true, tries to remove partial from original sound and plots spectrogram
 PTRACK_REMOVE=int(envget('PTRACK_REMOVE','0'))
 # Where to write the partial to
@@ -93,7 +97,8 @@ n=np.arange(N)
 t=n/FS
 
 fig,ax=plt.subplots(7,1)
-sd_ax,sg_ax,slider_ax,psd_ax,ptrack_grad_ax,ptrack_extracted_ax,ptrack_mag_ax=ax
+sd_ax,_,slider_ax,psd_ax,ptrack_grad_ax,ptrack_extracted_ax,ptrack_mag_ax=ax
+fig2,sg_ax=plt.subplots(1,1)
 
 ylim=(FMIN,FMAX)
 def do_specgram(ax_,x_):
@@ -104,6 +109,12 @@ def do_specgram(ax_,x_):
     ax_.set_ylim(ylim)
     ax_.set_yscale(YSCALE)
     return ret
+
+def interpret_ptrack_f0():
+    if PTRACK_F0[:2] == 'p:':
+        pitch=float(PTRACK_F0[2:])
+        return 440.*np.power(2.,(pitch-69)/12.)
+    return float(PTRACK_F0)
 
 S,f,t_spec,_=do_specgram(sg_ax,x)
 
@@ -142,7 +153,13 @@ if PTRACK:
         print("tracking %d peaks" % (len(peaks,)))
         ptrack_v0=f_local[peaks]/FS
     else:
-        ptrack_v0=np.array([float(PTRACK_F0)/FS])
+        f0v=interpret_ptrack_f0()/FS
+        if PTRACK_F0_MODE == 'harmonics':
+            ptrack_v0=np.arange(f0v,0.5,f0v)
+        else:
+            ptrack_v0=np.array([f0v])
+    # add window's length of samples so we have an analysis for every t in
+    # the specified range
     x_ptrack=x[ptrack_n0:ptrack_n1+PTRACK_WINLEN-1]
     # Time-domain window used with 'classic' and 'hop' methods
     ptrack_w=signal.get_window(PTRACK_WINTYPE,PTRACK_WINLEN)
@@ -157,9 +174,6 @@ if PTRACK:
         ptrack_wp=get_window_coefficients(PTRACK_WINTYPE)
         # Normalize window
         ptrack_wp/=(ptrack_wp[0]*PTRACK_WINLEN)
-        # also add window's length of samples so we have an analysis for every t in
-        # the specified range
-        # TODO use vector of v0 to track multiple simultaneously
         v_ks,Xs,grad=dhc.adaptive_ghc_recsumcos_log_pow_v(x_ptrack,
                                            ptrack_v0,
                                            ptrack_wp,
@@ -170,12 +184,10 @@ if PTRACK:
         ptrack_t=(np.arange(ptrack_n0,ptrack_n1)+PTRACK_WINLEN*0.5)/FS
     elif PTRACK_METHOD == 'hop':
         print('Using "hop" method for partial tracking.')
-        v_ks,Xs,grad=dhc.adaptive_ghc_hop_log_pow_v(x_ptrack,ptrack_v0,ptrack_w,PTRACK_H,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS,verbose=False,harmonic_lock=False)
+        v_ks,Xs,grad=dhc.adaptive_ghc_hop_log_pow_v(x_ptrack,ptrack_v0,ptrack_w,PTRACK_H,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS,verbose=False,harmonic_lock=PTRACK_HARM_LOCK)
+        ptrack_t=(np.arange(ptrack_n0,ptrack_n1-1,PTRACK_H)+PTRACK_WINLEN*0.5)/FS
     else:
         raise Exception("Unknown PTRACK_METHOD %s" % (PTRACK_METHOD,))
-    # TODO: How to incorporate this time offset with the phase estimate in Xs?
-    # Seems to not be necessary
-        ptrack_t=(np.arange(ptrack_n0,ptrack_n1-1,PTRACK_H)+PTRACK_WINLEN*0.5)/FS
     sg_ax.plot(np.ones_like(ptrack_v0)*PTRACK_T0,
                ptrack_v0*FS,'r.')
     sg_ax.plot(ptrack_t,v_ks*FS,lw=1)

@@ -250,7 +250,8 @@ def adaptive_ghc_hop_log_pow_v(x,v_k,w,H,mu=1e-6,max_step=float('inf'),verbose=F
                    at each v_k and adding this, multiplied by mu and the
                    harmonic number, to each v_k. That way if v_k is a harmonic
                    series, v_k+1 will also be a harmonic series. This is useful
-                   for tracking harmonic sounds that are thought to have a
+                   for tracking harmonic sounds that are thought to correspond
+                   to some fundamental frequency.
     grad_step_warmup, if True, means that the v_k will not be updated using the
                    gradient step until Nw samples have been processed. This is
                    to prevent using gradients that occur due to the transition
@@ -265,8 +266,9 @@ def adaptive_ghc_hop_log_pow_v(x,v_k,w,H,mu=1e-6,max_step=float('inf'),verbose=F
     Xs = np.zeros((N_ret,N_v),dtype='complex128')
     grad = np.zeros((N_ret,N_v))
     grad_compute=dft_bin_log_pow_dv
+    harm_nums=None
     if harmonic_lock:
-        raise NotImplementedError
+        harm_nums=np.arange(N_v)+1
     for n, _ in enumerate(x[:len(x)-Nw:H]):
         buf[:-H] = buf[H:]
         buf[-H:] = x[H*n:H*(n+1)]
@@ -274,7 +276,11 @@ def adaptive_ghc_hop_log_pow_v(x,v_k,w,H,mu=1e-6,max_step=float('inf'),verbose=F
         if grad_step_warmup and n*H < Nw:
             cur_grad[:]=0
         grad[n]=cur_grad
-        v_k = v_k + np.clip(mu * grad[n],-max_step,max_step)
+        if harmonic_lock:
+            mean_grad=grad[n].mean()
+            v_k = v_k + np.clip(mu * mean_grad * harm_nums,-max_step,max_step)
+        else:
+            v_k = v_k + np.clip(mu * grad[n],-max_step,max_step)
         v_ks[n] = v_k
         Xs[n] = dft_bin(buf*w,v_k)
     return v_ks, Xs, grad
