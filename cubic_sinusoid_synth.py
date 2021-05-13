@@ -66,12 +66,12 @@ class cubic_sinusoid_synth:
 
         # value used to determine smoothest interpolating phase polynomial
         M=np.round(RECIP_2PI*(self.theta_k0+self.omega_k0*self.H - theta_k1 
-                                + 0.5*self.H(omega_k1 - omega_k0)))
+                                + 0.5*self.H*(omega_k1 - self.omega_k0)))
         # determine coefficients of smoothest cubic polynomial
-        alpha_beta_M=self.alpha_beta @ np.vstack(
+        alpha_beta_M=self.alpha_beta @ np.vstack((
             theta_k1 - self.theta_k0 - self.H * self.omega_k0 + TWO_PI*M,
             omega_k1 - self.omega_k0
-        )
+        ))
         # evaluate the polynomial
         pcoefs = np.vstack((np.flipud(alpha_beta_M), self.omega_k0,
         self.theta_k0))
