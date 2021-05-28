@@ -3,6 +3,7 @@ from polyeval import polyeval
 
 RECIP_2PI=1./(2.*np.pi)
 TWO_PI=2.*np.pi
+j=complex('j')
 
 class cubic_sinusoid_synth:
     def __init__(self,n_partials,H):
@@ -31,7 +32,7 @@ class cubic_sinusoid_synth:
         # The reciprocal of H, used for amplitude interpolation.
         self.recip_H=1./self.H
     def set_theta_k0(self,theta_k0):
-        self.theta_k0[:]=theta_k0
+        self.theta_k0[:]=np.fmod(theta_k0,2*np.pi)
     def set_omega_k0(self,omega_k0):
         self.omega_k0[:]=omega_k0
     def set_a_k0(self,a_k0):
@@ -90,4 +91,78 @@ class cubic_sinusoid_synth:
         return (Th,A)
         
 
+def process_partial_tracks(H,theta,omega,a):
+    """
+    Computes the partial tracks using the theta, omega and a as breakpoints.
+    H is the number of samples between breakpoints.
+    theta is a matrix of size (F,n_partials) representing the phases of the
+    n_partials sinusoids at each breakpoint.
+    omega is a matrix of size (F,n_partials) representing the angular velocities
+    at each breakpoint.
+    a is a matrix of size (F,n_partials) representing the amplitudes at each
+    breakpoint.
+    Note that theta, omega and a must be the same size.
+    Returns: matricies Th, and A.
+    Th is a matrix of size (n_partials,H*(F-1)), representing the phases of the n_partials.
+    A is matrix of size (n_partials,H*(F-1)), containing the amplitudes of the n_partials.
+    """
+    assert(theta.shape == omega.shape == a.shape)
+    n_partials=theta.shape[1]
+    F=theta.shape[0]
+    part_synth=cubic_sinusoid_synth(n_partials,H)
+    part_synth.set_theta_k0(theta[0])
+    part_synth.set_omega_k0(omega[0])
+    part_synth.set_a_k0(a[0])
+    Th=np.zeros((n_partials,H*(F-1)))
+    A=np.zeros((n_partials,H*(F-1)))
+    for h,(theta_,omega_,a_) in enumerate(zip(theta[1:],omega[1:],a[1:])):
+        Th[:,h*H:(h+1)*H],A[:,h*H:(h+1)*H]=part_synth.process(theta_,omega_,a_)
+    return (Th,A)
 
+def synth_partial_tracks(Th,A,th_mode='cos',a_mode='linear',combine=True,
+                         phase_units='radians'):
+    """
+    Takes matrix Th of size (n_partials,N) of phases and matrix A of size
+    (n_partials,N) of amplitudes and uses these to synthesize the partial
+    tracks.
+    th_mode can be 'cos' or 'cexp' or a function taking a matrix as argument and
+    returning a matrix of the same size. 'cos' uses the phases as the argument
+    of the cosine function, 'cexp' uses the phases as the argument of the
+    complex exponential function.
+    a_mode can be 'linear', 'dB' or a function taking a matrix as argument and
+    returning a matrix of the same size. Linear just uses the amplitude values
+    directly, dB converts from decibels to amplitude, using the function
+    10^(A/20).
+    combine, if true multiplies each sinusoid track by the corresponding
+    amplitude track, sums these down the columns and returns an array of length
+    N, otherwise it returns matrices (Th_synth,A_synth) which represent the
+    sinusoid and amplitude tracks.
+    phase_units can be 'radians' or 'normalized'. If 'radians' the phase values
+    are used as-is to the arguments of the functions, otherwise the cos(x)
+    function is instead cos(2*pi*x) and exp(j*x) is exp(j*2*pi*x). The argument
+    to a function passed into th_mode is not affected: the user must provide a
+    function accepting normalized phase values in this case.
+    """
+    # Determine phase processing function
+    phase_mul=2*np.pi if phase_units == 'normalized' else 1.
+    th_fun=None
+    if th_mode == 'cos':
+        th_fun=lambda x: np.cos(phase_mul*x)
+    elif th_mode == 'cexp':
+        th_fun=lambda x: np.exp(j*phase_mul*x)
+    else:
+        th_fun=th_mode
+    # Determine amplitude processing function
+    a_fun=None
+    if a_mode == 'linear':
+        a_fun=lambda x: x
+    elif a_mode == 'dB':
+        a_fun=lambda x: np.power(10.,x/20)
+    # Synthesize tracks
+    Th_synth=th_fun(Th)
+    A_synth=a_fun(A)
+    if combine == False:
+        return (Th_synth,A_synth)
+    Th_synth*=A_synth
+    Th_synth=np.sum(Th_synth,axis=0)
+    return Th_synth

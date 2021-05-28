@@ -8,6 +8,7 @@ from spectral_difference import local_max, local_max_mat, spectral_diff
 import common
 from peak_finder import find_peaks
 import dft_hill_climbing as dhc
+import cubic_sinusoid_synth as csisy
 
 envget=os.environ.get
 
@@ -73,6 +74,9 @@ PTRACK_WINTYPE=envget('PTRACK_WINTYPE','hann')
 PTRACK_WINLEN=int(envget('PTRACK_WINLEN','4096'))
 # Partial tracking hop size (applies only to certain algorithms)
 PTRACK_H=int(envget('PTRACK_H','1024'))
+# Force hop size to 1 if not using the hop method
+if PTRACK_METHOD != 'hop':
+    PTRACK_H=1
 # If harmonic locking should be done
 PTRACK_HARM_LOCK=bool(int(envget('PTRACK_HARM_LOCK','0')))
 # If true, tries to remove partial from original sound and plots spectrogram
@@ -169,6 +173,7 @@ if PTRACK:
         print('Using "classic" method for partial tracking.')
         v_ks,Xs,grad=dhc.adaptive_ghc_slow_log_pow_v(x_ptrack,ptrack_v0,ptrack_w,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS)
         ptrack_t=(np.arange(ptrack_n0,ptrack_n1)+PTRACK_WINLEN*0.5)/FS
+        ptrack_t_full=ptrack_t
     elif PTRACK_METHOD == 'recursive':
         print('Using "recursive" method for partial tracking.')
         ptrack_wp=get_window_coefficients(PTRACK_WINTYPE)
@@ -182,10 +187,15 @@ if PTRACK:
                                            max_step=PTRACK_MAX_STEP/FS,
                                            ramp_err_max=PTRACK_EXP_DV_ERR_MAX)
         ptrack_t=(np.arange(ptrack_n0,ptrack_n1)+PTRACK_WINLEN*0.5)/FS
+        ptrack_t_full=ptrack_t
     elif PTRACK_METHOD == 'hop':
         print('Using "hop" method for partial tracking.')
         v_ks,Xs,grad=dhc.adaptive_ghc_hop_log_pow_v(x_ptrack,ptrack_v0,ptrack_w,PTRACK_H,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS,verbose=False,harmonic_lock=PTRACK_HARM_LOCK)
         ptrack_t=(np.arange(ptrack_n0,ptrack_n1-1,PTRACK_H)+PTRACK_WINLEN*0.5)/FS
+        # Allows plotting interpolated signals
+        ptrack_t_full=(np.arange(ptrack_n0,ptrack_n1-1)+PTRACK_WINLEN*0.5)/FS
+        Th,A=csisy.synth_partial_tracks(*csisy.process_partial_tracks(PTRACK_H,np.angle(Xs),v_ks*2.*np.pi,np.abs(Xs)),th_mode='cexp',combine=False)
+        Xs=(Th*A).T
     else:
         raise Exception("Unknown PTRACK_METHOD %s" % (PTRACK_METHOD,))
     sg_ax.plot(np.ones_like(ptrack_v0)*PTRACK_T0,
@@ -193,12 +203,12 @@ if PTRACK:
     sg_ax.plot(ptrack_t,v_ks*FS,lw=1)
     ptrack_grad_ax.plot(ptrack_t,np.log(np.abs(grad)))
     ptrack_grad_ax.set_title('log gradient')
-    ptrack_extracted_ax.plot(ptrack_t,np.real(Xs))
+    ptrack_extracted_ax.plot(ptrack_t_full[:len(Xs)],np.real(Xs))
     ptrack_extracted_ax.set_title('extracted partial')
     if PTRACK_A_LOG:
-        ptrack_mag_ax.plot(ptrack_t,20*np.log10(np.abs(Xs)))
+        ptrack_mag_ax.plot(ptrack_t_full[:len(Xs)],20*np.log10(np.abs(Xs)))
     else:
-        ptrack_mag_ax.plot(ptrack_t,np.abs(Xs))
+        ptrack_mag_ax.plot(ptrack_t_full[:len(Xs)],np.abs(Xs))
     ptrack_mag_ax.set_title('extracted partial amplitude')
     if Xs.shape[1] == 1:
         # Right now you can't save multiple partial tracks
@@ -208,8 +218,6 @@ if PTRACK:
     Xs_out=np.sum(np.real(Xs).copy(),axis=1)
     common.normalize(Xs_out).tofile(PTRACK_OUT)
     if PTRACK_REMOVE:
-        if PTRACK_METHOD == 'hop':
-            raise NotImplementedError
         fig_ptrack,ax_ptrack=plt.subplots(1,1)
         x_no_partial=np.zeros_like(x)
         x_no_partial[:] = x
