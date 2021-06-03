@@ -1,6 +1,13 @@
-# Tracks partials starting at PTRACK_T0 for PTRACK_DUR seconds. Chooses partials
-# whose peaks are above PEAK_T at time PTRACK_T0.
 # Tracks using the 'hop' partial tracking method.
+
+# Defaults unless set when calling script
+[ -z $PTRACK_DUR ] && export PTRACK_DUR=2.3
+[ -z $PTRACK_T0 ] && export PTRACK_T0=0
+[ -z $PTRACK_F0 ] && export PTRACK_F0='p:45'
+[ -z $SHOW_PLOT ] && export SHOW_PLOT=0
+[ -z $PTRACK_OUT ] && export \
+    PTRACK_OUT=".testout/sonnet_${PTRACK_T0}_${PTRACK_F0}.f64"
+
 PEAK_T=1e-3 \
 PTRACK_REMOVE=0 \
 PTRACK_WINTYPE=hann \
@@ -9,11 +16,8 @@ PTRACK_WINLEN=2048 \
 PTRACK_H=512 \
 PTRACK_HARM_LOCK=1 \
 PTRACK_F0_MODE=harmonics \
-PTRACK_MU=1e-7 \
+PTRACK_MU=3e-8 \
 PTRACK_MAX_STEP=inf \
-PTRACK_DUR=2.3 \
-PTRACK_T0=0. \
-PTRACK_F0='p:45' \
 PTRACK=1 \
 PLOT_SD=1 \
 SD_BIN_WEIGHT=8 \

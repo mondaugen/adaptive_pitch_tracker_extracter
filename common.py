@@ -94,3 +94,17 @@ def plot_arch(ax,s,l,h,b=0,color='black',print_h=None,t=0):
     ax.plot([s+l-t,s+l],[b+h,b],color=color)
     if print_h is not None:
         ax.text(s,b+h, print_h % (h,))
+
+def wrap(x,low=0,high=2.*np.pi):
+    dif=high-low
+    x_shape=x.shape
+    x_=x.flatten()
+    while np.any(x_ >= high):
+        x_[x_ >= high] -= dif
+    while np.any(x_ < low):
+        x_[x_ < low] += dif
+    return x_.reshape(x_shape)
+
+def dB(x):
+    return 20*np.log10(x)
+

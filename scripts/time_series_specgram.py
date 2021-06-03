@@ -6,9 +6,11 @@ from scipy import signal
 import os
 from spectral_difference import local_max, local_max_mat, spectral_diff
 import common
+from common import dB
 from peak_finder import find_peaks
 import dft_hill_climbing as dhc
 import cubic_sinusoid_synth as csisy
+import partial_processing as pp
 
 envget=os.environ.get
 
@@ -16,9 +18,6 @@ def local_max_2d(x,thresh=1e-5):
     x_c=local_max_mat(x,indices=False)
     x_r=local_max_mat(x.T,indices=False).T
     return np.where(x_c & x_r & (x > thresh))
-
-def dB(x):
-    return 20*np.log10(x)
 
 def get_window_coefficients(name):
     if name == 'hann':
@@ -89,10 +88,18 @@ PTRACK_REMOVED_OUT=envget('PTRACK_REMOVED_OUT','/tmp/ptrack_removed_out.f64')
 PTRACK_F0_OUT=envget('PTRACK_F0_OUT','/tmp/ptrack_f0_out.f64')
 # Where to write the partial amplitude to
 PTRACK_A_OUT=envget('PTRACK_A_OUT','/tmp/ptrack_a_out.f64')
+# Where to write phase and amplitude estimates to
+PTRACK_TH_A_OUT=envget('PTRACK_TH_A_OUT','/tmp/ptrack_th_a_out.npz')
+if PTRACK_TH_A_OUT is not None and PTRACK_METHOD != 'hop':
+    raise Exception('Saving phase and amplitude only supported for PTRACK_METHOD="hop"')
 # If PTRACK_EXP_DV is truthy, this specifies the maximum error of the
 # ramp-approximating exponential
 PTRACK_EXP_DV_ERR_MAX=float(envget('PTRACK_EXP_DV_ERR_MAX','1e-4'))
 PTRACK_A_LOG=int(envget('PTRACK_A_LOG','0'))
+# The "weighted" argument to common_partial_shape, if None, no partial amplitude
+# smoothing is performed
+PTRACK_SMOOTH_A=envget('PTRACK_SMOOTH_A',None)
+SHOW_PLOT=int(envget('SHOW_PLOT','1'))
 
 x=np.fromfile(INFILE,SAMPTYPE)
 
@@ -171,7 +178,8 @@ if PTRACK:
     ptrack_w/=np.sum(ptrack_w)
     if PTRACK_METHOD == 'classic':
         print('Using "classic" method for partial tracking.')
-        v_ks,Xs,grad=dhc.adaptive_ghc_slow_log_pow_v(x_ptrack,ptrack_v0,ptrack_w,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS)
+        v_ks,Xs,grad=dhc.adaptive_ghc_slow_log_pow_v(x_ptrack,ptrack_v0,
+                        ptrack_w,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS)
         ptrack_t=(np.arange(ptrack_n0,ptrack_n1)+PTRACK_WINLEN*0.5)/FS
         ptrack_t_full=ptrack_t
     elif PTRACK_METHOD == 'recursive':
@@ -194,7 +202,17 @@ if PTRACK:
         ptrack_t=(np.arange(ptrack_n0,ptrack_n1-1,PTRACK_H)+PTRACK_WINLEN*0.5)/FS
         # Allows plotting interpolated signals
         ptrack_t_full=(np.arange(ptrack_n0,ptrack_n1-1)+PTRACK_WINLEN*0.5)/FS
-        Th,A=csisy.synth_partial_tracks(*csisy.process_partial_tracks(PTRACK_H,np.angle(Xs),v_ks*2.*np.pi,np.abs(Xs)),th_mode='cexp',combine=False)
+        # Phase as estimated every H samples
+        Th_H=np.angle(Xs)
+        # Amplitude as estimated every H samples
+        A_H=np.abs(Xs)
+        Th,A=csisy.synth_partial_tracks(*csisy.process_partial_tracks(PTRACK_H,Th_H,v_ks*2.*np.pi,A_H),th_mode='cexp',combine=False)
+        if PTRACK_SMOOTH_A is not None:
+            A=pp.apply_partial_shape(A,pp.common_partial_shape(A,
+                weighted=PTRACK_SMOOTH_A))
+        if PTRACK_TH_A_OUT is not None:
+            with open(PTRACK_TH_A_OUT,'wb') as fd:
+                np.savez(fd,Th=Th,A=A,H=PTRACK_H,FS=FS)
         Xs=(Th*A).T
     else:
         raise Exception("Unknown PTRACK_METHOD %s" % (PTRACK_METHOD,))
@@ -216,7 +234,7 @@ if PTRACK:
         np.abs(Xs).tofile(PTRACK_A_OUT)
         v_ks.tofile(PTRACK_F0_OUT)
     Xs_out=np.sum(np.real(Xs).copy(),axis=1)
-    common.normalize(Xs_out).tofile(PTRACK_OUT)
+    Xs_out.tofile(PTRACK_OUT)
     if PTRACK_REMOVE:
         fig_ptrack,ax_ptrack=plt.subplots(1,1)
         x_no_partial=np.zeros_like(x)
@@ -227,7 +245,7 @@ if PTRACK:
         max_f0=ptrack_v0.max()
         ax_ptrack.set_ylim([min_f0-100,max_f0+100])
         ax_ptrack.set_xlim([PTRACK_T0,PTRACK_T0+PTRACK_DUR])
-        common.normalize(np.real(x_no_partial)).tofile(PTRACK_REMOVED_OUT)
+        np.real(x_no_partial).tofile(PTRACK_REMOVED_OUT)
 
 
 # Vertical line showing current frame shown in power-spectrum window
@@ -261,4 +279,5 @@ for ax_ in [sd_ax,sg_ax,slider_ax]:
 
 fig.suptitle(INFILE)
 fig.tight_layout()
-plt.show()
+if SHOW_PLOT:
+    plt.show()
