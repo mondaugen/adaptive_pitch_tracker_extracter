@@ -73,6 +73,8 @@ PTRACK_WINTYPE=envget('PTRACK_WINTYPE','hann')
 PTRACK_WINLEN=int(envget('PTRACK_WINLEN','4096'))
 # Partial tracking hop size (applies only to certain algorithms)
 PTRACK_H=int(envget('PTRACK_H','1024'))
+# Partial tracking synthesis hop size, for changing the duration (time-stretching/compression)
+PTRACK_SYNTH_H=int(envget('PTRACK_SYNTH_H',str(PTRACK_H)))
 # Force hop size to 1 if not using the hop method
 if PTRACK_METHOD != 'hop':
     PTRACK_H=1
@@ -201,7 +203,10 @@ if PTRACK:
         v_ks,Xs,grad=dhc.adaptive_ghc_hop_log_pow_v(x_ptrack,ptrack_v0,ptrack_w,PTRACK_H,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS,verbose=False,harmonic_lock=PTRACK_HARM_LOCK)
         ptrack_t=(np.arange(ptrack_n0,ptrack_n1-1,PTRACK_H)+PTRACK_WINLEN*0.5)/FS
         # Allows plotting interpolated signals
-        ptrack_t_full=(np.arange(ptrack_n0,ptrack_n1-1)+PTRACK_WINLEN*0.5)/FS
+        synth_rate_ratio=PTRACK_H/PTRACK_SYNTH_H
+        # TODO: Right now if synth_rate_ratio is not 1, then the output looks
+        # like it represents signal at non-integer sample values.
+        ptrack_t_full=(np.arange(ptrack_n0,ptrack_n1-1,synth_rate_ratio)+PTRACK_WINLEN*0.5)/FS
         # Phase as estimated every H samples
         Th_H=np.angle(Xs)
         # Amplitude as estimated every H samples
@@ -213,10 +218,10 @@ if PTRACK:
             else:
                 A_H=pp.apply_partial_shape(A_H,pp.common_partial_shape(A_H,
                     weighted=PTRACK_SMOOTH_A))
-        Th,A=csisy.synth_partial_tracks(*csisy.process_partial_tracks(PTRACK_H,Th_H,v_ks*2.*np.pi,A_H),th_mode='cexp',combine=False)
+        Th,A=csisy.synth_partial_tracks(*csisy.process_partial_tracks(PTRACK_SYNTH_H,Th_H,v_ks*2.*np.pi,A_H),th_mode='cexp',combine=False)
         if PTRACK_TH_A_OUT is not None:
             with open(PTRACK_TH_A_OUT,'wb') as fd:
-                np.savez(fd,Th=Th,A=A,H=PTRACK_H,FS=FS)
+                np.savez(fd,Th=Th,A=A,H=PTRACK_SYNTH_H,FS=FS)
         Xs=(Th*A).T
     else:
         raise Exception("Unknown PTRACK_METHOD %s" % (PTRACK_METHOD,))
