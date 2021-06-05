@@ -206,10 +206,14 @@ if PTRACK:
         Th_H=np.angle(Xs)
         # Amplitude as estimated every H samples
         A_H=np.abs(Xs)
-        Th,A=csisy.synth_partial_tracks(*csisy.process_partial_tracks(PTRACK_H,Th_H,v_ks*2.*np.pi,A_H),th_mode='cexp',combine=False)
         if PTRACK_SMOOTH_A is not None:
-            A=pp.apply_partial_shape(A,pp.common_partial_shape(A,
-                weighted=PTRACK_SMOOTH_A))
+            if PTRACK_SMOOTH_A.startswith('squish_anomalies'):
+                A_H=pp.squish_anomalies(A_H.T,
+                    K=float(PTRACK_SMOOTH_A[len('squish_anomalies:'):])).T
+            else:
+                A_H=pp.apply_partial_shape(A_H,pp.common_partial_shape(A_H,
+                    weighted=PTRACK_SMOOTH_A))
+        Th,A=csisy.synth_partial_tracks(*csisy.process_partial_tracks(PTRACK_H,Th_H,v_ks*2.*np.pi,A_H),th_mode='cexp',combine=False)
         if PTRACK_TH_A_OUT is not None:
             with open(PTRACK_TH_A_OUT,'wb') as fd:
                 np.savez(fd,Th=Th,A=A,H=PTRACK_H,FS=FS)

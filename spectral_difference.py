@@ -71,7 +71,7 @@ def local_rms_rt(x):
     ret=np.sqrt(np.mean(x**2))
     return ret
 
-def local_max(x,one_sided_max='right',K=1):
+def local_max(x,one_sided_max='right',K=1,return_bool=False):
     """
     for vectors only
     one_sided_max controls what happens if a point is equal to one of its adjacent points
@@ -83,19 +83,21 @@ def local_max(x,one_sided_max='right',K=1):
     the next value
     """
     if one_sided_max == 'right':
-        gtr=x[:-1]>=x[1:]
+        gtr=x[:-1]>=(K*x[1:])
         gtl=x[1:]>(K*x[:-1])
     elif one_sided_max == 'left':
         gtr=x[:-1]>(K*x[1:])
-        gtl=x[1:]>=x[:-1]
+        gtl=x[1:]>=(K*x[:-1])
     elif one_sided_max == 'none':
         gtr=x[:-1]>(K*x[1:])
         gtl=x[1:]>(K*x[:-1])
     elif one_sided_max == 'both':
-        gtr=x[:-1]>=x[1:]
-        gtl=x[1:]>=x[:-1]
+        gtr=x[:-1]>=(K*x[1:])
+        gtl=x[1:]>=(K*x[:-1])
     gtr=np.concatenate((gtr,np.zeros((1),dtype='bool')),axis=0)
     gtl=np.concatenate((np.zeros((1),dtype='bool'),gtl),axis=0)
+    if return_bool:
+        return gtr&gtl
     return np.where(gtr&gtl)[0]
 
 def local_min(x,one_sided_max='right',K=1):
