@@ -1,5 +1,7 @@
 import numpy as np
+from scipy import interpolate
 from spectral_difference import local_max
+from common import wrap
 
 def common_partial_shape(A,weighted='equal'):
     """
@@ -51,6 +53,16 @@ def column_max(X,one_sided_max='right',K=1,return_bool=False):
     return np.where(max_mask_mat)
 
 def squish_anomalies(A,K=2):
+    """
+    For use with the amplitudes of the partials at each time step. Any partial
+    amplitude that is a local maximum that is more that K-times its neighbours
+    is made to be the average of the neighbours. The neighbours are the
+    instantaneous amplitudes of the partials just lower or higher in frequency
+    at the same time step.
+    A is a matrix of shape (n_partials,N) where N is the number of time steps
+    and n_partials the number of paritals. Therefore the local maxima are
+    searched for in the columns of A.
+    """
     max_mask=column_max(A,one_sided_max='none',K=K,return_bool=True)
     fill_vals=np.zeros_like(A)
     # Make shifted masks to get the values one above and one below the local max
@@ -66,6 +78,42 @@ def squish_anomalies(A,K=2):
     A[max_mask]=fill_vals[max_mask]
     return A
 
+def interpolate_angular_velocity(Th,B=0,rate=1.):
+    """
+    Interpolates the angular velocities using linear interpolation to obtain an
+    interpolated phase sequence.
+    Th is a matrix of size (n_partials,N), where N is the number of time steps
+    and n_partials the number of partials. Th should represent phases at every
+    sample so that there is no ambiguity in the amount the phase has changed
+    between consecutive time-points.
+    B is the number of columns at the beginning of Th that should not be
+    interpolated. The remaining columns (len(Th)-B) are interpolated with a
+    lowered rate so that the final number of columns is round(N/rate).
+    Returns a matrix of size (n_partials,ceil(N/rate))
+    """
+    if B != 0:
+        raise NotImplementedError
+    n_partials=Th.shape[0]
+    N=Th.shape[1]
+    deltas=np.zeros((n_partials,N))
+    deltas[:,1:]=wrap(np.diff(Th))
+    n_orig=np.arange(N)
+    n_interp=np.linspace(0,N-1,int(np.round(N/rate)))
+    delta_interp=interpolate.interp1d(n_orig,deltas)(n_interp)
+    Th_interp=Th[:,0][:,None]+np.cumsum(delta_interp,axis=1)
+    return Th_interp
 
-
+def interpolate_amplitudes(A,B=0,rate=1.):
+    """
+    Works like interpolate_angular_velocity but for amplitudes. B works the same as above.
+    Returns a matrix of size (n_partials,ceil(N/rate))
+    """
+    if B != 0:
+        raise NotImplementedError
+    n_partials=A.shape[0]
+    N=A.shape[1]
+    n_orig=np.arange(N)
+    n_interp=np.linspace(0,N-1,int(np.round(N/rate)))
+    A_interp=interpolate.interp1d(n_orig,A)(n_interp)
+    return A_interp
 

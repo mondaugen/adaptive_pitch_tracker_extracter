@@ -99,6 +99,8 @@ PTRACK_A_LOG=int(envget('PTRACK_A_LOG','0'))
 # The "weighted" argument to common_partial_shape, if None, no partial amplitude
 # smoothing is performed
 PTRACK_SMOOTH_A=envget('PTRACK_SMOOTH_A',None)
+# Partial time stretch rate, < 1 makes the output longer, > 1 makes it shorter.
+PTRACK_TS=float(envget('PTRACK_TS','1.'))
 SHOW_PLOT=int(envget('SHOW_PLOT','1'))
 
 x=np.fromfile(INFILE,SAMPTYPE)
@@ -213,7 +215,13 @@ if PTRACK:
             else:
                 A_H=pp.apply_partial_shape(A_H,pp.common_partial_shape(A_H,
                     weighted=PTRACK_SMOOTH_A))
-        Th,A=csisy.synth_partial_tracks(*csisy.process_partial_tracks(PTRACK_H,Th_H,v_ks*2.*np.pi,A_H),th_mode='cexp',combine=False)
+        # compute the interpolated phase and amplitude
+        Th_n,A_n=csisy.process_partial_tracks(PTRACK_H,Th_H,v_ks*2.*np.pi,A_H)
+        if PTRACK_TS != 1.:
+            Th_n=pp.interpolate_angular_velocity(Th_n,rate=PTRACK_TS)
+            A_n=pp.interpolate_amplitudes(A_n,rate=PTRACK_TS)
+            ptrack_t_full=(np.arange(Th_n.shape[1])+ptrack_n0+PTRACK_WINLEN*0.5)/FS
+        Th,A=csisy.synth_partial_tracks(Th_n,A_n,th_mode='cexp',combine=False)
         if PTRACK_TH_A_OUT is not None:
             with open(PTRACK_TH_A_OUT,'wb') as fd:
                 np.savez(fd,Th=Th,A=A,H=PTRACK_H,FS=FS)
