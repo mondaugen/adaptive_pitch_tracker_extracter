@@ -5,6 +5,49 @@ RECIP_2PI=1./(2.*np.pi)
 TWO_PI=2.*np.pi
 j=complex('j')
 
+def cubic_phase_pcoefs(H,theta,omega):
+    """
+    Computes the polynomial coefficients for the smoothest cubic phase
+    polynomial. Unlike cubic_sinusoid_synth.process, this can process theta and
+    omega as matrices, and therefore all the splines in a batch.
+    H (an integer) is the number of samples between phase measurements.
+    theta is a matrix of size (F,n_partials) representing the phases of the
+    n_partials sinusoids at each breakpoint.
+    omega is a matrix of size (F,n_partials) representing the angular velocities
+    at each breakpoint.
+    The result is a matrix of size (n_partials,(F-1)*H+1) containing the phases
+    of the n_partials sinusoids evaluated at sample 0, 1, ...., (F-1)*H+1.
+    """
+    F=theta.shape[0]
+    n_partials=theta.shape[1]
+    assert (F == omega.shape[0]) and (n_partials == omega.shape[1])
+    # matrix that is used to determine phase polynomial coefficients
+    alpha_beta=np.array([
+        [3./(H*H), -1./H],
+        [-2./(H*H*H), 1./(H*H)]
+    ])
+    theta_k0=theta[:-1,:]
+    theta_k1=theta[1:,:]
+    omega_k0=omega[:-1,:]
+    omega_k1=omega[1:,:]
+    # value used to determine smoothest interpolating phase polynomial
+    M=np.round(RECIP_2PI*(theta_k0+omega_k0*H - theta_k1 
+                            + 0.5*H*(omega_k1 - omega_k0)))
+    # coefficients of smoothest cubic polynomial
+    omega_theta_M=np.stack((
+        theta_k1 - self.theta_k0 - self.H * self.omega_k0 + TWO_PI*M,
+        omega_k1 - self.omega_k0
+    ).transpose(1,0,2)
+    pcoefs=np.zeros((F,4,n_partials))
+    pcoefs[:,:2,:]=alpha_beta @ omega_theta_M
+    pcoefs[:,2,:]=omega_k0
+    pcoefs[:,3,:]=theta_k0
+    n=np.arange(H)
+    Th=np.zeros((n_partials,(F-1)*H+1))
+    Th[:,:-1]=np.hstack(polyeval(np.hstack(pcoefs),n).reshape((F,4,H)))
+    Th[:,-1]=theta[-1]
+    return Th
+
 class cubic_sinusoid_synth:
     def __init__(self,n_partials,H):
         """
