@@ -3,7 +3,13 @@ mkfile_path := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 .PHONY=plot_sonnet_m11_p45_th_a
 
-TS_SCRIPTS=scripts/time_series_specgram.py cubic_sinusoid_synth.py
+TS_SCRIPTS=scripts/time_series_specgram.py \
+cubic_sinusoid_synth.py \
+spectral_difference.py \
+common.py \
+peak_finder.py \
+test/gradient_partial_tracker/dft_hill_climbing.py \
+partial_processing.py
 
 .testout/sonnet_m11_p45_th_a.npz : $(mkfile_path)/sonnet_note.sh \
 								   $(TS_SCRIPTS)
