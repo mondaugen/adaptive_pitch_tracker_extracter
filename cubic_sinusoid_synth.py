@@ -1,15 +1,18 @@
+import pdb
 import numpy as np
 from polyeval import polyeval
+from scipy import interpolate
 
 RECIP_2PI=1./(2.*np.pi)
 TWO_PI=2.*np.pi
 j=complex('j')
 
-def cubic_phase_pcoefs(H,theta,omega):
+def cubic_phase_poly_interp(H,theta,omega):
     """
     Computes the polynomial coefficients for the smoothest cubic phase
-    polynomial. Unlike cubic_sinusoid_synth.process, this can process theta and
-    omega as matrices, and therefore all the splines in a batch.
+    polynomial splines and evaluates these polynomials. Unlike
+    cubic_sinusoid_synth.process, this can process theta and omega as matrices,
+    and therefore all the splines in a batch.
     H (an integer) is the number of samples between phase measurements.
     theta is a matrix of size (F,n_partials) representing the phases of the
     n_partials sinusoids at each breakpoint.
@@ -35,18 +38,34 @@ def cubic_phase_pcoefs(H,theta,omega):
                             + 0.5*H*(omega_k1 - omega_k0)))
     # coefficients of smoothest cubic polynomial
     omega_theta_M=np.stack((
-        theta_k1 - self.theta_k0 - self.H * self.omega_k0 + TWO_PI*M,
-        omega_k1 - self.omega_k0
-    ).transpose(1,0,2)
-    pcoefs=np.zeros((F,4,n_partials))
-    pcoefs[:,:2,:]=alpha_beta @ omega_theta_M
+        theta_k1 - theta_k0 - H * omega_k0 + TWO_PI*M,
+        omega_k1 - omega_k0
+    )).transpose(1,0,2)
+    pcoefs=np.zeros((F-1,4,n_partials))
+    pcoefs[:,:2,:]=(alpha_beta @ omega_theta_M)[:,::-1,:]
     pcoefs[:,2,:]=omega_k0
     pcoefs[:,3,:]=theta_k0
+    #pdb.set_trace()
     n=np.arange(H)
     Th=np.zeros((n_partials,(F-1)*H+1))
-    Th[:,:-1]=np.hstack(polyeval(np.hstack(pcoefs),n).reshape((F,4,H)))
+    Th[:,:-1]=np.hstack(polyeval(np.hstack(pcoefs),n).reshape((F-1,n_partials,H)))
     Th[:,-1]=theta[-1]
     return Th
+
+def linear_amplitude_interp(H,a):
+    """
+    Takes a matrix "a" of shape (F,n_partials) containing F amplitude estimates
+    (taken every H samples) for n_partials partial tracks.
+    The result is a matrix of size (n_partials,(F-1)*H+1) containing the
+    amplitudes of the n_partials for every sample by interpolating linearly
+    between the amplitude estimates.
+    """
+    F=a.shape[0]
+    n=np.arange(F)*H
+    ni=np.linspace(0,n[-1],(F-1)*H+1)
+    A=interpolate.interp1d(n,a,axis=0)(ni)
+    return A.T
+    
 
 class cubic_sinusoid_synth:
     def __init__(self,n_partials,H):
@@ -156,10 +175,8 @@ def process_partial_tracks(H,theta,omega,a):
     part_synth.set_theta_k0(theta[0])
     part_synth.set_omega_k0(omega[0])
     part_synth.set_a_k0(a[0])
-    Th=np.zeros((n_partials,H*(F-1)))
-    A=np.zeros((n_partials,H*(F-1)))
-    for h,(theta_,omega_,a_) in enumerate(zip(theta[1:],omega[1:],a[1:])):
-        Th[:,h*H:(h+1)*H],A[:,h*H:(h+1)*H]=part_synth.process(theta_,omega_,a_)
+    Th=cubic_phase_poly_interp(H,theta,omega)[:,:H*(F-1)]
+    A=linear_amplitude_interp(H,a)[:,:H*(F-1)]
     return (Th,A)
 
 def synth_partial_tracks(Th,A,th_mode='cos',a_mode='linear',combine=True,
