@@ -26,8 +26,8 @@ def cubic_phase_poly_interp(H,theta,omega):
     assert (F == omega.shape[0]) and (n_partials == omega.shape[1])
     # matrix that is used to determine phase polynomial coefficients
     alpha_beta=np.array([
-        [3./(H*H), -1./H],
-        [-2./(H*H*H), 1./(H*H)]
+        [-2./(H*H*H), 1./(H*H)],
+        [3./(H*H), -1./H]
     ])
     theta_k0=theta[:-1,:]
     theta_k1=theta[1:,:]
@@ -42,7 +42,7 @@ def cubic_phase_poly_interp(H,theta,omega):
         omega_k1 - omega_k0
     )).transpose(1,0,2)
     pcoefs=np.zeros((F-1,4,n_partials))
-    pcoefs[:,:2,:]=(alpha_beta @ omega_theta_M)[:,::-1,:]
+    pcoefs[:,:2,:]=alpha_beta @ omega_theta_M
     pcoefs[:,2,:]=omega_k0
     pcoefs[:,3,:]=theta_k0
     #pdb.set_trace()
