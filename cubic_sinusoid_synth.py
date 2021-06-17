@@ -1,4 +1,3 @@
-import pdb
 import numpy as np
 from polyeval import polyeval
 from scipy import interpolate
@@ -45,7 +44,6 @@ def cubic_phase_poly_interp(H,theta,omega):
     pcoefs[:,:2,:]=alpha_beta @ omega_theta_M
     pcoefs[:,2,:]=omega_k0
     pcoefs[:,3,:]=theta_k0
-    #pdb.set_trace()
     n=np.arange(H)
     Th=np.zeros((n_partials,(F-1)*H+1))
     Th[:,:-1]=np.hstack(polyeval(np.hstack(pcoefs),n).reshape((F-1,n_partials,H)))

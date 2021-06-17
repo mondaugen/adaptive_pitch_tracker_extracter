@@ -3,6 +3,7 @@ from scipy import signal
 import matplotlib.pyplot as plt
 from exp_approx_line import exp_approx_line_coeffs
 from recursive_dft import rec_dv_dft_sumcos
+import freq_dom_window
 
 j=complex('j')
 
@@ -58,12 +59,13 @@ def dft_bin_pow_dv(x,v):
     dX=dft_bin_dv(x,v)
     return np.real(X*np.conj(dX)+np.conj(X)*dX)
 
-def dft_bin_log_pow_dv(x,v,thresh_to_zero=1e-4,exp_dv=False):
+def dft_bin_log_pow_dv(x,v,thresh_to_zero=1e-4,exp_dv=False,X=None,dX=None):
     # thresh_to_zero forces the derivative to be zero if the magnitude of the
     # DFT at bin centred on v is too small. This is to avoid wild gradients
     # due to low-powered noise which should actually be considered silence.
-    X=dft_bin(x,v)
-    dX=dft_bin_dv(x,v)
+    if X is None and dX is None:
+        X=dft_bin(x,v)
+        dX=dft_bin_dv(x,v)
     ret = np.real(X*np.conj(dX)+np.conj(X)*dX)/np.real(X*np.conj(X))
     if len(np.shape(X)) > 0:
         ret[np.abs(X) < thresh_to_zero] = 0
@@ -259,7 +261,7 @@ def adaptive_ghc_hop_log_pow_v(x,v_k,w,H,mu=1e-6,max_step=float('inf'),verbose=F
     """
     Nw=len(w)
     assert(H <= Nw)
-    buf=np.zeros_like(w)
+    buf=np.zeros(len(w))
     N_v=len(v_k)
     N_ret=len(x[:len(x)-Nw:H])
     v_ks = np.zeros((N_ret,N_v))
@@ -272,7 +274,10 @@ def adaptive_ghc_hop_log_pow_v(x,v_k,w,H,mu=1e-6,max_step=float('inf'),verbose=F
     for n, _ in enumerate(x[:len(x)-Nw:H]):
         buf[:-H] = buf[H:]
         buf[-H:] = x[H*n:H*(n+1)]
-        cur_grad=grad_compute(buf*w,v_k)
+        R=w.R(v_k)
+        X=freq_dom_window.dft(buf,R)
+        dX=freq_dom_window.dft_dv(buf,R)
+        cur_grad=grad_compute(None,None,X=X,dX=dX)
         if grad_step_warmup and n*H < Nw:
             cur_grad[:]=0
         grad[n]=cur_grad
@@ -282,7 +287,7 @@ def adaptive_ghc_hop_log_pow_v(x,v_k,w,H,mu=1e-6,max_step=float('inf'),verbose=F
         else:
             v_k = v_k + np.clip(mu * grad[n],-max_step,max_step)
         v_ks[n] = v_k
-        Xs[n] = dft_bin(buf*w,v_k)
+        Xs[n] = X
     return v_ks, Xs, grad
 
     

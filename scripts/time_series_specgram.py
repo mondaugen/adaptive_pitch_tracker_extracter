@@ -11,6 +11,7 @@ from peak_finder import find_peaks
 import dft_hill_climbing as dhc
 import cubic_sinusoid_synth as csisy
 import partial_processing as pp
+import freq_dom_window
 
 envget=os.environ.get
 
@@ -71,6 +72,8 @@ PTRACK_MAX_STEP=float(envget('PTRACK_MAX_STEP','1'))
 PTRACK_WINTYPE=envget('PTRACK_WINTYPE','hann')
 # Partial tracking window length
 PTRACK_WINLEN=int(envget('PTRACK_WINLEN','4096'))
+# Partial tracking window oversampling
+PTRACK_WIN_OS=int(envget('PTRACK_WIN_OS','64'))
 # Partial tracking hop size (applies only to certain algorithms)
 PTRACK_H=int(envget('PTRACK_H','1024'))
 # Force hop size to 1 if not using the hop method
@@ -200,6 +203,8 @@ if PTRACK:
         ptrack_t_full=ptrack_t
     elif PTRACK_METHOD == 'hop':
         print('Using "hop" method for partial tracking.')
+        # Replace ptrack_w with accelerated version
+        ptrack_w=freq_dom_window.freq_dom_window(PTRACK_WINLEN,PTRACK_WINTYPE,PTRACK_WIN_OS)
         v_ks,Xs,grad=dhc.adaptive_ghc_hop_log_pow_v(x_ptrack,ptrack_v0,ptrack_w,PTRACK_H,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS,verbose=False,harmonic_lock=PTRACK_HARM_LOCK)
         ptrack_t=(np.arange(ptrack_n0,ptrack_n1-1,PTRACK_H)+PTRACK_WINLEN*0.5)/FS
         # Allows plotting interpolated signals
