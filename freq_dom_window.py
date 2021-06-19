@@ -12,20 +12,16 @@ j=complex('j')
 
 def calc_window_with_radius(window_name,lobe_radius):
     def f(N_win,oversamp):
-        l=N_win*oversamp
-        w=np.zeros(l)
-        #w[l//2-N_win//2:l//2+N_win//2]=signal.get_window(window_name,N_win)
-        w_=signal.get_window(window_name,N_win)
-        # Zero padded this way so the real parts of the fourier transform of the
-        # window are always positive
-        w[:N_win//2]=w_[N_win//2:]
-        w[-N_win//2:]=w_[:N_win//2]
+        l=N_win
+        w=signal.get_window(window_name,N_win)
         w/=np.sum(w)
         evalradius=lobe_radius*oversamp
         evalbins=np.arange(-evalradius,evalradius+1)
         bins=evalbins/oversamp
+        # Oversampled fourier transform matrix
+        F=np.exp(j*2*np.pi*bins[:,None]*np.arange(N_win)/N_win)/N_win
         # Divide by N_win to remove the fourier transform constant ?
-        vals=np.fft.fft(w)[evalbins]/N_win
+        vals=(F@w)[:len(evalbins)]
         return (bins,vals)
     return f
 
@@ -85,17 +81,17 @@ class freq_dom_window:
         b_rounded=np.round(b)
         b_frac=b_rounded-b
         b_ranges=b_frac[:,None]+self.lu_bins
-        b_indices=(b_rounded[:,None]+self.lu_bins) % self.N_win
+        b_indices=(b_rounded[:,None]+self.lu_bins).astype('int') % self.N_win
         r_indices=np.arange(len(v))[:,None]*np.ones(len(self.lu_bins))
         R[r_indices.flatten(),b_indices.flatten()]=self.W_lookup(b_ranges.flatten())
         return R.tocsr()
         
 def dft(x,R):
     X=np.fft.fft(x)
-    RX=R@X
+    RX=R@np.conj(X)
     return RX
 
 def dft_dv(x,R):
     N=len(x)
-    x_=x*-j*2*np.pi*np.arange(N)
+    x_=x*j*2*np.pi*np.arange(N)
     return dft(x_,R)
