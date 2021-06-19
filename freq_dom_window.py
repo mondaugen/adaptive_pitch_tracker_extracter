@@ -6,22 +6,31 @@
 import numpy as np
 from scipy import signal, interpolate, sparse
 
+import pdb
+
 j=complex('j')
 
 def calc_window_with_radius(window_name,lobe_radius):
     def f(N_win,oversamp):
         l=N_win*oversamp
         w=np.zeros(l)
-        w[l//2-N_win//2:l//2+N_win//2]=signal.get_window(window_name,N_win)
+        #w[l//2-N_win//2:l//2+N_win//2]=signal.get_window(window_name,N_win)
+        w_=signal.get_window(window_name,N_win)
+        # Zero padded this way so the real parts of the fourier transform of the
+        # window are always positive
+        w[:N_win//2]=w_[N_win//2:]
+        w[-N_win//2:]=w_[:N_win//2]
         w/=np.sum(w)
         evalradius=lobe_radius*oversamp
         evalbins=np.arange(-evalradius,evalradius+1)
         bins=evalbins/oversamp
-        vals=np.fft.fft(w)[evalbins]
+        # Divide by N_win to remove the fourier transform constant ?
+        vals=np.fft.fft(w)[evalbins]/N_win
         return (bins,vals)
     return f
 
 calc_blackman=calc_window_with_radius('blackman',3)
+calc_hann=calc_window_with_radius('hann',2)
 
 window_types = {
     # The name of the window type
@@ -34,7 +43,12 @@ window_types = {
         # give values halfway between the bins as well as the bin values
         # this function must return bins and vals, where bins are the bins at
         # which the DFT of the window was evaluated and vals the values there
+        # NOTE: This function should return real values
         'calc' : calc_blackman
+    },
+    'hann' : {
+        'lobe_radius': 2,
+        'calc': calc_hann
     }
 }
 
@@ -66,7 +80,7 @@ class freq_dom_window:
         transform of the signal at the bins v.
         v are the normalized frequencies.
         """
-        R=sparse.lil_matrix((len(v),self.N_win))
+        R=sparse.lil_matrix((len(v),self.N_win),dtype='complex128')
         b=v*self.N_win
         b_rounded=np.round(b)
         b_frac=b_rounded-b

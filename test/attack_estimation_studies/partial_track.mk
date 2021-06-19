@@ -9,7 +9,8 @@ spectral_difference.py \
 common.py \
 peak_finder.py \
 test/gradient_partial_tracker/dft_hill_climbing.py \
-partial_processing.py
+partial_processing.py \
+freq_dom_window.py
 
 .testout/sonnet_m11_p45_th_a.npz : $(mkfile_path)/sonnet_note.sh \
 								   $(TS_SCRIPTS)
