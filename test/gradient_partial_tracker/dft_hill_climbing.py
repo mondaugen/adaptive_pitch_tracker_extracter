@@ -281,8 +281,12 @@ def adaptive_ghc_hop_log_pow_v(x,v_k,w,H,mu=1e-6,max_step=float('inf'),verbose=F
         if grad_step_warmup and n*H < Nw:
             cur_grad[:]=0
         grad[n]=cur_grad
-        if harmonic_lock:
+        if harmonic_lock == 'average':
             mean_grad=grad[n].mean()
+            v_k = v_k + np.clip(mu * mean_grad * harm_nums,-max_step,max_step)
+        elif harmonic_lock == 'amplitude_weighted':
+            tot_pow=np.sum(np.abs(X))
+            mean_grad=(grad[n] * np.abs(X) / tot_pow).mean()
             v_k = v_k + np.clip(mu * mean_grad * harm_nums,-max_step,max_step)
         else:
             v_k = v_k + np.clip(mu * grad[n],-max_step,max_step)

@@ -19,8 +19,8 @@ def calc_window_with_radius(window_name,lobe_radius):
         evalbins=np.arange(-evalradius,evalradius+1)
         bins=evalbins/oversamp
         # Oversampled fourier transform matrix
-        F=np.exp(j*2*np.pi*bins[:,None]*np.arange(N_win)/N_win)/N_win
-        # Divide by N_win to remove the fourier transform constant ?
+        # Divide by N_win to remove the fourier transform constant
+        F=np.exp(-j*2*np.pi*bins[:,None]*np.arange(N_win)/N_win)/N_win
         vals=(F@w)[:len(evalbins)]
         return (bins,vals)
     return f
@@ -80,8 +80,8 @@ class freq_dom_window:
         b=v*self.N_win
         b_rounded=np.round(b)
         b_frac=b_rounded-b
-        b_ranges=b_frac[:,None]+self.lu_bins
-        b_indices=(b_rounded[:,None]+self.lu_bins).astype('int') % self.N_win
+        b_ranges=-b_frac[:,None]+self.lu_bins
+        b_indices=(-b_rounded[:,None]+self.lu_bins).astype('int') % self.N_win
         r_indices=np.arange(len(v))[:,None]*np.ones(len(self.lu_bins))
         R[r_indices.flatten(),b_indices.flatten()]=self.W_lookup(b_ranges.flatten())
         return R.tocsr()

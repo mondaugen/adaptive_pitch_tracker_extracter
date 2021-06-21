@@ -41,6 +41,20 @@ plot_sonnet_m11_p45_th_a : .testout/sonnet_m11_p45_th_a.npz
 	PTRACK_F0='p:52' \
 	PTRACK_SMOOTH_A='squish_anomalies:2' bash $<
 
+.testout/sucrier_horns_p64_smooth_squish.npz : $(mkfile_path)/sonnet_note.sh \
+								   $(TS_SCRIPTS)
+	INFILE=sounds/sucrier_horns-1ch_44.1k.f64 \
+	PTRACK_OUT='.testout/sucrier_horns_p64_smooth_squish.f64' \
+	PTRACK_TH_A_OUT=$@ \
+	PTRACK_F0='p:73' \
+	PTRACK_T0=23.8 \
+	PTRACK_DUR=1.7 \
+	TMIN=23.8 \
+	TMAX=25.5 \
+	PTRACK_MU=1e-6 \
+	PTRACK_HARM_LOCK=amplitude_weighted \
+	PTRACK_SMOOTH_A='squish_anomalies:2' bash $<
+
 plot_sonnet_m11_p45_th_a_smooth_squish : .testout/sonnet_m11_p45_th_a_smooth_squish.npz
 	PYTHONPATH=. PTRACK_TH_A=.testout/sonnet_m11_p45_th_a_smooth_squish.npz python3 \
 		scripts/plot_partial_tracks.py

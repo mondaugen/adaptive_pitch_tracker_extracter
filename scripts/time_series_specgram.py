@@ -75,14 +75,14 @@ PTRACK_WINTYPE=envget('PTRACK_WINTYPE','hann')
 # Partial tracking window length
 PTRACK_WINLEN=int(envget('PTRACK_WINLEN','4096'))
 # Partial tracking window oversampling
-PTRACK_WIN_OS=int(envget('PTRACK_WIN_OS','64'))
+PTRACK_WIN_OS=int(envget('PTRACK_WIN_OS','16'))
 # Partial tracking hop size (applies only to certain algorithms)
 PTRACK_H=int(envget('PTRACK_H','1024'))
 # Force hop size to 1 if not using the hop method
 if PTRACK_METHOD != 'hop':
     PTRACK_H=1
 # If harmonic locking should be done
-PTRACK_HARM_LOCK=bool(int(envget('PTRACK_HARM_LOCK','0')))
+PTRACK_HARM_LOCK=envget('PTRACK_HARM_LOCK','0')
 # If true, tries to remove partial from original sound and plots spectrogram
 PTRACK_REMOVE=int(envget('PTRACK_REMOVE','0'))
 # Where to write the partial to
