@@ -85,13 +85,27 @@ class freq_dom_window:
         r_indices=np.arange(len(v))[:,None]*np.ones(len(self.lu_bins))
         R[r_indices.flatten(),b_indices.flatten()]=self.W_lookup(b_ranges.flatten())
         return R.tocsr()
-        
-def dft(x,R):
+
+def calc_X(x):
     X=np.fft.fft(x)
+    return X
+
+def calc_dX(x):
+    N=len(x)
+    x_=x*j*2*np.pi*np.arange(N)
+    dX=calc_X(x_)
+    return dX
+        
+def dftX(X,R):
     RX=R@np.conj(X)
     return RX
 
+def dft(x,R):
+    X=calc_X(x)
+    return dftX(X,R)
+
 def dft_dv(x,R):
-    N=len(x)
-    x_=x*j*2*np.pi*np.arange(N)
+    x_=calc_dX(x)
     return dft(x_,R)
+
+    

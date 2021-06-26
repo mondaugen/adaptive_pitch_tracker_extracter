@@ -234,7 +234,7 @@ def adaptive_ghc_recsumcos_log_pow_v(x,v_k,wp,Nw,mu=1e-6,max_step=float('inf'),
         Xs[n] = Xv
     return v_ks, Xs, grad
 
-def adaptive_ghc_hop_log_pow_v(x,v_k,w,H,mu=1e-6,max_step=float('inf'),verbose=False, harmonic_lock=False,grad_step_warmup=True):
+def adaptive_ghc_hop_log_pow_v(x,v_k,w,H,mu=1e-6,max_step=float('inf'),verbose=False, harmonic_lock=False,grad_step_warmup=True,steps_per_frame=1):
     """
     Tracks partials starting at initial estimates in v_k and updating them using
     a gradient ascent algorithm.
@@ -258,6 +258,7 @@ def adaptive_ghc_hop_log_pow_v(x,v_k,w,H,mu=1e-6,max_step=float('inf'),verbose=F
                    gradient step until Nw samples have been processed. This is
                    to prevent using gradients that occur due to the transition
                    from silence to signal for early steps.
+    steps_per_frame is the number of gradient steps taken for each H samples
     """
     Nw=len(w)
     assert(H <= Nw)
@@ -274,24 +275,27 @@ def adaptive_ghc_hop_log_pow_v(x,v_k,w,H,mu=1e-6,max_step=float('inf'),verbose=F
     for n, _ in enumerate(x[:len(x)-Nw:H]):
         buf[:-H] = buf[H:]
         buf[-H:] = x[H*n:H*(n+1)]
-        R=w.R(v_k)
-        X=freq_dom_window.dft(buf,R)
-        dX=freq_dom_window.dft_dv(buf,R)
-        cur_grad=grad_compute(None,None,X=X,dX=dX)
-        if grad_step_warmup and n*H < Nw:
-            cur_grad[:]=0
-        grad[n]=cur_grad
-        if harmonic_lock == 'average':
-            mean_grad=grad[n].mean()
-            v_k = v_k + np.clip(mu * mean_grad * harm_nums,-max_step,max_step)
-        elif harmonic_lock == 'amplitude_weighted':
-            tot_pow=np.sum(np.abs(X))
-            mean_grad=(grad[n] * np.abs(X) / tot_pow).mean()
-            v_k = v_k + np.clip(mu * mean_grad * harm_nums,-max_step,max_step)
-        else:
-            v_k = v_k + np.clip(mu * grad[n],-max_step,max_step)
+        X=freq_dom_window.calc_X(buf)
+        dX=freq_dom_window.calc_dX(buf)
+        for step in np.arange(steps_per_frame):
+            R=w.R(v_k)
+            X_=freq_dom_window.dftX(X,R)
+            dX_=freq_dom_window.dftX(dX,R)
+            cur_grad=grad_compute(None,None,X=X_,dX=dX_)
+            if grad_step_warmup and n*H < Nw:
+                cur_grad[:]=0
+            grad[n]=cur_grad
+            if harmonic_lock == 'average':
+                mean_grad=grad[n].mean()
+                v_k = v_k + np.clip(mu * mean_grad * harm_nums,-max_step,max_step)
+            elif harmonic_lock == 'amplitude_weighted':
+                tot_pow=np.sum(np.abs(X_))
+                mean_grad=(grad[n] * np.abs(X_) / tot_pow).mean()
+                v_k = v_k + np.clip(mu * mean_grad * harm_nums,-max_step,max_step)
+            else:
+                v_k = v_k + np.clip(mu * grad[n],-max_step,max_step)
         v_ks[n] = v_k
-        Xs[n] = X
+        Xs[n] = X_
     return v_ks, Xs, grad
 
     
