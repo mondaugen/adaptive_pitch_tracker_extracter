@@ -61,6 +61,12 @@ def next_pow_2(n):
         x = x << 1
     return x
 
+def is_pow_2(n):
+    """ Works only for integer n """
+    if n < 1:
+        return False
+    return n == next_pow_2(n-1)
+
 def mktemp(template='/tmp/%s%s',suf=''):
     """ Make a temporary file. Not secure. """
     return template % (str(uuid.uuid4()),suf)
