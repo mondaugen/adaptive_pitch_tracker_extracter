@@ -30,6 +30,14 @@ def get_window_coefficients(name):
     else:
         raise ValueError("Unsupported window %s" % (name,))
 
+def interpret_wintype(wintype):
+    args=wintype.split(':')
+    if len(args) == 1:
+        return (args[0],None)
+    elif len(args) == 2:
+        # Second argument should be frequency/q pairs
+        return (args[0],np.array(eval(args[1])))
+
 INFILE=envget('INFILE','/tmp/in.f32')
 FS=float(envget('FS','16000'))
 NFFT=int(envget('NFFT','2048'))
@@ -207,9 +215,12 @@ if PTRACK:
         ptrack_t_full=ptrack_t
     elif PTRACK_METHOD == 'hop':
         print('Using "hop" method for partial tracking.')
-        # Replace ptrack_w with accelerated version
-        ptrack_w=freq_dom_window.freq_dom_window(PTRACK_WINLEN,PTRACK_WINTYPE,PTRACK_WIN_OS)
-        #pdb.set_trace()
+        wintype,vq=interpret_wintype(PTRACK_WINTYPE)
+        if vq is None:
+            ptrack_w=freq_dom_window.freq_dom_window(PTRACK_WINLEN,PTRACK_WINTYPE,
+                                                     PTRACK_WIN_OS)
+        else:
+            ptrack_w=freq_dom_window.multi_q_window(PTRACK_WINLEN,vq,wintype,PTRACK_WIN_OS)
         v_ks,Xs,grad=dhc.adaptive_ghc_hop_log_pow_v(x_ptrack,ptrack_v0,ptrack_w,PTRACK_H,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS,verbose=False,harmonic_lock=PTRACK_HARM_LOCK,steps_per_frame=PTRACK_STEPS_PER_FRAME)
         ptrack_t=(np.arange(ptrack_n0,ptrack_n1-1,PTRACK_H)+PTRACK_WINLEN*0.5)/FS
         # Allows plotting interpolated signals
