@@ -149,6 +149,7 @@ def fractional_get_window_dft(wintype,N_win,N_dft,oversample=1):
 # This should be compatible with dftX, dft, dft_dv accepting R argument
 class multi_q_window:
     def __init__(
+    self,
     # Maximum window length (length of DFT)
     N_max,
     # Desired Q for specific, unique v (v normalized frequency), ascending in v and

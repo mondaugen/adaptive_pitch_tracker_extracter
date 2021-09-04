@@ -1,6 +1,6 @@
 """
 
-Load in sounfile
+Load in soundfile
 For each hop, plot the spectrum. This constitutes a frame.
 Concatenate the frames to make a movie.
 
