@@ -171,7 +171,9 @@ class multi_q_window:
     # The window type (e.g., 'blackman')
     wintype,
     # The number of times the fourier transform of the windows are oversampled
-    oversample=16):
+    oversample=16,
+    # The interpolation order on the grid of windows
+    v_q_interp_order=3):
         """
         Returns 2 interpolators.
         The first is an instance of interpolate.interp2d that can be evaluated with x
@@ -182,7 +184,7 @@ class multi_q_window:
         frequency (accepts np.arrays). This gives the approximate lobe radius in
         bins, rounded up.
         """
-        B_l=window_types[wintype]['lobe_radius']/N_max
+        B_l=window_types[wintype]['lobe_radius']
         self.N_max=N_max
         self.m_v=m_v
         self.B_l=B_l
@@ -194,17 +196,19 @@ class multi_q_window:
         self.m=np.array([m for v,m in m_v])
         # Ideal window length (can be fractional)
         self.N_v=N_max/self.m
-        import pdb; pdb.set_trace()
         # Find the DFTs of windows for each N_v
         self.Ws=np.vstack([fractional_get_window_dft(wintype,n_v,N_max,oversample=oversample)
                       for n_v in self.N_v])
         # Find the new lobe radii caused by the smaller N_v
-        self.B_l_v=B_l*N_max/self.N_v
+        self.B_l_v=B_l*self.m
         # TODO: What you want is interpolate.RectBivariateSpline ... or is it?
         self.win_dft_interp=interpolate.RectBivariateSpline(
         self.v,
-        np.arange(N_max*oversample)/oversample,
-        self.Ws)
+        np.arange(N_max*oversample)/oversample - N_max//2,
+        np.hstack((self.Ws[:,-self.Ws.shape[1]//2:],
+                   self.Ws[:,:self.Ws.shape[1]//2])),
+        kx=v_q_interp_order,
+        ky=v_q_interp_order)
         self.lobe_radius_interp=(lambda v_: np.ceil(
             interpolate.interp1d(self.v,self.B_l_v)(v_)))
     def __len__(self):
@@ -223,8 +227,8 @@ class multi_q_window:
         # Figure out what bins are worth looking up
         lobe_radii=self.lobe_radius_interp(v)
         lu_bins=[np.arange(-lr,lr+1) for lr in lobe_radii]
-        b_ranges=[lub - bf for bf,lub in zip(b_frac,lu_bins)]
-        b_indices=[(lub - br) % self.N_max for br,lub in zip(b_rounded,lu_bins)]
+        b_ranges=[lub + bf for bf,lub in zip(b_frac,lu_bins)]
+        b_indices=[(lub + br) % self.N_max for br,lub in zip(b_rounded,lu_bins)]
         r_indices=[idx * np.ones(len(lub)) for idx,lub in enumerate(lu_bins)]
         vs=[v_ * np.ones(len(lub)) for v_,lub in zip(v,lu_bins)]
         R[np.concatenate(r_indices),np.concatenate(b_indices)]=self.win_dft_interp(
