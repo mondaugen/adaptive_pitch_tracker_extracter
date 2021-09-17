@@ -190,7 +190,7 @@ if PTRACK:
     # the specified range
     x_ptrack=x[ptrack_n0:ptrack_n1+PTRACK_WINLEN-1]
     # Time-domain window used with 'classic' and 'hop' methods
-    ptrack_w=signal.get_window(PTRACK_WINTYPE,PTRACK_WINLEN)
+    ptrack_w=signal.get_window(interpret_wintype(PTRACK_WINTYPE)[0],PTRACK_WINLEN)
     # Normalize window
     ptrack_w/=np.sum(ptrack_w)
     if PTRACK_METHOD == 'classic':
@@ -217,7 +217,7 @@ if PTRACK:
         print('Using "hop" method for partial tracking.')
         wintype,vq=interpret_wintype(PTRACK_WINTYPE)
         if vq is None:
-            ptrack_w=freq_dom_window.freq_dom_window(PTRACK_WINLEN,PTRACK_WINTYPE,
+            ptrack_w=freq_dom_window.freq_dom_window(PTRACK_WINLEN,wintype,
                                                      PTRACK_WIN_OS)
         else:
             ptrack_w=freq_dom_window.multi_q_window(PTRACK_WINLEN,vq,wintype,PTRACK_WIN_OS)

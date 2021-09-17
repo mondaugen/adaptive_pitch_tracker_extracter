@@ -13,10 +13,10 @@
 [ -z $PTRACK_MU ] && export PTRACK_MU=3e-8
 [ -z $PTRACK_F0_MODE ] && export PTRACK_F0_MODE=harmonics
 [ -z $PTRACK_HARM_LOCK ] && export PTRACK_HARM_LOCK=1
+[ -z $PTRACK_WINTYPE ] && export PTRACK_WINTYPE=blackman
 
 PEAK_T=1e-3 \
 PTRACK_REMOVE=0 \
-PTRACK_WINTYPE=blackman \
 PTRACK_METHOD=hop \
 PTRACK_WINLEN=2048 \
 PTRACK_H=512 \

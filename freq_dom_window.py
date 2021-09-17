@@ -9,25 +9,21 @@ from common import is_pow_2
 from math import floor, ceil
 from functools import partial
 
-import pdb
-
 j=complex('j')
 
 def calc_window_with_radius(window_name,lobe_radius):
     def f(N_win,oversamp):
-        l=N_win
-        w=signal.get_window(window_name,N_win)
-        w/=np.sum(w)
+        W=fractional_get_window_dft(window_name,N_win,N_win,oversample=oversamp,real=False,symmetrical_padding=False)
         evalradius=lobe_radius*oversamp
         evalbins=np.arange(-evalradius,evalradius+1)
         bins=evalbins/oversamp
         # Oversampled fourier transform matrix
         # Divide by N_win to remove the fourier transform constant
-        F=np.exp(-j*2*np.pi*bins[:,None]*np.arange(N_win)/N_win)/N_win
-        vals=(F@w)[:len(evalbins)]
+        vals=np.concatenate((W[-evalradius:],W[:evalradius+1]))
         return (bins,vals)
     return f
 
+calc_blackmanharris=calc_window_with_radius('blackmanharris',4)
 calc_blackman=calc_window_with_radius('blackman',3)
 calc_hann=calc_window_with_radius('hann',2)
 
@@ -43,6 +39,10 @@ window_types = {
         # this function must return bins and vals, where bins are the bins at
         # which the DFT of the window was evaluated and vals the values there
         # NOTE: This function should return real values
+        'calc' : calc_blackman
+    },
+    'blackmanharris' : {
+        'lobe_radius' : 4,
         'calc' : calc_blackman
     },
     'hann' : {
@@ -113,18 +113,21 @@ def dft_dv(x,R):
 
     
 
-def get_padded_window(wintype,N,N_max):
+def get_padded_window(wintype,N,N_max,symmetrical=True):
     # Only works if N_max is power of 2 and N is even
     assert is_pow_2(N_max)
     assert N <= N_max
     assert (N % 2) == 0
     w=np.zeros(N_max)
     w_=signal.get_window(wintype,N)
-    w[:N//2]=w_[N//2:]
-    w[-N//2:]=w_[:N//2]
+    if symmetrical:
+        w[:N//2]=w_[N//2:]
+        w[-N//2:]=w_[:N//2]
+    else:
+        w[:N]=w_
     return w
 
-def fractional_get_window_dft(wintype,N_win,N_dft,oversample=1,real=True):
+def fractional_get_window_dft(wintype,N_win,N_dft,oversample=1,real=True,symmetrical_padding=True):
     """
     Get the Fourier transform of length N_dft of a window of length N_win of
     type wintype.  N_win can be fractional: the Fourier transforms of the
@@ -132,9 +135,9 @@ def fractional_get_window_dft(wintype,N_win,N_dft,oversample=1,real=True):
     interpolated linearly.
     oversample is the number of times the fourier transform is oversampled
     If real is True, output the real part only, otherwise output the complex spectrum.
-    Note that if wintype is symmetrical (usual case), then because the windows
-    are zero padded such that the "periodized" window function is an even
-    function, then the spectrum of the window is purely real and setting
+    If symmetrical_padding is True and wintype is symmetrical (usual case), then
+    the windows are zero padded such that the "periodized" window function is an
+    even function, and the spectrum of the window is purely real and setting
     real=True discards no information.
     """
     N_dft *= oversample
@@ -144,8 +147,8 @@ def fractional_get_window_dft(wintype,N_win,N_dft,oversample=1,real=True):
         frac = 0
     else:
         frac=(N_win - N_win_f)/(N_win_c - N_win_f)
-    w0=get_padded_window(wintype,N_win_f,N_dft)
-    w1=get_padded_window(wintype,N_win_c,N_dft)
+    w0=get_padded_window(wintype,N_win_f,N_dft,symmetrical=symmetrical_padding)
+    w1=get_padded_window(wintype,N_win_c,N_dft,symmetrical=symmetrical_padding)
     W0=np.fft.fft(w0)/np.sum(w0)
     W1=np.fft.fft(w1)/np.sum(w1)
     ret = W0 + frac * (W1 - W0)
@@ -190,7 +193,7 @@ class multi_q_window:
         self.B_l=B_l
         self.wintype=wintype
         self.oversample=oversample
-        assert all(0 <= v < 1 for v,_ in m_v)
+        assert all(0 <= v <= 1 for v,_ in m_v)
         assert all(m > 0 for _,m in m_v)
         self.v=np.array([v for v,m in m_v])
         self.m=np.array([m for v,m in m_v])
@@ -231,6 +234,11 @@ class multi_q_window:
         b_indices=[(lub + br) % self.N_max for br,lub in zip(b_rounded,lu_bins)]
         r_indices=[idx * np.ones(len(lub)) for idx,lub in enumerate(lu_bins)]
         vs=[v_ * np.ones(len(lub)) for v_,lub in zip(v,lu_bins)]
+        # TODO: the values getting written into R need to be multiplied by a
+        # complex exponential sequence as to shift them in time (the window they
+        # represent the fourier transform of is not one at the correct time)
+        # specificaly I think the windows need to be shifted back half a DFT
+        # length (the window length multiplied by oversample) in time.
         R[np.concatenate(r_indices),np.concatenate(b_indices)]=self.win_dft_interp(
             np.concatenate(vs),np.concatenate(b_ranges),grid=False)
         return R.tocsr()
