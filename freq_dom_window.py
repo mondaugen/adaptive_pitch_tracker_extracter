@@ -193,6 +193,7 @@ class multi_q_window:
         self.B_l=B_l
         self.wintype=wintype
         self.oversample=oversample
+        self.N_os=self.N_max*self.oversample
         assert all(0 <= v <= 1 for v,_ in m_v)
         assert all(m > 0 for _,m in m_v)
         self.v=np.array([v for v,m in m_v])
@@ -207,7 +208,7 @@ class multi_q_window:
         # TODO: What you want is interpolate.RectBivariateSpline ... or is it?
         self.win_dft_interp=interpolate.RectBivariateSpline(
         self.v,
-        np.arange(N_max*oversample)/oversample - N_max//2,
+        np.arange(self.N_os)/oversample - N_max//2,
         np.hstack((self.Ws[:,-self.Ws.shape[1]//2:],
                    self.Ws[:,:self.Ws.shape[1]//2])),
         kx=v_q_interp_order,
@@ -231,16 +232,18 @@ class multi_q_window:
         lobe_radii=self.lobe_radius_interp(v)
         lu_bins=[np.arange(-lr,lr+1) for lr in lobe_radii]
         b_ranges=[lub + bf for bf,lub in zip(b_frac,lu_bins)]
-        b_indices=[(lub + br) % self.N_max for br,lub in zip(b_rounded,lu_bins)]
+        b_indices=[(self.N_max - (lub + br)) % self.N_max for br,lub in zip(b_rounded,lu_bins)]
         r_indices=[idx * np.ones(len(lub)) for idx,lub in enumerate(lu_bins)]
         vs=[v_ * np.ones(len(lub)) for v_,lub in zip(v,lu_bins)]
+        a=-self.N_max/2
+        fdt_shift=[np.exp(-2*np.pi*j*a*(b_+lub)/self.N_max) for b_,lub in zip(b,lu_bins)]
         # TODO: the values getting written into R need to be multiplied by a
         # complex exponential sequence as to shift them in time (the window they
         # represent the fourier transform of is not one at the correct time)
         # specificaly I think the windows need to be shifted back half a DFT
         # length (the window length multiplied by oversample) in time.
-        R[np.concatenate(r_indices),np.concatenate(b_indices)]=self.win_dft_interp(
-            np.concatenate(vs),np.concatenate(b_ranges),grid=False)
+        R[np.concatenate(r_indices),np.concatenate(b_indices)]=np.conj(self.win_dft_interp(
+            np.concatenate(vs),np.concatenate(b_ranges),grid=False)*np.concatenate(fdt_shift))
         return R.tocsr()
 
 # TODO: First try getting a sort of constant Q transform of an STFT: the

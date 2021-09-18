@@ -220,7 +220,7 @@ if PTRACK:
             ptrack_w=freq_dom_window.freq_dom_window(PTRACK_WINLEN,wintype,
                                                      PTRACK_WIN_OS)
         else:
-            ptrack_w=freq_dom_window.multi_q_window(PTRACK_WINLEN,vq,wintype,PTRACK_WIN_OS)
+            ptrack_w=freq_dom_window.multi_q_window(PTRACK_WINLEN,vq,wintype,PTRACK_WIN_OS,v_q_interp_order=1)
         v_ks,Xs,grad=dhc.adaptive_ghc_hop_log_pow_v(x_ptrack,ptrack_v0,ptrack_w,PTRACK_H,mu=PTRACK_MU,max_step=PTRACK_MAX_STEP/FS,verbose=False,harmonic_lock=PTRACK_HARM_LOCK,steps_per_frame=PTRACK_STEPS_PER_FRAME)
         ptrack_t=(np.arange(ptrack_n0,ptrack_n1-1,PTRACK_H)+PTRACK_WINLEN*0.5)/FS
         # Allows plotting interpolated signals
@@ -267,7 +267,7 @@ if PTRACK:
         np.abs(Xs).tofile(PTRACK_A_OUT)
         v_ks.tofile(PTRACK_F0_OUT)
     Xs_out=np.sum(np.real(Xs).copy(),axis=1)
-    Xs_out.tofile(PTRACK_OUT)
+    common.normalize(Xs_out).tofile(PTRACK_OUT)
     if PTRACK_REMOVE:
         fig_ptrack,ax_ptrack=plt.subplots(1,1)
         x_no_partial=np.zeros_like(x)
