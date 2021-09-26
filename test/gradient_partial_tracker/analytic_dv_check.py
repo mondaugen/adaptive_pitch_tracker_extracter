@@ -1,6 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+print_ = print
+
+show_plot=True
+print_data=True
+
+def print(*args):
+    if print_data:
+        print_(*args)
+
 def dirichlet(k,W,N):
     ret = np.sin((np.pi*W*k)/N)/(W*np.sin(np.pi*k/N))
     ret[k == 0] = 1
@@ -30,18 +39,18 @@ plt.legend()
 plt.figure()
 dXth=dirichlet_dk(n,W,N)
 dXthfd=np.diff(Xth)
-n_=np.concatenate((np.arange(N//2),np.arange(N//2)-N))
-# This I got to by guessing but it's getting closer...
-#dX=-j*2*np.pi/N*np.fft.fft(n_*x/N)
-dX=np.fft.fft(-j*2*np.pi/N*n*x)
+n_=np.concatenate((np.arange(N//2),np.arange(N//2)-N//2))
+nx=n_*x
+print("nx*W:")
+print(nx*W)
+dX=np.fft.fft(-j*2*np.pi/N*nx)
 plt.plot(n,np.real(dX),label='computed_real')
 plt.plot(n,np.imag(dX),label='computed_imag')
-plt.plot(n,np.abs(dX),label='computed_abs')
-plt.plot(n[:-1]+0.5,dXthfd,label='finite difference')
-plt.plot(n,dXth,label='theoretical')
-print("quotient")
-print(np.angle(dX))
-#print("abs quotient")
-#print(np.abs(dX/dXth))
+plt.plot(n,np.abs(dX),'--',label='computed_abs')
+plt.plot(n[:-1]+0.5,dXthfd,'--',label='finite difference')
+plt.plot(n,dXth,'--',label='theoretical')
 plt.legend()
-plt.show()
+print("sum(abs(computed_real-theoretical)):",
+np.sum(np.abs(np.real(dX)-dXth)))
+if show_plot:
+    plt.show()
