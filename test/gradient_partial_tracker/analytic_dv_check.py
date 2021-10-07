@@ -16,8 +16,8 @@ def print(*args):
 j=complex('j')
 N=4096
 n=np.arange(N)
-W=1023
-k=np.linspace(0,4,1000) # non-integer bins
+W=7
+k=np.linspace(0,100,123) # non-integer bins
 x=rectangular(n,W,N)
 plt.plot(n,x)
 X=np.fft.fft(x)
@@ -72,6 +72,15 @@ plt.plot(n[:-1]+0.5,dPfd,label='finite difference')
 plt.plot(n,dP,label='computed')
 plt.plot(k,ps_dk(Xni,dXni,extract=np.real),label='non-integer k real')
 plt.plot(k,ps_dk(Xni,dXni,extract=np.imag),label='non-integer k imaginary')
+plt.legend()
+
+# oversampled using zero-padding
+x_zp = np.concatenate((x[:N//2],np.zeros(N),x[N//2:]))
+X_zp = np.fft.fft(x_zp)
+n_zp = np.arange(0,N,0.5)
+plt.figure()
+plt.plot(n,np.real(X),label="original")
+plt.plot(n_zp,np.real(X_zp),label="zero-padded")
 plt.legend()
 
 
