@@ -47,8 +47,26 @@ def ps_dk(X,dX,extract=np.real):
     """ Power spectrum derivative. """
     return extract(X*np.conj(dX)+dX*np.conj(X))
 
+def log_ps_dk(X,dX,extract=np.real):
+    return extract(np.conj(dX)/np.conj(X) + dX/X)
+
+def dft_bin_log_ps_dk(x,k):
+    X=dft_bin(x,k)
+    dX=dft_bin(x,k,p=1)
+    return log_ps_dk(X,dX)
+
 def gradient_ascent_step(x,k0,mu,grad=dft_bin_grad(1)):
     k1 = k0 + mu * np.real(grad(x,k0))
+    return k1
+
+def gradient_ascent_step_harm_lock(x,k0,mu,grad=dft_bin_grad(1),grad_weight='equal'):
+    g=np.real(grad(x,k0))
+    if grad_weight == 'equal':
+        step=g.mean()
+    elif grad_weight == '1/p':
+        step=(g/(1+np.arange(len(g)))).mean()
+    k_step = mu * step * (1+np.arange(len(k0)))
+    k1 = k0 + k_step
     return k1
 
 def newton_ascent_step(x,k0,grad=dft_bin_grad(1),grad2=dft_bin_grad(2)):
