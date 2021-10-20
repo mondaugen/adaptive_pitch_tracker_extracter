@@ -33,3 +33,30 @@ def comb(t,v0,t1,v1,method='linear',phi=0,vertex_zero=True,v_max=0.5,partial_amp
     ret=X.sum(axis=0)
     return ret
         
+def sum_of_cos(
+    # array of cosine coefficients
+    a,
+    # the period of the window. This means that a[1] is the coefficient of a
+    # sampled cosine of angular velocity v whose cycle takes L samples, i.e.,
+    # cos(0) == cos(vL)
+    L,
+    # the length of boxcar whose center as at sample time 0. This should be odd
+    # if a purely real fourier transform is desired.
+    W,
+    # the length of the signal, usually a power of 2 > W (so the DFT of the
+    # resulting signal can be taken easily)
+    N
+):
+    Q=len(a)
+    x=np.zeros(N)
+    l=np.arange(-W//2,W//2+1)
+    w=np.sum(a[:,None]*np.cos(
+            2*np.pi/L*np.multiply.outer(np.arange(Q),l)),axis=0)
+    x[:W//2+1]=w[W//2:]
+    x[-W//2:]=w[:W//2]
+    return x
+
+def csinusoid()
+    raise NotImplementedError
+    # period of the sinusoid, so like L argument to sum_of_cos but function is exp(j
+    # L, 
