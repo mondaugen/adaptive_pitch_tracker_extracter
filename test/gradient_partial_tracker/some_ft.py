@@ -18,4 +18,5 @@ def dirichlet_dk(k,W,N,normalized=True):
     ret[k == 0] = 0
     return ret
 
-
+def sum_of_cos_dft():
+    raise NotImplementedError
