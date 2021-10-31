@@ -2,6 +2,7 @@
 
 import numpy as np
 from scipy import signal
+from common import cast_array
 
 j=complex('j')
 
@@ -47,16 +48,17 @@ def sum_of_cos(
     # resulting signal can be taken easily)
     N
 ):
+    a=cast_array(a)
     Q=len(a)
     x=np.zeros(N)
-    l=np.arange(-W//2,W//2+1)
+    l=np.arange(-(W//2),W//2+1)
     w=np.sum(a[:,None]*np.cos(
             2*np.pi/L*np.multiply.outer(np.arange(Q),l)),axis=0)
-    x[:W//2+1]=w[W//2:]
-    x[-W//2:]=w[:W//2]
+    x[:W//2+1]=w[-(W//2+1):]
+    x[-(W//2):]=w[:W//2]
     return x
 
-def csinusoid()
+def csinusoid():
     raise NotImplementedError
     # period of the sinusoid, so like L argument to sum_of_cos but function is exp(j
     # L, 

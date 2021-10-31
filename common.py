@@ -114,3 +114,7 @@ def wrap(x,low=0,high=2.*np.pi):
 def dB(x):
     return 20*np.log10(x)
 
+def cast_array(x):
+    if not isinstance(x,np.ndarray):
+        return np.array(x)
+    return x
