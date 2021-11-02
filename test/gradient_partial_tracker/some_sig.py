@@ -67,3 +67,12 @@ def mod_sum_of_cos(v,a,L,W,N):
     w[:W//2+1]*=np.exp(j*2*np.pi*l*nl/N)
     w[-(W//2):]*=np.exp(j*2*np.pi*l*nr/N)
     return w
+
+def _multi(B,V,A,L,W,N,fun):
+    w=np.zeros(N,dtype='complex128')
+    for b,v in zip(B,V):
+        w += b*fun(v,A,L,W,N)
+    return w
+
+def multi_mod_sum_of_cos(B,V,A,L,W,N):
+    return _multi(B,V,A,L,W,N,mod_sum_of_cos)

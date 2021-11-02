@@ -64,3 +64,15 @@ def mod_sum_of_cos_dft_df(f0,Fs,f,A,L,W,N):
     k=f/Fs*N
     return mod_sum_of_cos_dft_dk(k0,k,A,L,W,N)
 
+def _multi(B,V,k,A,L,W,N,fun):
+    A=cast_array(A)
+    w=np.zeros(N,dtype=A.dtype)
+    for b,v in zip(B,V):
+        w += b*fun(v,k,A,L,W,N)
+    return w
+
+def multi_mod_sum_of_cos_dft_k(B,K0,k,A,L,W,N):
+    return _multi(B,K0,k,A,L,W,N,mod_sum_of_cos_dft_k)
+
+def multi_mod_sum_of_cos_dft_dk(B,K0,k,A,L,W,N):
+    return _multi(B,K0,k,A,L,W,N,mod_sum_of_cos_dft_dk)
