@@ -16,7 +16,7 @@ def dirichlet_dk(k,W,N,normalized=True):
     if normalized:
         C=1/W
     ret = C*W*np.pi/(N*np.sin(np.pi*k/N))*(np.cos(np.pi*W*k/N) - np.sin(np.pi*W*k/N)*np.cos(np.pi*k/N)/(W*np.sin(np.pi*k/N)))
-    ret[k == 0] = 0
+    ret[(k%N) == 0] = 0
     return ret
 
 def sum_of_cos_dft(
@@ -29,13 +29,38 @@ def sum_of_cos_dft(
     # transform is desired
     W,
     # the length of the DFT
-    N
+    N,
+    # a dirichlet-like function
+    D = lambda k,W,N: dirichlet(k,W,N,normalized=False)
 ):
     A=cast_array(A)
     r = np.zeros_like(k).astype(A.dtype)
     B = N/L # bin width
-    D = lambda k,W,N: dirichlet(k,W,N,normalized=False)
     for  p, a in enumerate(A):
         r += a*0.5*(D(k-p*B,W,N)+D(k+p*B,W,N))
     return r
+
+def mod_sum_of_cos_dft(v,k,A,L,W,N):
+    k_v=N*v
+    return sum_of_cos_dft(k-k_v,A,L,W,N)
+
+def mod_sum_of_cos_dft_k(k0,k,A,L,W,N):
+    return sum_of_cos_dft(k-k0,A,L,W,N)
+
+def sum_of_cos_dft_dk(k,A,L,W,N):
+    return sum_of_cos_dft(
+        k,A,L,W,N,D=lambda k,W,N: dirichlet_dk(k,W,N,normalized=False))
+
+def mod_sum_of_cos_dft_dk(k0,k,A,L,W,N):
+    # like sum_of_cos_dft_dk but of a signal modulated by a sinusoid of bin
+    # frequency k0
+    return sum_of_cos_dft_dk(k-k0,A,L,W,N)
+
+def mod_sum_of_cos_dft_df(f0,Fs,f,A,L,W,N):
+    # Like mod_sum_of_cos_dft_dk but in units of frequency (modulated by a
+    # sinusoid of bin frequency f0 and with a sampling rate of Fs)
+    v0=f0/Fs
+    k0=v0*N
+    k=f/Fs*N
+    return mod_sum_of_cos_dft_dk(k0,k,A,L,W,N)
 

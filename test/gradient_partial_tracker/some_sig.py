@@ -58,7 +58,12 @@ def sum_of_cos(
     x[-(W//2):]=w[:W//2]
     return x
 
-def csinusoid():
-    raise NotImplementedError
-    # period of the sinusoid, so like L argument to sum_of_cos but function is exp(j
-    # L, 
+def mod_sum_of_cos(v,a,L,W,N):
+    l=v*N
+    # the modulator must be symmetrical around time-0 (the centre of the boxcar)
+    nl=np.arange(W//2+1)
+    nr=np.arange(-(W//2),0)
+    w=sum_of_cos(a,L,W,N).astype('complex128')
+    w[:W//2+1]*=np.exp(j*2*np.pi*l*nl/N)
+    w[-(W//2):]*=np.exp(j*2*np.pi*l*nr/N)
+    return w
