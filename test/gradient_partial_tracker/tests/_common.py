@@ -1,6 +1,6 @@
 import numpy as np
 from some_sig import mod_sum_of_cos
-from some_ft import mod_sum_of_cos_dft, mod_sum_of_cos_dft_dk, mod_sum_of_cos_dft_k
+from some_ft import mod_sum_of_cos_dft, mod_sum_of_cos_dft_dk, mod_sum_of_cos_dft_k, normalize_sum_of_cos_A
 from dftdk import dft_bin
 import matplotlib.pyplot as plt
 
@@ -13,8 +13,11 @@ def check_dv_dft(
     Fs=16e3,
     x_td=mod_sum_of_cos,
     x_dft=mod_sum_of_cos_dft_k,
-    x_ddft=mod_sum_of_cos_dft_dk
+    x_ddft=mod_sum_of_cos_dft_dk,
+    normalize=True
 ):
+    if normalize:
+        A=normalize_sum_of_cos_A(A,L,W,N)
     k=np.arange(N)
     k0=v*N
     w=x_td(v,A,L,W,N)

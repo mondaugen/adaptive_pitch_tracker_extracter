@@ -76,3 +76,22 @@ def multi_mod_sum_of_cos_dft_k(B,K0,k,A,L,W,N):
 
 def multi_mod_sum_of_cos_dft_dk(B,K0,k,A,L,W,N):
     return _multi(B,K0,k,A,L,W,N,mod_sum_of_cos_dft_dk)
+
+def normalize_sum_of_cos_A(A,L,W,N,normalized=False):
+    """
+    Multiply all elements of A with a constant such that the fourier transform
+    of a sum of cosine window using A as the coefficients will be 1 at k=0
+    This is confusing: normalized refers to the "normalized" argument of
+    dirichlet, which there causes it to be divided by W. So it depends what was
+    passed to dirichlet when the sum-of-cosine window's FT was computed (using
+    the definitions, not the DFT). For all the *sum_of_cos* functions above,
+    normalized is set to False by default (see the D argument of sum_of_cos_dft).
+    """
+    D = lambda k: dirichlet(k,W,N,normalized=normalized)
+    B = N/L # bin width
+    A=cast_array(A)
+    C=np.sum(A*D(B*np.arange(len(A))))
+    A/=C
+    return A
+
+
