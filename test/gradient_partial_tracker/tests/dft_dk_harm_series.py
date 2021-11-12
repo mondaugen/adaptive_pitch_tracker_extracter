@@ -10,6 +10,7 @@ from some_ft import (multi_mod_sum_of_cos_dft_k,
                      multi_mod_sum_of_cos_dft_dk,
                      multi_mod_sum_of_cos_dft_k,
                      normalize_sum_of_cos_A)
+from some_sig import mod_sum_of_cos, multiply_ramp, multi_mod_sum_of_cos
 
 
 N=2048
@@ -17,15 +18,37 @@ W=1023
 L=W+1
 k0_sig=N*0.1
 k0_anl=N*np.power(0.1,1/12) # can specify in semitones
+v0_sig=k0_sig/N
+v0_anl=k0_anl/N
 # partial multipliers
-p=(1+np.arange(10))
+P=10
+p=(1+np.arange(P))
 # amplitude scalars
 B=1./p
 A=normalize_sum_of_cos_A([0.42,0.5,0.08],L,W,N)
 dX_dk=multi_mod_sum_of_cos_dft_dk(B,k0_sig*p,k0_anl*p,A,L,W,N)
 avg_dX_dk=dX_dk.mean()
 
-print(avg_dX_dk)
+# The average derivative
+print("avg_dX_dk:",avg_dX_dk)
 
-# TODO: Find the same value simply by finding the inner product with a signal
-# that is the sum of all the harmonics
+# The value of the DFT at each analysis bin
+X=multi_mod_sum_of_cos_dft_k(B,k0_sig*p,k0_anl*p,A,L,W,N)
+X_sum=np.sum(X)
+print("X:",X)
+print("sum(X):",X_sum)
+
+# Now the DFT done directly using two time-domain signals
+x_anl=multi_mod_sum_of_cos(np.ones_like(B),v0_anl*p,A,L,W,N)
+x_sig=multi_mod_sum_of_cos(B,v0_sig*p,[1.],L,W,N)
+X_sum_td=np.sum(np.conj(x_anl)*x_sig)
+print("X_sum_td:",X_sum_td)
+print("X_sum_td/X_sum:",X_sum_td/X_sum)
+
+# DFT dk using time-domain signal
+sig=multiply_ramp(multi_mod_sum_of_cos(B,v0_sig*p,[1.],L,W,N),N,1)
+dX_dk_kern=multi_mod_sum_of_cos(np.ones_like(B)/P,v0_anl*p,A,L,W,N)
+avg_dX_dk_td=(np.conj(dX_dk_kern)*sig).sum()
+print("avg_dX_dk_td:",avg_dX_dk_td)
+print("avg_dX_dk_td/avg_dX_dk:",avg_dX_dk_td/avg_dX_dk)
+# Good

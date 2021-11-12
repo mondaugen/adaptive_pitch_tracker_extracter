@@ -3,6 +3,7 @@
 import numpy as np
 from scipy import signal
 from common import cast_array
+from dftdk import dk_ramp, dk_scale
 
 j=complex('j')
 
@@ -60,13 +61,17 @@ def sum_of_cos(
 
 def mod_sum_of_cos(v,a,L,W,N):
     l=v*N
-    # the modulator must be symmetrical around time-0 (the centre of the boxcar)
+    # the modulator must be conjugate-symmetrical around time-0 (the centre of
+    # the boxcar)
     nl=np.arange(W//2+1)
     nr=np.arange(-(W//2),0)
     w=sum_of_cos(a,L,W,N).astype('complex128')
     w[:W//2+1]*=np.exp(j*2*np.pi*l*nl/N)
     w[-(W//2):]*=np.exp(j*2*np.pi*l*nr/N)
     return w
+
+def multiply_ramp(x,N,p):
+    return dk_ramp(N,p)*dk_scale(N,p)*x
 
 def _multi(B,V,A,L,W,N,fun):
     w=np.zeros(N,dtype='complex128')
