@@ -10,7 +10,7 @@ from some_ft import (multi_mod_sum_of_cos_dft_k,
                      multi_mod_sum_of_cos_dft_dk,
                      multi_mod_sum_of_cos_dft_k,
                      normalize_sum_of_cos_A)
-from some_sig import mod_sum_of_cos, multiply_ramp, multi_mod_sum_of_cos
+from some_sig import sum_of_cos, mod_sum_of_cos, multiply_ramp, multi_mod_sum_of_cos
 
 
 N=2048
@@ -47,7 +47,11 @@ print("X_sum_td/X_sum:",X_sum_td/X_sum)
 
 # DFT dk using time-domain signal
 sig=multiply_ramp(multi_mod_sum_of_cos(B,v0_sig*p,[1.],L,W,N),N,1)
-dX_dk_kern=multi_mod_sum_of_cos(np.ones_like(B)/P,v0_anl*p,A,L,W,N)
+#dX_dk_kern=multi_mod_sum_of_cos(np.ones_like(B)/P,v0_anl*p,A,L,W,N)
+# Done by multiplying the harmonically spaced sinusoids with the window after
+# summing them to prove it can be done this way
+dX_dk_kern=multi_mod_sum_of_cos(
+    np.ones_like(B)/P,v0_anl*p,[1],L,W,N)*sum_of_cos(A,L,W,N)
 avg_dX_dk_td=(np.conj(dX_dk_kern)*sig).sum()
 print("avg_dX_dk_td:",avg_dX_dk_td)
 print("avg_dX_dk_td/avg_dX_dk:",avg_dX_dk_td/avg_dX_dk)

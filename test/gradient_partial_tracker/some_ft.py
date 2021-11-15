@@ -93,5 +93,3 @@ def normalize_sum_of_cos_A(A,L,W,N,normalized=False):
     C=np.sum(A*D(B*np.arange(len(A))))
     A/=C
     return A
-
-

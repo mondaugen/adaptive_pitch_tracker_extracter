@@ -132,82 +132,56 @@ def odd_round_positive(x):
 def window_scale(w):
     return w / w.sum()
 
-class harm_grad_tracker:
+class harm_grad_td:
     """
-    A partial tracker that tracks partials related by the harmonic series.
-    To use, initialize with the lowest and highest frequency you are interested
-    in tracking, this will initialize the wavetables.
-    Then to make analyses, simply call the dft_bin functions on signals.
+    Find the average gradient in the frequency domain by averaging the gradient
+    at harmonically spaced frequencies.
+    The gradients are found using inner-products with sinusoids windowed by
+    sum-of-cosine windows.
     """
     def __init__(self,
-        min_f=55, # A1
-        max_f=110, # A2
-        window=lambda N: window_scale(signal.get_window('blackman',N,fftbins=False)),
-        q=lambda p: 1 + (p-1)/10,
-        sample_rate=44100
+        A,L,W,N,
+        # A function taking the fundamental frequency and harmonic number
+        # (starting at 1) and giving an amplitude
+        B    = lambda k0, p: np.ones_like(p),
+        # dirichlet
+        D    = lambda k,W,N: dirichlet(k,W,N,normalized=False),
+        # d/dk dirichlet
+        D_dk = lambda k,W,N: dirichlet_dk(k,W,N,normalized=False),
+        # Are the coefficients of A normalized so that the fourier transform of
+        # a sinusoid of amplitude 1 at frequency v has a value of 1 at frequency
+        # v?
+        normalize_A=True
+        # Synthesize a harmonic signal with partial amplitudes B at frequencies
+        # V, using the L, W, N parameters passed to __init__.
+        harm_sig=lambda b,v,L,W,N: multi_mod_sum_of_cos(b,v,[1],L,W,N)
     ):
         """
-        Initialize the wavetables for doing gradient ascent tracking of harmonic
-        signals.
-        min_f is the frequency (Hz) of the lowest partial (or fundamental)
-        we are interested in tracking.
-        max_f is the frequency of the highest fundamental we are
-        interested in tracking
-        window is a function accepting a number a returning a window of that
-        length. It is recommended that the window be symmetric and have its
-        maximum at floor(N/2) for odd N.
-        q is a function accepting a partial number and returning a "Q" factor.
-        Here Q is simply interpreted as a divider of maximum window length. So
-        if the window length determined for min_f is N, then the second partial
-        would have length N*q(2) etc. In fact q(p) can be any positive number
-        for p in [1, 2, ...] so N is actually determined using min_f, the
-        sample rate and q(1).
+        See some_ft.sum_of_cos_dft, some_ft.sum_of_cos_dft_dk for descriptions
+        of the function arguments.
         """
-        # window sizes
-        max_p=int(np.floor(sample_rate/2/max_f))
-        N_w=odd_round_positive(sample_rate/min_f/q(np.arange(1,max_p+1))).astype('int')
-        W=np.zeros((max_p,N_w.max()),dtype='complex128')
-        center=N_w.max() // 2
-        self.min_v=min_f/sample_rate
-        for r,n_w in enumerate(N_w):
-            nr=np.arange(-(n_w//2),n_w//2+1)
-            c=center+nr
-            W[r,c] = window(n_w) * np.exp(-j*2.*np.pi*nr*self.min_v*(r+1))
-        self._w=W.mean(axis=0)
-        # TODO: not sure how complex values are interpolated so splitting into
-        # real and imaginary.
-        self.w=np.vstack((self._w.real,self._w.imag))
-        self.n=np.arange(N_w.max()) - center
-        self.w_lu=interpolate.interp1d(self.n,self.w,bounds_error=False,fill_value=0)
-        self.N_w_max=N_w.max()
-        self.max_p=max_p
-        
-    def dft_v(self,x,v0,p=0,N=1):
-        """
-        Compute the inner product of x with self.w. self.w is over- or
-        undersampled so as to adjust its fundamental (in normalized frequency)
-        to v0.
-        x should have length == len(self.n)
-        p (>= 0) is the order of the derivative of the fourier transform
-        computed.
-        N is a scalar passed to dk_scale, so it is used only when p is > 0 (when
-        derivatives are being computed). Basically it can be used to scale the
-        resulting gradient, because if we were differentiating the fourier
-        transform w.r.t. the bin number, the length of the fourier transform has
-        to get divided out of the result. In this case N would be set to the
-        length of the fourier transform. So len(x) is a reasonable value for N
-        but it can be set as needed.
-        """
-        n_steps=v0/self.min_v
-        n=np.multiply.outer(n_steps,self.n)
-        w_=self.w_lu(n)
-        # convert back to complex
-        w=w_[0] + j*w_[1]
-        ret=w@(dk_scale(N,p)*np.power(self.n,p)*x)
-        return ret
-        
-    def dft_bin_log_ps_dk(self,x,v,N=1):
-        X=self.dft_v(x,v,N=N)
-        dX=self.dft_v(x,v,p=1,N=N)
-        return log_ps_dk(X,dX)
+        if normalize_A:
+            self.A=normalize_sum_of_cos_A(A,L,W,N)
+        else
+            self.A=A
+        self.L=L
+        self.W=W
+        self.N=N
+        self.B=B
+        self.D=D
+        self.D_dk=D_dk
+        self._w=sum_of_cos(self.A,self.L,self.W,self.N)
+        self.harm_sig=harm_sig
+    def X(self,x,k0):
+        p_max=int(np.floor((self.N*0.5)/k0))
+        p=np.arange(p_max)+1
+        b=self.B(k0,p)/p_max
+        v=k0/self.N*p
+        # TODO: There should be the option to precompute this and have s just be
+        # looked up using interpolation. In that case, a guess needs to be made
+        # as to the number of harmonics so as to avoid aliasing. Initialization
+        # probably should just happen outside of the function, and b,a,L,W,N are
+        # ignored.
+        s=self.harm_sig(b,v,self.L,self.W,self.N)
+        return multiply_ramp(x,self.N,1)
         

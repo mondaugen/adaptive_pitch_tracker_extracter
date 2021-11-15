@@ -61,7 +61,7 @@ def sum_of_cos(
 
 def mod_sum_of_cos(v,a,L,W,N):
     l=v*N
-    # the modulator must be conjugate-symmetrical around time-0 (the centre of
+    # the modulator must be conjugate-symmetric around time-0 (the centre of
     # the boxcar)
     nl=np.arange(W//2+1)
     nr=np.arange(-(W//2),0)
