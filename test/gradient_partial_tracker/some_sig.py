@@ -3,9 +3,17 @@
 import numpy as np
 from scipy import signal
 from common import cast_array
-from dftdk import dk_ramp, dk_scale
 
 j=complex('j')
+
+def dk_ramp(N,p):
+    return np.power(np.concatenate((np.arange(N//2),np.arange(N//2)-N//2)),p)
+
+def dk_scale(N,p):
+    return (-j*2*np.pi/N)**p
+
+def multiply_ramp(x,N,p):
+    return dk_ramp(N,p)*dk_scale(N,p)*x
 
 def rectangular(n,W,N):
     ret = np.zeros(len(n))
@@ -69,9 +77,6 @@ def mod_sum_of_cos(v,a,L,W,N):
     w[:W//2+1]*=np.exp(j*2*np.pi*l*nl/N)
     w[-(W//2):]*=np.exp(j*2*np.pi*l*nr/N)
     return w
-
-def multiply_ramp(x,N,p):
-    return dk_ramp(N,p)*dk_scale(N,p)*x
 
 def _multi(B,V,A,L,W,N,fun):
     w=np.zeros(N,dtype='complex128')

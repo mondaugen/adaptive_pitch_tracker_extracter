@@ -3,14 +3,10 @@
 import numpy as np
 from functools import partial
 from scipy import interpolate, signal
+from some_ft import normalize_sum_of_cos_A
+from some_sig import sum_of_cos, multi_mod_sum_of_cos, dk_ramp, dk_scale, multiply_ramp
 
 j=complex('j')
-
-def dk_ramp(N,p):
-    return np.power(np.concatenate((np.arange(N//2),np.arange(N//2)-N//2)),p)
-
-def dk_scale(N,p):
-    return (-j*2*np.pi/N)**p
 
 class dft_dk:
     """ The pth derivative of a DFT w.r.t. bin k """
@@ -134,27 +130,30 @@ def window_scale(w):
 
 class harm_grad_td:
     """
-    Find the average gradient in the frequency domain by averaging the gradient
-    at harmonically spaced frequencies.
+    Find a gradient in the frequency domain at bin k0 by using a linear
+    combination of the gradient at harmonically spaced frequencies (k0, 2*k0,
+    etc.).
+    For example, this can be used to find the average gradient (the coefficients
+    are 1/number_of_harmonics in this case).
     The gradients are found using inner-products with sinusoids windowed by
     sum-of-cosine windows.
     """
+    @staticmethod
+    def default_harm_sig(B=np.ones(10)/10.):
+        def _synth(k0,L,W,N):
+            p_max=len(B)
+            p=np.arange(p_max)+1
+            v=k0/N*p
+            # TODO: implement a version that uses interpolation
+            return multi_mod_sum_of_cos(B,v,[1],L,W,N)
+        return _synth
+        
     def __init__(self,
         A,L,W,N,
-        # A function taking the fundamental frequency and harmonic number
-        # (starting at 1) and giving an amplitude
-        B    = lambda k0, p: np.ones_like(p),
-        # dirichlet
-        D    = lambda k,W,N: dirichlet(k,W,N,normalized=False),
-        # d/dk dirichlet
-        D_dk = lambda k,W,N: dirichlet_dk(k,W,N,normalized=False),
-        # Are the coefficients of A normalized so that the fourier transform of
-        # a sinusoid of amplitude 1 at frequency v has a value of 1 at frequency
-        # v?
-        normalize_A=True
-        # Synthesize a harmonic signal with partial amplitudes B at frequencies
-        # V, using the L, W, N parameters passed to __init__.
-        harm_sig=lambda b,v,L,W,N: multi_mod_sum_of_cos(b,v,[1],L,W,N)
+        # A function synthesizing a harmonic signal with fundamental k0
+        # using the L, W, N parameters passed to __init__.
+        harm_sig,
+        normalize_A=True,
     ):
         """
         See some_ft.sum_of_cos_dft, some_ft.sum_of_cos_dft_dk for descriptions
@@ -162,26 +161,19 @@ class harm_grad_td:
         """
         if normalize_A:
             self.A=normalize_sum_of_cos_A(A,L,W,N)
-        else
+        else:
             self.A=A
         self.L=L
         self.W=W
         self.N=N
-        self.B=B
-        self.D=D
-        self.D_dk=D_dk
         self._w=sum_of_cos(self.A,self.L,self.W,self.N)
         self.harm_sig=harm_sig
+    def _kern(self,k0):
+        s=self.harm_sig(k0,self.L,self.W,self.N)
+        return s*self._w
+    def dX_dk_p(self,x,k0,p):
+        return (np.conj(self._kern(k0))*multiply_ramp(x,self.N,p)).sum()
     def X(self,x,k0):
-        p_max=int(np.floor((self.N*0.5)/k0))
-        p=np.arange(p_max)+1
-        b=self.B(k0,p)/p_max
-        v=k0/self.N*p
-        # TODO: There should be the option to precompute this and have s just be
-        # looked up using interpolation. In that case, a guess needs to be made
-        # as to the number of harmonics so as to avoid aliasing. Initialization
-        # probably should just happen outside of the function, and b,a,L,W,N are
-        # ignored.
-        s=self.harm_sig(b,v,self.L,self.W,self.N)
-        return multiply_ramp(x,self.N,1)
-        
+        return self.dX_dk_p(x,k0,0)
+    def dX_dk(self,x,k0):
+        return self.dX_dk_p(x,k0,1)

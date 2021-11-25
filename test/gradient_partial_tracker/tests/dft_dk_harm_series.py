@@ -10,7 +10,9 @@ from some_ft import (multi_mod_sum_of_cos_dft_k,
                      multi_mod_sum_of_cos_dft_dk,
                      multi_mod_sum_of_cos_dft_k,
                      normalize_sum_of_cos_A)
-from some_sig import sum_of_cos, mod_sum_of_cos, multiply_ramp, multi_mod_sum_of_cos
+from some_sig import sum_of_cos, mod_sum_of_cos, multi_mod_sum_of_cos
+import dftdk
+from dftdk import multiply_ramp
 
 
 N=2048
@@ -25,7 +27,8 @@ P=10
 p=(1+np.arange(P))
 # amplitude scalars
 B=1./p
-A=normalize_sum_of_cos_A([0.42,0.5,0.08],L,W,N)
+raw_A=[0.42,0.5,0.08]
+A=normalize_sum_of_cos_A(raw_A,L,W,N)
 dX_dk=multi_mod_sum_of_cos_dft_dk(B,k0_sig*p,k0_anl*p,A,L,W,N)
 avg_dX_dk=dX_dk.mean()
 
@@ -46,13 +49,23 @@ print("X_sum_td:",X_sum_td)
 print("X_sum_td/X_sum:",X_sum_td/X_sum)
 
 # DFT dk using time-domain signal
-sig=multiply_ramp(multi_mod_sum_of_cos(B,v0_sig*p,[1.],L,W,N),N,1)
+sig=multi_mod_sum_of_cos(B,v0_sig*p,[1.],L,W,N)
 #dX_dk_kern=multi_mod_sum_of_cos(np.ones_like(B)/P,v0_anl*p,A,L,W,N)
 # Done by multiplying the harmonically spaced sinusoids with the window after
 # summing them to prove it can be done this way
 dX_dk_kern=multi_mod_sum_of_cos(
     np.ones_like(B)/P,v0_anl*p,[1],L,W,N)*sum_of_cos(A,L,W,N)
-avg_dX_dk_td=(np.conj(dX_dk_kern)*sig).sum()
+avg_dX_dk_td=(np.conj(dX_dk_kern)*multiply_ramp(sig,N,1)).sum()
 print("avg_dX_dk_td:",avg_dX_dk_td)
 print("avg_dX_dk_td/avg_dX_dk:",avg_dX_dk_td/avg_dX_dk)
-# Good
+
+# DFT dk using the class
+hgtd=dftdk.harm_grad_td(raw_A,L,W,N,
+    harm_sig=dftdk.harm_grad_td.default_harm_sig(B=np.ones_like(B)/P)
+)
+#import pdb; pdb.set_trace()
+avg_dX_dk_td_hgtd=hgtd.dX_dk(sig,k0_anl)
+print("avg_dX_dk_td_hgtd:",avg_dX_dk_td_hgtd)
+print("avg_dX_dk_td_hgtd/avg_dX_dk:",avg_dX_dk_td_hgtd/avg_dX_dk)
+
+# very good
