@@ -63,7 +63,6 @@ print("avg_dX_dk_td/avg_dX_dk:",avg_dX_dk_td/avg_dX_dk)
 hgtd=dftdk.harm_grad_td(raw_A,L,W,N,
     harm_sig=dftdk.harm_grad_td.default_harm_sig(B=np.ones_like(B)/P)
 )
-#import pdb; pdb.set_trace()
 avg_dX_dk_td_hgtd=hgtd.dX_dk(sig,k0_anl)
 print("avg_dX_dk_td_hgtd:",avg_dX_dk_td_hgtd)
 print("avg_dX_dk_td_hgtd/avg_dX_dk:",avg_dX_dk_td_hgtd/avg_dX_dk)
