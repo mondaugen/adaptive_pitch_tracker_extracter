@@ -11,7 +11,7 @@ W=2047
 n=np.arange(N)
 # The true peak position
 k_star=1234
-x=rectangular(n,W,N)*sinusoid_about_0(k_star,N)+np.random.standard_normal(N)*0.003
+x=rectangular(n,W,N)*sinusoid_about_0(k_star,N)#+np.random.standard_normal(N)*0.003
 X=dft_dk(N,p=0)(x)
 plt.plot(n,np.real(X),label="Fourier transform of x")
 mu_ga=1

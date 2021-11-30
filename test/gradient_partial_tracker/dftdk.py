@@ -177,3 +177,7 @@ class harm_grad_td:
         return self.dX_dk_p(x,k0,0)
     def dX_dk(self,x,k0):
         return self.dX_dk_p(x,k0,1)
+    def d_log_ps_dk(self,x,k0):
+        X=self.X(x,k0)
+        dX=self.dX_dk(x,k0)
+        return log_ps_dk(X,dX)

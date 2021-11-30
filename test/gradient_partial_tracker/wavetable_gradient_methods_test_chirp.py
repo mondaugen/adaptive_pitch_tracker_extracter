@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from scipy import signal
 from dftdk import dft_dk, dft_bin, ps_dk, dft_bin_log_ps_dk, harm_grad_td, gradient_ascent_step, window_scale, normalize_sum_of_cos_A
 from some_sig import complex_chirp, comb, sum_of_cos
+from some_ft import multi_mod_sum_of_cos_dft_k
 
 j=complex('j')
 
@@ -47,7 +48,7 @@ x=x_sig+x_noise
 hgt=harm_grad_td(raw_A,L,W,N,
     harm_sig=harm_grad_td.default_harm_sig(B=np.ones_like(B)/P)
 )
-starting_error=0
+starting_error=0.5
 # starting frequency
 vstart=np.array([v0*np.power(2,starting_error/12.)])
 print("starting frequency:",vstart*Fs)
@@ -61,25 +62,51 @@ mu=1e-4
 def do_gradient_method(
 params=(vstart,),
 do_step=lambda buf,p: gradient_ascent_step(buf,p[0],mu,
-grad=lambda x,v: hgt.dX_dk(x,v*N)), # TODO: use log power spectrum gradient instead
-extract_k=lambda p: p[0]):
+grad=lambda x,v: hgt.d_log_ps_dk(x,v*N)),
+extract_k=lambda p: p[0],
+x_const=False,
+n_steps=10):
     buf=np.zeros(N,dtype=x.dtype)
-    k=np.zeros((len(vstart),len(h)+1))
-    k[:,0] = extract_k(params)
-    for i, n_h in enumerate(h):
-        buf[:]=x[n_h:n_h+N]
-        params=do_step(buf,params)
-        if not isinstance(params,tuple):
-            params=(params,)
-        k[:,i+1]=extract_k(params)
+    if x_const:
+        k=np.zeros((len(vstart),n_steps+1))
+        k[:,0] = extract_k(params)
+        buf[:]=x[10000:10000+N]
+        for i in range(n_steps):
+            params=do_step(buf,params)
+            if not isinstance(params,tuple):
+                params=(params,)
+            k[:,i+1]=extract_k(params)
+    else:
+        k=np.zeros((len(vstart),len(h)+1))
+        k[:,0] = extract_k(params)
+        for i, n_h in enumerate(h):
+            buf[:]=x[n_h:n_h+N]
+            for m in range(n_steps):
+                params=do_step(buf,params)
+                if not isinstance(params,tuple):
+                    params=(params,)
+            k[:,i+1]=extract_k(params)
     return k
-v_ga=do_gradient_method()
 
-# TODO: why does the spectrogram look like marde?
-plt.specgram(x,NFFT=N,Fs=1,window=sum_of_cos(A,L,W,N),noverlap=N-N_h,sides='onesided')
-print(v_ga)
-for v_ga_ in v_ga:
-    for v in np.multiply.outer(p,v_ga_):
-        plt.plot(h,v[:-1])
+x_const=True
+# TODO: it's adapting poorly again
+v_ga=do_gradient_method(x_const=x_const,n_steps=10)
+
+if x_const:
+    def _X(k):
+        return 20*np.log10(abs(multi_mod_sum_of_cos_dft_k(B,(v0*p)*N,k,A,L,W,N)))
+    k=np.arange(0,N,0.1)
+    X=_X(k)
+    plt.plot(k,X)
+    steps=np.arange(v_ga.shape[0])
+    for p_ in p:
+        k=p_*v_ga[0,:]*N
+        plt.plot(k,_X(k))
+else:
+    plt.specgram(x,NFFT=N,Fs=1,window=sum_of_cos(A,L,W,N,centered_at_time_zero=False),noverlap=N-N_h,sides='onesided')
+    print(v_ga*Fs)
+    for v_ga_ in v_ga:
+        for v in np.multiply.outer(p,v_ga_):
+            plt.plot(h,v[:-1])
 
 plt.show()

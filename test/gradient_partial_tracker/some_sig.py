@@ -55,7 +55,9 @@ def sum_of_cos(
     W,
     # the length of the signal, usually a power of 2 > W (so the DFT of the
     # resulting signal can be taken easily)
-    N
+    N,
+    # If centered_at_time_zero is False, then the window is centered at time N//2
+    centered_at_time_zero=True
 ):
     a=cast_array(a)
     Q=len(a)
@@ -65,6 +67,8 @@ def sum_of_cos(
             2*np.pi/L*np.multiply.outer(np.arange(Q),l)),axis=0)
     x[:W//2+1]=w[-(W//2+1):]
     x[-(W//2):]=w[:W//2]
+    if not centered_at_time_zero:
+        return np.concatenate((x[N//2:],x[:N//2]))
     return x
 
 def mod_sum_of_cos(v,a,L,W,N):
