@@ -37,8 +37,7 @@ p=(1+np.arange(P))
 B=1./p
 
 n=np.arange(N_x)
-# TODO: Why is this "flat" (i.e., its frequency is too low)
-x_sig=comb(n,v0,N_x,v1,partial_amp=lambda p: np.ones_like(p))#/(p*p))
+x_sig=comb(n,v0,N_x,v1,v_max=0.0625,partial_amp=lambda p: np.ones_like(p))#/(p*p))
 x_sig+=0*comb(n,v0*(2**4/12),N_x,v1*(2**4/12),partial_amp=lambda p: 1./(p*p))
 x_noise=0*np.random.standard_normal(N_x)*0.1
 SNR=10*np.log10(np.real(x_noise*x_noise.conj()).mean()/np.real(x_sig*x_sig.conj()).mean())
@@ -48,7 +47,7 @@ x=x_sig+x_noise
 hgt=harm_grad_td(raw_A,L,W,N,
     harm_sig=harm_grad_td.default_harm_sig(B=np.ones_like(B)/P)
 )
-starting_error=0.5
+starting_error=0.4
 # starting frequency
 vstart=np.array([v0*np.power(2,starting_error/12.)])
 print("starting frequency:",vstart*Fs)
@@ -59,8 +58,15 @@ h=np.arange(0,N_x-N,N_h)
 # gradient step coefficient
 mu=1e-4
 
+def do_step_save_frame_spectrum(buf,p):
+    frame_num=p[-1]
+    np.save('/tmp/frame-%d.npy' % (frame_num,), hgt.dft(buf))
+    return gradient_ascent_step(
+        buf,p[0],mu,grad=lambda x,v: hgt.d_log_ps_dk(x,v*N)
+    )
+
 def do_gradient_method(
-params=(vstart,),
+params=(vstart,0),
 do_step=lambda buf,p: gradient_ascent_step(buf,p[0],mu,
 grad=lambda x,v: hgt.d_log_ps_dk(x,v*N)),
 extract_k=lambda p: p[0],
@@ -70,11 +76,12 @@ n_steps=10):
     if x_const:
         k=np.zeros((len(vstart),n_steps+1))
         k[:,0] = extract_k(params)
-        buf[:]=x[10000:10000+N]
+        buf[:]=x[h[10]:h[10]+N]
         for i in range(n_steps):
             params=do_step(buf,params)
             if not isinstance(params,tuple):
                 params=(params,)
+            params+=(0,)
             k[:,i+1]=extract_k(params)
     else:
         k=np.zeros((len(vstart),len(h)+1))
@@ -85,12 +92,16 @@ n_steps=10):
                 params=do_step(buf,params)
                 if not isinstance(params,tuple):
                     params=(params,)
+            params+=(i,)
             k[:,i+1]=extract_k(params)
     return k
 
-x_const=True
-# TODO: it's adapting poorly again
-v_ga=do_gradient_method(x_const=x_const,n_steps=10)
+x_const=False
+# Why does the gradient tracker "jump" after a while when the signal is stable...?
+v_ga=do_gradient_method(
+do_step=do_step_save_frame_spectrum,
+x_const=x_const,
+n_steps=3)
 
 if x_const:
     def _X(k):
@@ -106,7 +117,18 @@ else:
     plt.specgram(x,NFFT=N,Fs=1,window=sum_of_cos(A,L,W,N,centered_at_time_zero=False),noverlap=N-N_h,sides='onesided')
     print(v_ga*Fs)
     for v_ga_ in v_ga:
-        for v in np.multiply.outer(p,v_ga_):
-            plt.plot(h,v[:-1])
+        p_x_v_ga=np.multiply.outer(p,v_ga_)
+        for v in p_x_v_ga:
+            lines=plt.plot(h,v[:-1])
+        for i,(h_,v_) in enumerate(zip(h,p_x_v_ga[0,:-1])):
+            lines[0].axes.annotate(i,xy=(h_,v_))
+
+plt.figure()
+plt.plot(n,x)
+plt.title("harmonic chirp signal")
+
+plt.figure()
+plt.plot(n[1:]-0.5,np.diff(x))
+plt.title("finite-difference of harmonic chirp signal")
 
 plt.show()

@@ -8,6 +8,9 @@ from some_sig import sum_of_cos, multi_mod_sum_of_cos, dk_ramp, dk_scale, multip
 
 j=complex('j')
 
+def half_shift_x(x,N):
+    return np.concatenate((x[N//2:],x[:N//2]))
+
 class dft_dk:
     """ The pth derivative of a DFT w.r.t. bin k """
     def __init__(self,N,p=1):
@@ -170,14 +173,33 @@ class harm_grad_td:
         self.harm_sig=harm_sig
     def _kern(self,k0):
         s=self.harm_sig(k0,self.L,self.W,self.N)
+        np.save('/tmp/s_k0=%d.npy' % (k0,), s)
         return s*self._w
     def dX_dk_p(self,x,k0,p):
-        return (np.conj(self._kern(k0))*multiply_ramp(x,self.N,p)).sum()
+        # x is shifted to align center of window with time 0
+        _x=half_shift_x(x,self.N)
+        return (np.conj(self._kern(k0))*multiply_ramp(_x,self.N,p)).sum()
+    def dft(self,x):
+        """ Compute the DFT of shifted x windowed by self._w.
+        Useful for debugging. """
+        _x=half_shift_x(x,self.N)
+        return np.fft.fft(self._w*_x)
     def X(self,x,k0):
         return self.dX_dk_p(x,k0,0)
     def dX_dk(self,x,k0):
         return self.dX_dk_p(x,k0,1)
+    def dX_dk_fd(self,x,k0,dk=1e-6):
+        Xl=self.X(x,k0-dk*0.5)
+        Xr=self.X(x,k0+dk*0.5)
+        return (Xr-Xl)/dk
     def d_log_ps_dk(self,x,k0):
         X=self.X(x,k0)
         dX=self.dX_dk(x,k0)
+        return log_ps_dk(X,dX)
+    def d_log_ps_dk_fd(self,x,k0,dk=1e-6):
+        # computed with finite difference
+        Xl=self.X(x,k0-dk*0.5)
+        Xr=self.X(x,k0+dk*0.5)
+        dX=(Xr-Xl)/dk
+        X=self.X(x,k0)
         return log_ps_dk(X,dX)

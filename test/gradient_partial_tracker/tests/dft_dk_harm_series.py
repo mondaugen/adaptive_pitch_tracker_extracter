@@ -10,7 +10,7 @@ from some_ft import (multi_mod_sum_of_cos_dft_k,
                      multi_mod_sum_of_cos_dft_dk,
                      multi_mod_sum_of_cos_dft_k,
                      normalize_sum_of_cos_A)
-from some_sig import sum_of_cos, mod_sum_of_cos, multi_mod_sum_of_cos
+from some_sig import sum_of_cos, mod_sum_of_cos, multi_mod_sum_of_cos, nonsym_multi_mod_sum_of_cos
 import dftdk
 from dftdk import multiply_ramp
 
@@ -66,5 +66,15 @@ hgtd=dftdk.harm_grad_td(raw_A,L,W,N,
 avg_dX_dk_td_hgtd=hgtd.dX_dk(sig,k0_anl)
 print("avg_dX_dk_td_hgtd:",avg_dX_dk_td_hgtd)
 print("avg_dX_dk_td_hgtd/avg_dX_dk:",avg_dX_dk_td_hgtd/avg_dX_dk)
+avg_dX_dk_td_hgtd_fd=hgtd.dX_dk_fd(sig,k0_anl)
+print("avg_dX_dk_td_hgtd_fd:",avg_dX_dk_td_hgtd_fd)
+# non-symmetrical signal, therefore complex fourier transform
+sig_nonsym=nonsym_multi_mod_sum_of_cos(B,v0_sig*p,N)
+avg_d_log_ps_nonsym=hgtd.d_log_ps_dk(sig,k0_anl)
+avg_d_log_ps_nonsym_fd=hgtd.d_log_ps_dk_fd(sig,k0_anl)
+print("avg_d_log_ps_nonsym:",avg_d_log_ps_nonsym)
+print("avg_d_log_ps_nonsym_fd:",avg_d_log_ps_nonsym_fd)
+print("avg_d_log_ps_nonsym/avg_d_log_ps_nonsym_fd:",avg_d_log_ps_nonsym/avg_d_log_ps_nonsym_fd)
+# TODO: It seems the finite differences are wrong !
 
 # very good

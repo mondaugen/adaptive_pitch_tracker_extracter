@@ -15,6 +15,9 @@ def check_dv_dft(
     x_dft=mod_sum_of_cos_dft_k,
     x_ddft=mod_sum_of_cos_dft_dk,
     normalize=True
+    # additional processing after the fourier transform of the time-domain
+    # signal
+    x_fd_transform=lambda x: x
 ):
     if normalize:
         A=normalize_sum_of_cos_A(A,L,W,N)
@@ -52,4 +55,3 @@ def check_dv_dft(
     plt.plot(k,w_ft_df_ft,label='df FFT') 
     plt.plot(k,w_ft_df_th,label='df th') 
     plt.legend()
-

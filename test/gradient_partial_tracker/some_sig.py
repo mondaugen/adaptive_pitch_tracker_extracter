@@ -90,3 +90,26 @@ def _multi(B,V,A,L,W,N,fun):
 
 def multi_mod_sum_of_cos(B,V,A,L,W,N):
     return _multi(B,V,A,L,W,N,mod_sum_of_cos)
+
+def nonsym_multi_mod_sum_of_cos(B,K,N):
+    x=np.zeros(N,dtype='complex128')
+    n=np.arange(N)
+    for b,k in zip(B,K):
+        x += b*np.exp(j*2*np.pi*k*n/N)
+    return x
+    
+def sinusoid(
+    # length of signal
+    N=1024,
+    # phase of sinusoid to be analysed
+    ph=0.1*2*np.pi,
+    # frequency of sinusoid to be analysed
+    v=0.03,
+    # sample times
+    n=None, 
+):
+    if n in None:
+        n=np.arange(N)
+    # sinusoid to be analysed
+    x=np.exp(j*(2*np.pi*v*n + ph))
+    return x
