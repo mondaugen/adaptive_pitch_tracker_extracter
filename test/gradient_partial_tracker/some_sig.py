@@ -42,6 +42,14 @@ def comb(t,v0,t1,v1,method='linear',phi=0,vertex_zero=True,v_max=0.5,partial_amp
                             vertex_zero) * partial_amp(i+1)
     ret=X.sum(axis=0)
     return ret
+
+def comb_no_mod(t,v0,phi=0,v_max=0.5,partial_amp=lambda p: 1./p):
+    V0=np.arange(v0,v_max,v0)
+    X=np.zeros((len(V0),len(t)),dtype='complex128')
+    for i, v0_ in enumerate(V0):
+        X[i,:]=np.exp(j*(2.*np.pi*t*v0_+phi)) * partial_amp(i+1)
+    ret=X.sum(axis=0)
+    return ret
         
 def sum_of_cos(
     # array of cosine coefficients
