@@ -18,9 +18,11 @@ from dftdk import multiply_ramp
 N=2048
 W=1023
 L=W+1
-k0_sig=N*0.1
-k0_anl=N*np.power(0.1,1/12) # can specify in semitones
-v0_sig=k0_sig/N
+v0_sig=0.1
+k0_sig=N*v0_sig
+# initial signal phase (radians)
+ph_sig=0#2*np.pi*0.25
+k0_anl=N*v0_sig*np.power(2,1/12) # can specify in semitones
 v0_anl=k0_anl/N
 # partial multipliers
 P=10
