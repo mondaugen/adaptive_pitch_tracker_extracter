@@ -8,12 +8,20 @@ from scipy import signal, interpolate, sparse
 from common import is_pow_2
 from math import floor, ceil
 from functools import partial
+# TODO: some_sig, dftdk shouldn't be imported from a test folder, currently
+# requires test/gradient_partial_tracker/ in PYTHONPATH
+from some_sig import multiply_ramp
+from dftdk import half_shift_x
 
 j=complex('j')
 
 def calc_window_with_radius(window_name,lobe_radius):
     def f(N_win,oversamp):
         W=fractional_get_window_dft(window_name,N_win,N_win,oversample=oversamp,real=False,symmetrical_padding=False)
+        # TODO: real=False here as we can't interpolate complex numbers as
+        # easily as real numbers, and there should be no real reason to use
+        # complex numbers (we can only support symmetric windows, which is good
+        # enough)
         evalradius=lobe_radius*oversamp
         evalbins=np.arange(-evalradius,evalradius+1)
         bins=evalbins/oversamp
@@ -43,7 +51,7 @@ window_types = {
     },
     'blackmanharris' : {
         'lobe_radius' : 4,
-        'calc' : calc_blackman
+        'calc' : calc_blackmanharris
     },
     'hann' : {
         'lobe_radius': 2,
@@ -56,19 +64,32 @@ class freq_dom_window:
         """
         Make a freq_dom_window instance.
         N_win is the length of the window in samples.
-        win_type is the type of window, e.g., 'blackman'
+        win_type is a string giving the type of window, e.g., 'blackman', or can
+        be a callable object
+        accepting N_win (the length of the window) and oversamp (the
+        oversampling factor: N_win*oversamp gives the length the window is
+        padded to before performing the transform). Calling this object returns
+        at tuple that are the bins that were evaluated in the DFT and the values
+        of those bins. The peak value of the values should be 1 (typically) so
+        as not to change the gain of observered sinusoids. It also must give the
+        lobe_radius when looking up win_type.lobe_radius.
         interpolator is the interpolation method (currently only 'linear' is
         officially supported)
         oversample is the number of times the DFT of the window is oversampled
         when computing the values for the interpolator.
         """
         self.N_win=N_win
-        bins,vals=window_types[win_type]['calc'](N_win,oversample)
+        if '__call__' in dir(win_type):
+            bins,vals=win_type(N_win,oversample)
+            lobe_radius=win_type.lobe_radius
+        else:
+            bins,vals=window_types[win_type]['calc'](N_win,oversample)
+            lobe_radius=window_types[win_type]['lobe_radius']
         self.bins=bins
-        self.vals=vals
+        # Divide by N_win to cancel out fourier transform constant
+        self.vals=vals/self.N_win
         self.W_lookup=interpolate.interp1d(self.bins,self.vals,kind=interpolator,
         fill_value=0.,bounds_error=False)
-        lobe_radius=window_types[win_type]['lobe_radius']
         self.lu_bins=np.arange(-lobe_radius,lobe_radius+1)
     def __len__(self):
         return self.N_win
@@ -76,40 +97,48 @@ class freq_dom_window:
         """
         Get a sparse matrix R that when right-multiplied by the fourier
         transform of a signal of length N_win gives the values of the fourier
-        transform of the signal at the bins v.
+       transform of the signal at the bins v.
         v are the normalized frequencies.
         """
         R=sparse.lil_matrix((len(v),self.N_win),dtype='complex128')
         b=v*self.N_win
         b_rounded=np.round(b)
         b_frac=b_rounded-b
-        b_ranges=-b_frac[:,None]+self.lu_bins
-        b_indices=(-b_rounded[:,None]+self.lu_bins).astype('int') % self.N_win
+        b_ranges=b_frac[:,None]+self.lu_bins
+        b_indices=(b_rounded[:,None]+self.lu_bins).astype('int') % self.N_win
         r_indices=np.arange(len(v))[:,None]*np.ones(len(self.lu_bins))
         R[r_indices.flatten(),b_indices.flatten()]=self.W_lookup(b_ranges.flatten())
         return R.tocsr()
 
-def calc_X(x):
-    X=np.fft.fft(x)
+def calc_X(x,half_shift=True):
+    N=len(x)
+    if half_shift:
+        _x=half_shift_x(x,N)
+    else:
+        _x=x
+    X=np.fft.fft(_x)
     return X
 
 def calc_dX(x):
     N=len(x)
-    x_=x*j*2*np.pi*np.arange(N)
-    dX=calc_X(x_)
+    _x=half_shift_x(x,N)
+    dX=multiply_ramp(_x,N,1)
     return dX
         
 def dftX(X,R):
-    RX=R@np.conj(X)
+    """ R.shape[1] must equal len(X) """
+    RX=np.conj(R)@X
     return RX
 
-def dft(x,R):
-    X=calc_X(x)
+def dft(x,R,half_shift=True):
+    """ R.shape[1] must equal len(x) """
+    X=calc_X(x,half_shift=half_shift)
     return dftX(X,R)
 
 def dft_dv(x,R):
-    x_=calc_dX(x)
-    return dft(x_,R)
+    """ R.shape[1] must equal len(x) """
+    dX=calc_dX(x)
+    return dft(dX,R,half_shift=False)
 
     
 

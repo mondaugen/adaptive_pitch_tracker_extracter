@@ -30,15 +30,23 @@ class dft_dk:
 # by M*N) is from the the original fourier transform (length N), and a sinusoid
 # convolved with the M*N length Fourier transform of a low side-lobed window
 # (e.g., blackman)?
-def dft_bin(x,k,p=0):
-    """ Given the signal x, find the value of the DFT's pth derivative at k. k
-    must be a vector and x is multiplied by a matrix. """
+def dft_bin(x,k,p=0,shift_x=False):
+    """
+    Given the signal x, find the value of the DFT's pth derivative at k. k
+    must be a vector and x is multiplied by a matrix.
+    WARNING: This assumes x[:N/2] refer to times 0,...,N/2-1 and x[-N/2:] refer
+    to times -N/2,...,0. So a large discontinuity could be observed in the
+    analysis frame of a sinusoid that has not been rotated by half the frame
+    length (if the sinusoid doesn't have an integer multiple frequency of the
+    window length *inhale*).
+    """
     N=x.shape[0]
     Q=np.hstack((
     np.exp(-j*2*np.pi/N*np.multiply.outer(k,np.arange(0,N//2))),
     np.exp(-j*2*np.pi/N*np.multiply.outer(k,np.arange(-N//2,0))),
     ))
-    return Q@(dk_scale(N,p)*dk_ramp(N,p)*x)
+    _x=half_shift_x(x) if shift_x else x
+    return Q@(dk_scale(N,p)*dk_ramp(N,p)*_x)
 
 def dft_bin_grad(p):
     return partial(dft_bin,p=p)
