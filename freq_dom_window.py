@@ -10,7 +10,7 @@ from math import floor, ceil
 from functools import partial
 # TODO: some_sig, dftdk, some_ft shouldn't be imported from a test folder,
 # currently requires test/gradient_partial_tracker/ in PYTHONPATH
-from some_sig import multiply_ramp
+from some_sig import multiply_ramp, sum_of_cos
 from dftdk import half_shift_x
 from some_ft import normalize_sum_of_cos_A, sum_of_cos_dft
 
@@ -68,16 +68,26 @@ class sum_of_cos_dft_win_type:
         # You can artifically widen the main lobe by choosing a lobe_radius >
         # len(self.A)
         self.lobe_radius=lobe_radius
+    def _compute_window_params(self,N_win,oversample):
+        L=int(round(N_win*(len(self.A)/self.lobe_radius)))
+        W=L-1
+        N=N_win*oversample
+        A_norm=normalize_sum_of_cos_A(self.A,L,W,N)
+        return (L,W,N,A_norm)
     def __call__(self,N_win,oversample):
         evalradius=self.lobe_radius*oversample
         evalbins=np.arange(-evalradius,evalradius+1)
         bins=evalbins/oversample
-        L=N_win*(len(self.A)/self.lobe_radius)
-        W=L-1
-        N=N_win*oversample
-        A_norm=normalize_sum_of_cos_A(self.A,L,W,N)
+        L,W,N,A_norm=self._compute_window_params(N_win,oversample)
         vals=sum_of_cos_dft(evalbins,A_norm,L,W,N)
         return bins,vals
+    def window(self,N_win,centered_at_time_zero=False):
+        """
+        Get the window this is using but in the time-domain. Useful for plotting
+        spectrograms that have been analysed with the same window.
+        """
+        L,W,N,A_norm=self._compute_window_params(N_win,1)
+        return sum_of_cos(A_norm,L,W,N,centered_at_time_zero=centered_at_time_zero)
 
 class freq_dom_window:
     def __init__(self,N_win,win_type,oversample,interpolator='linear'):
