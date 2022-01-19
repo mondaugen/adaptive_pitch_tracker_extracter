@@ -1,4 +1,4 @@
-from freq_dom_window import freq_dom_window, dft_dv, calc_X, dft
+from freq_dom_window import freq_dom_window, dft_dv, calc_X, dft, sum_of_cos_dft_win_type
 import numpy as np
 import matplotlib.pyplot as plt
 from some_ft import normalize_sum_of_cos_A, sum_of_cos_dft
@@ -45,23 +45,6 @@ plt.plot(dft_v[1:]-0.5/dft_os,np.diff(X_dft_plot))
 plt.title("Finite differences of DFT of signal")
 
 # now find it with freq_dom_window
-
-# callable win_type parameter
-class sum_of_cos_dft_win_type:
-    def __init__(self,A,lobe_radius):
-        """ A are the sum-of-cos coefficients """
-        self.A=A
-        self.lobe_radius=lobe_radius
-    def __call__(self,N_win,oversample):
-        evalradius=self.lobe_radius*oversample
-        evalbins=np.arange(-evalradius,evalradius+1)
-        bins=evalbins/oversample
-        L=N_win
-        W=L-1
-        N=N_win*oversample
-        A_norm=normalize_sum_of_cos_A(self.A,L,W,N)
-        vals=sum_of_cos_dft(evalbins,A_norm,L,W,N)
-        return bins,vals
 
 fdw=freq_dom_window(N,
     sum_of_cos_dft_win_type(win_coeffs,win_lobe_radius),

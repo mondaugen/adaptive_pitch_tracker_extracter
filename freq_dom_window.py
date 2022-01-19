@@ -8,10 +8,11 @@ from scipy import signal, interpolate, sparse
 from common import is_pow_2
 from math import floor, ceil
 from functools import partial
-# TODO: some_sig, dftdk shouldn't be imported from a test folder, currently
-# requires test/gradient_partial_tracker/ in PYTHONPATH
+# TODO: some_sig, dftdk, some_ft shouldn't be imported from a test folder,
+# currently requires test/gradient_partial_tracker/ in PYTHONPATH
 from some_sig import multiply_ramp
 from dftdk import half_shift_x
+from some_ft import normalize_sum_of_cos_A, sum_of_cos_dft
 
 j=complex('j')
 
@@ -58,6 +59,25 @@ window_types = {
         'calc': calc_hann
     }
 }
+
+# callable win_type parameter
+class sum_of_cos_dft_win_type:
+    def __init__(self,A,lobe_radius):
+        """ A are the sum-of-cos coefficients """
+        self.A=A
+        # You can artifically widen the main lobe by choosing a lobe_radius >
+        # len(self.A)
+        self.lobe_radius=lobe_radius
+    def __call__(self,N_win,oversample):
+        evalradius=self.lobe_radius*oversample
+        evalbins=np.arange(-evalradius,evalradius+1)
+        bins=evalbins/oversample
+        L=N_win*(len(self.A)/self.lobe_radius)
+        W=L-1
+        N=N_win*oversample
+        A_norm=normalize_sum_of_cos_A(self.A,L,W,N)
+        vals=sum_of_cos_dft(evalbins,A_norm,L,W,N)
+        return bins,vals
 
 class freq_dom_window:
     def __init__(self,N_win,win_type,oversample,interpolator='linear'):
