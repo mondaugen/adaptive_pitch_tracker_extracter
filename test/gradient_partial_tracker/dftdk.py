@@ -67,14 +67,26 @@ def gradient_ascent_step(x,k0,mu,grad=dft_bin_grad(1)):
     k1 = k0 + mu * np.real(grad(x,k0))
     return k1
 
-def gradient_ascent_step_harm_lock(x,k0,mu,grad=dft_bin_grad(1),grad_weight='equal'):
+def gradient_ascent_step_harm_lock(x,k0,mu,grad=dft_bin_grad(1),grad_weight='equal',groups=None):
+    """
+    groups is an array of integers assumed to start at zero and have integers up
+    to n_groups - 1. Entries of the same integer are in the same group and these
+    groups have their gradients averaged and adjusted.
+    """
+    if groups is None:
+        groups = np.zeros(len(k0),dtype='int')
+    n_groups = groups.max() + 1
     g=np.real(grad(x,k0))
-    if grad_weight == 'equal':
-        step=g.mean()
-    elif grad_weight == '1/p':
-        step=(g/(1+np.arange(len(g)))).mean()
-    k_step = mu * step * (1+np.arange(len(k0)))
-    k1 = k0 + k_step
+    step = np.zeros_like(k0)
+    for n in range(n_groups):
+        group_mask = groups == n
+        sub_g=g[group_mask]
+        if grad_weight == 'equal':
+            step[group_mask] = sub_g.mean()
+        elif grad_weight == '1/p':
+            step[group_mask]=(sub_g/(1+np.arange(len(sub_g)))).mean()
+        step[group_mask] *= mu * (1+np.arange(group_mask.sum()))
+    k1 = k0 + step
     return k1
 
 def newton_ascent_step(x,k0,grad=dft_bin_grad(1),grad2=dft_bin_grad(2)):

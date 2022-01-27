@@ -48,13 +48,13 @@ class fdw_tracker:
     def analyse(self,
         # signal to analyse
         x,
-        # starting frequency
-        vstart,
+        # starting frequencies
+        vstarts,
+        # frequency groups
+        v_groups=None,
         # the number of hops where no gradient step is made (to ignore noisy
         # gradients caused by transients)
         warm_up_hops=4,
-        # the number of harmonics to track
-        n_harms=10,
         # gradient step coefficient
         mu=0.5,
         # number of gradient steps per frame
@@ -69,7 +69,6 @@ class fdw_tracker:
         
         h=np.arange(0,N_x-self.N,self.N_h,dtype='int')
 
-
         def grad(i):
             def _grad(x,k0):
                 if i < warm_up_hops:
@@ -82,14 +81,15 @@ class fdw_tracker:
                 return log_sq_mod_dv(X_dft_fdw,X_dft_dv_fdw)
             return _grad
 
-        k0=vstart*self.N*(1+np.arange(n_harms))
+        k0=vstarts*self.N
         buf=np.zeros(self.N,dtype=x.dtype)
         k=np.zeros((len(k0),len(h)+1))
         k[:,0] = k0
         for i, n_h in enumerate(h):
             buf[:]=x[n_h:n_h+self.N]
             for m in range(n_steps):
-                k0=gradient_ascent_step_harm_lock(buf,k0,mu,grad=grad(i))
+                k0=gradient_ascent_step_harm_lock(buf,k0,mu,grad=grad(i),
+                groups=v_groups)
             k[:,i+1]=k0
 
         return (k,h)
