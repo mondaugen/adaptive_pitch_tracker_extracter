@@ -1,6 +1,7 @@
 import numpy as np
 from polyeval import polyeval
 from scipy import interpolate
+from common import wrap
 
 RECIP_2PI=1./(2.*np.pi)
 TWO_PI=2.*np.pi
@@ -49,6 +50,49 @@ def cubic_phase_poly_interp(H,theta,omega):
     Th[:,:-1]=np.hstack(polyeval(np.hstack(pcoefs),n).reshape((F-1,n_partials,H)))
     Th[:,-1]=theta[-1]
     return Th
+
+def single_frame_quadratic_phase_poly_interp(th,o0,o1,H):
+    """
+    Compute a single frame of polynomial interpolation
+    theta has size n_partials, the initial phase (time h=0)
+    o0 has size n_partials, the initial frequencies (time h=0)
+    o1 has size n_partials, the frequencies at time h=H
+    Returns a matrix of size(n_partials,H+1)
+    """
+    a=(o1-o0)/(2.*H)
+    b=o0
+    c=th
+    pcoeffs=np.vstack((a,b,c))
+    h=np.arange(H+1)
+    phs=polyeval(pcoeffs,h)
+    return phs
+
+def quadratic_phase_poly_interp(H,theta,omega):
+    """
+    Computes the polynomial coefficients for the piece-wise quadratic splines
+    and evaluates these polynomials.
+    H (an integer) is the number of samples between phase measurements.
+    theta is a vector of size n_partials containing the initial phases of the
+    n_partials sinusoids.
+    omega is a matrix of size (F,n_partials) representing the angular velocities
+    at each breakpoint
+    The result is a matrix of size (n_partials,(F-1)*H+1) containing the phases
+    of the n_partials sinusoids evaluated at sample 0, 1, ...., (F-1)*H+1.
+    """
+    F=omega.shape[0]
+    n_partials=theta.shape[0]
+    assert n_partials == omega.shape[1]
+    cur_theta=theta
+    ret=np.zeros((n_partials,(F-1)*H+1))
+    for f in np.arange(F-1):
+        start_sample=H*f
+        end_sample=H*(f+1)+1
+        phs=single_frame_quadratic_phase_poly_interp(cur_theta,omega[f,:],omega[f+1,:],H)
+        phs=wrap(phs)
+        ret[:,start_sample:end_sample]=phs
+        cur_theta=ret[:,end_sample-1]
+    return ret
+
 
 def linear_amplitude_interp(H,a):
     """
