@@ -149,9 +149,12 @@ def calc_X(x,half_shift=True):
     X=np.fft.fft(_x)
     return X
 
-def calc_dX(x):
+def calc_dX(x,half_shift=True):
     N=len(x)
-    _x=half_shift_x(x,N)
+    if half_shift:
+        _x=half_shift_x(x,N)
+    else:
+        _x=x
     dX=multiply_ramp(_x,N,1)
     return dX
         
@@ -170,6 +173,19 @@ def dft_dv(x,R):
     dX=calc_dX(x)
     return dft(dX,R,half_shift=False)
 
+class dft_frame:
+    def __init__(self,x,half_shift=True):
+        self.X=calc_X(x,half_shift=half_shift)
+        self.dX=calc_X(
+            calc_dX(x,half_shift=half_shift),
+            half_shift=not half_shift
+        )
+        self.half_shift=half_shift
+    def dft(self,R):
+        return dftX(self.X,R)
+    def dft_dv(self,R):
+        return dftX(self.dX,R)
+        
     
 
 def get_padded_window(wintype,N,N_max,symmetrical=True):

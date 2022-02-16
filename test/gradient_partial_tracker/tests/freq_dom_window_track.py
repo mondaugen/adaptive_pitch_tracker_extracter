@@ -29,9 +29,9 @@ v_groups=np.multiply.outer(np.arange(len(vstart)),np.ones(n_harms)).flatten().as
 print(v_groups)
 N=2048
 N_h=N//4
-fdwt=fdw_tracker(N=N,N_h=N_h)
+fdwt=fdw_tracker(N=N)
 
-k,h = fdwt.analyse(x,vstarts,v_groups=v_groups)
+k,h = fdwt.analyse(x,vstarts,v_groups=v_groups,N_h=N_h)
 
 for k_row in k:
     plt.plot(h,k_row[:len(h)]/N)
