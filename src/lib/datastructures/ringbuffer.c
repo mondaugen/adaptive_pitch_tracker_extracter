@@ -89,8 +89,8 @@ rngbuf_available_capacity(struct rngbuf *rb)
 /*
 Advance the head of the ring buffer. This effectively discards the first n
 values and makes the beginning of the ring buffer n values later than
-previously. If the capacity of the ring buffer is less than n, no advance can be
-made and -1 is returned. Otherwise 0 is returned.
+previously. If the size of the contents of the ring buffer is less than n, no
+advance can be made and -1 is returned. Otherwise 0 is returned.
 */
 int
 rngbuf_advance_head(struct rngbuf *rb, unsigned int n)

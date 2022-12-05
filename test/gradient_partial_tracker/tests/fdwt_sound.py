@@ -7,17 +7,24 @@ from some_sig import comb_no_mod, sum_of_cos
 from scipy import signal, interpolate
 from fdw_tracker import fdw_tracker, v_dev_stop_criterion, multi_analyse_combine
 from cubic_sinusoid_synth import quadratic_phase_poly_interp, linear_amplitude_interp
-from common import normalize
+from common import normalize, get_env
 import partial_processing as pp
 from buf import inf_buf
 
-x=np.fromfile('sounds/tanguillo-1ch-48k.f64')
-sr=44100.
-t_start=.6
+IN_FILE=get_env('IN_FILE',default='sounds/tanguillo-1ch-48k.f64')
+OUT_FILE=get_env('OUT_FILE',default='/tmp/a.f64')
+SR=get_env('SR',default=44100,conv=float)
+T_START=get_env('T_START',default=0.6,conv=float)
+F_START=get_env('F_START',default=150.,conv=float)
+R=get_env('R',default=0.02,conv=float) # output rate
+
+x=np.fromfile(IN_FILE)
+sr=SR
+t_start=T_START
 n_start=int(np.round(t_start*sr))
 
 # starting frequency
-vstart=np.array([150./sr])
+vstart=np.array([F_START/sr])
 n_harms=30
 vstarts=np.multiply.outer(vstart,(1+np.arange(n_harms))).flatten()
 v_groups=np.multiply.outer(np.arange(len(vstart)),np.ones(n_harms)).flatten().astype('int')
@@ -54,7 +61,7 @@ if N_h < 0:
     omega=omega[:,::-1]
 
 # output rate for time stretching (<1) or compression (>1)
-output_rate=0.02
+output_rate=R
 orig_rate_len=min(100,omega.shape[1])
 input_indices=np.arange(0,omega.shape[1])
 output_indices=np.concatenate((
@@ -79,6 +86,6 @@ phase_tracks=quadratic_phase_poly_interp(np.abs(N_h),X_phs[:,0],omega_interp.T)
 amp_tracks=linear_amplitude_interp(np.abs(N_h),X_abs_interp.T)
 
 x_synth=np.real((np.exp(complex('j')*phase_tracks)*amp_tracks).sum(axis=0))
-normalize(x_synth).tofile('/tmp/a.f64')
+normalize(x_synth).tofile(OUT_FILE)
 
 plt.show()
