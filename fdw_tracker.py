@@ -41,6 +41,14 @@ class v_dev_stop_criterion:
         self.v=v[self.v_select]
         return ret
 
+class t_bounds_stop_criterion:
+    """ Stop if the analysis time (h) exceeds the time boundaries. """
+    def __init__(self,h_min,h_max):
+        self.h_min = h_min
+        self.h_max = h_max
+    def __call__(self,h,v,g,X):
+        return not (self.h_min <= h <= self.h_max)
+
 class soc_fdw_lookup:
     """
     Initialize sum-of-cosine "frequency-domain windows" so they can be looked up
@@ -101,7 +109,7 @@ class fdw_tracker(soc_fdw_lookup):
         # v are the current normalized frequencies of the partial tracks,
         # gradients are the gradients evaluated at those frequencies and X the
         # DFT evaluated at those frequencies)
-        # The function should return True if the tracking should stop or True to
+        # The function should return True if the tracking should stop or False to
         # continue
         stop_criterion=lambda h,v,g,X: False
     ):
@@ -158,6 +166,11 @@ class fdw_tracker(soc_fdw_lookup):
             X_dft_R=self.fdw.R(v0)
             X_dft_fdw=x.dft(X_dft_R)
             return X_dft_fdw
+
+        def bins(k0,k_min=0,k_max=self.N/2,res=0.1):
+            ret=np.concatenate((k0,np.arange(k_min,k_max,res)))
+            ret.sort()
+            return ret
             
         k0=vstarts*self.N
         buf=np.zeros(self.N,dtype=x.dtype)
@@ -165,10 +178,14 @@ class fdw_tracker(soc_fdw_lookup):
         X=np.zeros((len(k0),len(h)+1),dtype='complex128')
         k_list=[k0]
         X_list=[]
+        X_frames_list=[]
+        k_frames_list=[]
         for i, n_h in enumerate(h):
             buf[:]=x[n_h:n_h+self.N]
             buf_dft_frame=dft_frame(buf)
+            X_frames_list.append(bin_vals(buf_dft_frame,bins(k0)))
             X_list.append(bin_vals(buf_dft_frame,k0))
+            k_frames_list.append(bins(k0))
             for m in range(n_steps):
                 k0=gradient_ascent_step_harm_lock(buf_dft_frame,
                 k0,mu,grad=grad(i),
@@ -178,13 +195,21 @@ class fdw_tracker(soc_fdw_lookup):
             v0=k_to_v(k0)
             if stop_criterion(n_h,v0,grads[-1],X[-1]):
                 break
+        X_frames_list.append(bin_vals(buf_dft_frame,bins(k0)))
         X_list.append(bin_vals(buf_dft_frame,k0))
+        k_frames_list.append(bins(k0))
         min_list_len=min([len(l) for l in [X_list,k_list,grads,h]])
         k=np.hstack([k_[:,None] for k_ in k_list[:min_list_len]])
         X=np.hstack([X_[:,None] for X_ in X_list[:min_list_len]])
+        X_frames=np.hstack([
+            X_frames_[:,None] for X_frames_ in X_frames_list[:min_list_len]
+        ])
+        k_frames=np.hstack([
+            k_frames_[:,None] for k_frames_ in k_frames_list[:min_list_len]
+        ])
         grads_ret=np.hstack([grad_[:,None] for grad_ in grads[:min_list_len]])
         h=h[:min_list_len]
-        return (k,h,X,grads_ret)
+        return (k,h,X,grads_ret,X_frames,k_frames)
 
 def multi_analyse_combine(fdwt,**args):
     hs=args.pop('h')
@@ -193,19 +218,25 @@ def multi_analyse_combine(fdwt,**args):
     Xs=[]
     grads=[]
     final_hs=[]
+    X_frames=[]
+    k_frames=[]
     for h in hs:
         args['h']=h
         args['stop_criterion']=stop_criterion()
-        k,h_,X,g=fdwt.analyse(**args)
+        k,h_,X,g,X_fr,k_fr=fdwt.analyse(**args)
         sort_i=np.argsort(h_)
         ks.append(k[:,sort_i])
         Xs.append(X[:,sort_i])
         grads.append(g[:,sort_i])
         final_hs.append(h_[sort_i])
+        X_frames.append(X_fr[:,sort_i])
+        k_frames.append(k_fr[:,sort_i])
         if h[1] > h[0]:
             print('final_hs',h_)
     hs_ret=np.concatenate(final_hs)
     ks_ret=np.hstack(ks)
     Xs_ret=np.hstack(Xs)
     grads_ret=np.hstack(grads)
-    return ks_ret,hs_ret,Xs_ret,grads_ret
+    X_frames_ret=np.hstack(X_frames)
+    k_frames_ret=np.hstack(k_frames)
+    return ks_ret,hs_ret,Xs_ret,grads_ret,X_frames_ret,k_frames_ret
