@@ -1,5 +1,6 @@
 from freq_dom_window import freq_dom_window, dft_dv, calc_X, dft, sum_of_cos_dft_win_type
 import numpy as np
+from numpy import linalg
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from dftdk import gradient_ascent_step_harm_lock
@@ -56,8 +57,8 @@ wrapped_x=inf_buf(x)
 h_fw=np.arange(n_start,len(x),N_h)
 h_bw=np.arange(n_start,0,-N_h)
 
-k,h,X,_,X_fr,k_fr = multi_analyse_combine(fdwt,x=wrapped_x,vstarts=vstarts,h=[h_bw,h_fw],v_groups=v_groups,warm_up_hops=0,mu=0.2,n_steps=3,grad_weight='equal',stop_criterion=sc)
-
+k,h,X,gr,X_fr,k_fr = multi_analyse_combine(fdwt,x=wrapped_x,vstarts=vstarts,h=[h_bw,h_fw],v_groups=v_groups,warm_up_hops=0,mu=0.2,n_steps=3,grad_weight='equal',stop_criterion=sc)
+gr_sc=np.exp(-10*(gr*gr))
 fig_spec,ax_spec=plt.subplots()
 def plot_spec_line(line,col):
     x=k_fr[:,col]/N*SR
@@ -76,6 +77,24 @@ def plot_ana_points(line,col):
         line.set_xdata(x)
         line.set_ydata(y)
     return line
+def plot_amp_fit_points(line,col):
+    def regX(x):
+        return np.hstack((np.ones(len(x))[:,None],x[:,None],x[:,None]**2))
+    x=k[:,col]/N*SR
+    A=regX(x)
+    B=20*np.log10(np.abs(X[:,col]))
+    W=np.diag(gr_sc[:,col])
+    prms=linalg.lstsq(W@A,W@B)
+    x_plt=np.arange(0,N,1./8)/N*SR
+    y_plt=regX(x_plt)@prms[0]
+    if line is None:
+        line, = ax_spec.plot(x_plt,y_plt)
+    else:
+        line.set_xdata(x_plt)
+        line.set_ydata(y_plt)
+    return line
+
+    
     
 
 ax_spec_slider = fig_spec.add_axes([0.25, 0.1, 0.65, 0.03])
@@ -84,10 +103,12 @@ class update_spec:
     def __init__(self):
         self.spec_line = plot_spec_line(None,0)
         self.ana_points = plot_ana_points(None,0)
+        self.amp_fit_points = plot_amp_fit_points(None,0)
         ax_spec.set_ylim([-100,0])
     def __call__(self,val):
         self.spec_line = plot_spec_line(self.spec_line,spec_slider.val)
         self.ana_points = plot_ana_points(self.ana_points,spec_slider.val)
+        self.amp_fit_points = plot_amp_fit_points(self.amp_fit_points,spec_slider.val)
         ax_spec.set_ylim([-100,0])
         fig_spec.canvas.draw_idle()
 spec_slider.on_changed(update_spec())
@@ -145,17 +166,21 @@ amp_tracks=linear_amplitude_interp(np.abs(N_h),X_abs_interp.T)
 print('amp_tracks.shape',amp_tracks.shape)
 print('X_abs.shape',X_abs.shape)
 fig,ax=plt.subplots()
-ax_track = fig.add_axes([0.25, 0.15, 0.65, 0.03])
+ax_track = fig.add_axes([0.25, 0.05, 0.65, 0.03])
+ax_gr=ax.twinx()
 # the figure 2 plotting function
 t_amp_track=h_plot/sr
 def track_line(p):
     track = 20*np.log10(X_abs[p,:])
     return track
-line,=ax.plot(t_amp_track,track_line(0))
+tr_line,=ax.plot(t_amp_track,track_line(0))
+gr_line,=ax_gr.plot(t_amp_track,gr_sc[0,:],c='g')
 ax.set_ylim([-100,0])
+ax_gr.set_ylim([0,1])
 track_slider=Slider(ax_track,"Track",0,X_abs.shape[0]-1,valinit=0,valstep=1)
 def update_fig2(val):
-    line.set_ydata(track_line(track_slider.val))
+    tr_line.set_ydata(track_line(track_slider.val))
+    gr_line.set_ydata(gr_sc[track_slider.val,:])
     ax.set_ylim([-100,0])
     fig.canvas.draw_idle()
 track_slider.on_changed(update_fig2)
