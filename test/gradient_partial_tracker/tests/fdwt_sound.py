@@ -94,14 +94,20 @@ def plot_amp_fit_points(line,col):
         line.set_ydata(y_plt)
     return line
 
-def lstsq_fit_at_v(X,v,Frows):
+def lstsq_fit_at_v(X,v,Frows,w=None):
     F=fdwt.fdw.R(v).T.todense()[Frows,:]
-    params=linalg.lstsq(F,X)
+    if w is not None:
+        params=linalg.lstsq(np.vstack((F,np.diag(w))),
+                      np.concatenate((X,np.zeros(len(w)))))
+    else:
+        params=linalg.lstsq(F,X)
     return params[0],F
 
 def plot_lstsq_fit_at_v(line,col):
     v=k[:,col]/fdwt.N
     i_v_bins=fdwt.extract_ovbins(k_fr[:,col])[::fdwt.oversamp]
+    #w=1-gr_sc[:,col]
+    #alph,F=lstsq_fit_at_v(X_fr[i_v_bins,col],v,np.arange(len(i_v_bins)),w=w)
     alph,F=lstsq_fit_at_v(X_fr[i_v_bins,col],v,np.arange(len(i_v_bins)))
     fit=20*np.log10(np.abs(np.array(F@alph).flatten()))
     v_F=k_fr[i_v_bins,col]/fdwt.N*sr
