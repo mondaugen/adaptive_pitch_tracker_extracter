@@ -68,6 +68,12 @@ class soc_fdw_lookup:
         # products in the time-domain for sparse matrix operations approximating
         # fourier transforms using the window described by win_coeffs
         win_lobe_radius=6,
+        # The oversampling of the bins when getting DFT with ovbins
+        oversamp=8,
+        # the minimum bin to get using ovbins
+        k_min=0,
+        # The maximum bin to get using ovbins
+        k_max=None
     ):
 
         self.N=N
@@ -76,7 +82,33 @@ class soc_fdw_lookup:
         self.fdw=freq_dom_window(N,
             self.win_type,
             dft_os)
+        self.oversamp = oversamp
+        self.k_min=k_min
+        self.k_max = k_max
+        if self.k_max is None:
+            self.k_max = self.N//2
 
+    def k_to_v(self,k):
+        return k/self.N
+        
+    def bin_vals(self,x,k0):
+        """ x must be a dft_frame """
+        v0=self.k_to_v(k0)
+        X_dft_R=self.fdw.R(v0)
+        X_dft_fdw=x.dft(X_dft_R)
+        return X_dft_fdw
+
+    def ovbins(self):
+        return np.arange(self.k_min,self.k_max*self.oversamp,1)/self.oversamp
+
+    def allbins(self,k0):
+        ret=np.concatenate((k0,self.ovbins()))
+        ret.sort()
+        return ret
+
+    def extract_ovbins(self,allk):
+        """ returns indices of the ovbins """
+        return np.where(np.subtract.outer(allk,self.ovbins()) == 0.)[0]
 
 class fdw_tracker(soc_fdw_lookup):
     # TODO: fdw_tracker with the analyse method should be a subclass of a simple
@@ -159,18 +191,13 @@ class fdw_tracker(soc_fdw_lookup):
             return store_grad(_grad)
 
         def k_to_v(k):
-            return k/self.N
+            return self.k_to_v(k)
             
         def bin_vals(x,k0):
-            v0=k_to_v(k0)
-            X_dft_R=self.fdw.R(v0)
-            X_dft_fdw=x.dft(X_dft_R)
-            return X_dft_fdw
+            return self.bin_vals(x,k0)
 
-        def bins(k0,k_min=0,k_max=self.N/2,res=0.1):
-            ret=np.concatenate((k0,np.arange(k_min,k_max,res)))
-            ret.sort()
-            return ret
+        def bins(k0):
+            return self.allbins(k0)
             
         k0=vstarts*self.N
         buf=np.zeros(self.N,dtype=x.dtype)

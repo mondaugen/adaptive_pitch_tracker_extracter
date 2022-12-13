@@ -94,7 +94,23 @@ def plot_amp_fit_points(line,col):
         line.set_ydata(y_plt)
     return line
 
-    
+def lstsq_fit_at_v(X,v,Frows):
+    F=fdwt.fdw.R(v).T.todense()[Frows,:]
+    params=linalg.lstsq(F,X)
+    return params[0],F
+
+def plot_lstsq_fit_at_v(line,col):
+    v=k[:,col]/fdwt.N
+    i_v_bins=fdwt.extract_ovbins(k_fr[:,col])[::fdwt.oversamp]
+    alph,F=lstsq_fit_at_v(X_fr[i_v_bins,col],v,np.arange(len(i_v_bins)))
+    fit=20*np.log10(np.abs(np.array(F@alph).flatten()))
+    v_F=k_fr[i_v_bins,col]/fdwt.N*sr
+    if line is None:
+        line, = ax_spec.plot(v_F,fit)
+    else:
+        line.set_xdata(v_F)
+        line.set_ydata(fit)
+    return line
     
 
 ax_spec_slider = fig_spec.add_axes([0.25, 0.1, 0.65, 0.03])
@@ -104,11 +120,13 @@ class update_spec:
         self.spec_line = plot_spec_line(None,0)
         self.ana_points = plot_ana_points(None,0)
         self.amp_fit_points = plot_amp_fit_points(None,0)
+        self.amp_lstsq_fit = plot_lstsq_fit_at_v(None,0)
         ax_spec.set_ylim([-100,0])
     def __call__(self,val):
         self.spec_line = plot_spec_line(self.spec_line,spec_slider.val)
         self.ana_points = plot_ana_points(self.ana_points,spec_slider.val)
         self.amp_fit_points = plot_amp_fit_points(self.amp_fit_points,spec_slider.val)
+        self.amp_lstsq_fit = plot_lstsq_fit_at_v(self.amp_lstsq_fit,spec_slider.val)
         ax_spec.set_ylim([-100,0])
         fig_spec.canvas.draw_idle()
 spec_slider.on_changed(update_spec())
