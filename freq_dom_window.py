@@ -127,7 +127,7 @@ class freq_dom_window:
         """
         Get a sparse matrix R that when right-multiplied by the fourier
         transform of a signal of length N_win gives the values of the fourier
-       transform of the signal at the bins v.
+        transform of the signal at the bins v.
         v are the normalized frequencies.
         """
         R=sparse.lil_matrix((len(v),self.N_win),dtype='complex128')

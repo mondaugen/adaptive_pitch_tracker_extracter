@@ -86,7 +86,7 @@ class soc_fdw_lookup:
         self.k_min=k_min
         self.k_max = k_max
         if self.k_max is None:
-            self.k_max = self.N//2
+            self.k_max = self.N//2 + 1
 
     def k_to_v(self,k):
         return k/self.N
@@ -106,9 +106,15 @@ class soc_fdw_lookup:
         ret.sort()
         return ret
 
-    def extract_ovbins(self,allk):
+    def winharmbins(self,k0):
+        x=np.concatenate((k0,self.ovbins()))
+        xi=np.arange(len(x))
+        xis=np.argsort(x)
+        return np.where(np.subtract.outer(xis,xi[len(k0):]) == 0.)[0]
+
+    def extract_ovbins(self,allk,step=1):
         """ returns indices of the ovbins """
-        return np.where(np.subtract.outer(allk,self.ovbins()) == 0.)[0]
+        return np.where(np.subtract.outer(allk,self.ovbins()[::step]) == 0.)[0]
 
 class fdw_tracker(soc_fdw_lookup):
     # TODO: fdw_tracker with the analyse method should be a subclass of a simple
@@ -198,6 +204,9 @@ class fdw_tracker(soc_fdw_lookup):
 
         def bins(k0):
             return self.allbins(k0)
+
+        def winharmbins(k0):
+            return self.winharmbins(k0)
             
         k0=vstarts*self.N
         buf=np.zeros(self.N,dtype=x.dtype)

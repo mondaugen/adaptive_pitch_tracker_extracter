@@ -37,7 +37,7 @@ n_start=int(np.round(t_start*sr))
 
 # starting frequency
 vstart=np.array([F_START/sr])
-n_harms=30
+n_harms=40
 vstarts=np.multiply.outer(vstart,(1+np.arange(n_harms))).flatten()
 v_groups=np.multiply.outer(np.arange(len(vstart)),np.ones(n_harms)).flatten().astype('int')
 print(v_groups)
@@ -95,7 +95,11 @@ def plot_amp_fit_points(line,col):
     return line
 
 def lstsq_fit_at_v(X,v,Frows,w=None):
-    F=fdwt.fdw.R(v).T.todense()[Frows,:]
+    # F has the main-lobes centred at the frequencies in v in its columns
+    # we want to return the scalars for each of the column vectors so that their
+    # sum best approximates X in the least squares sense
+    F_=fdwt.fdw.R(v).T.todense()
+    F=F_[Frows,:]
     if w is not None:
         params=linalg.lstsq(np.vstack((F,np.diag(w))),
                       np.concatenate((X,np.zeros(len(w)))))
@@ -209,6 +213,40 @@ def update_fig2(val):
     fig.canvas.draw_idle()
 track_slider.on_changed(update_fig2)
 
+def lstsq_fit_ola_synth(X,V,Frows,W=None):
+    """
+    X is the DFT frames of the signal, each frame occupies a column of X.
+    V is the set of frequencies at each frame. Each frequency set occupies a
+    column of V.
+    Frows are the indices of the rows in the F matrix that will be used for
+    least squares fitting.
+    W are optional weighting parameters. It must be the same size and shape as V
+    (NOT IMPLEMENTED).
+    Returns y,Y
+    y is the synthesized time-domain signal
+    Y is the frequency-domain signal (STFT) before synthesizing
+    """
+    def _f(x,v):
+        alph,F=lstsq_fit_at_v(x,v,Frows)
+        return (F@alph).T
+    Y=np.hstack([_f(x,v) for x,v in zip(X.T,V.T)])
+    window=fdwt.win_type.window(N)
+    y=signal.istft(Y,window=window,noverlap=N-N_h)[1]
+    return (y,Y)
+
+# synthesize least squares fit in OLA fashion
+cols=np.arange(X_fr.shape[1])
+print('X_fr.shape:',X_fr.shape)
+Xlsq=np.hstack([X_fr[fdwt.extract_ovbins(k_fr[:,col],fdwt.oversamp),col][:,None] for col in cols])
+Vlsq=np.hstack([k[:,col][:,None]/fdwt.N for col in cols])
+# This should always be the same length...
+Frows=np.arange(Xlsq.shape[0])
+y,Y=lstsq_fit_ola_synth(Xlsq,Vlsq,Frows)
+normalize(y.real).tofile('.'.join(OUT_FILE.split('.')[:-1]+['ola',OUT_FILE.split('.')[-1]]))
+fig,axs=plt.subplots()
+axs.imshow(20*np.log(np.abs(Y)),aspect='auto',origin='lower')
+fig,axs=plt.subplots()
+axs.plot(np.arange(len(y.real))/SR+T_MIN,y.real)
 x_synth=np.real((np.exp(complex('j')*phase_tracks)*amp_tracks).sum(axis=0))
 normalize(x_synth).tofile(OUT_FILE)
 
