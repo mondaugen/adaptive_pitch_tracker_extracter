@@ -77,16 +77,24 @@ def plot_ana_points(line,col):
         line.set_xdata(x)
         line.set_ydata(y)
     return line
-def plot_amp_fit_points(line,col):
-    def regX(x):
+
+class spect_shape_fitter:
+    def regX(self,x):
+        """ x here is the value of the variable of the polynonial """
         return np.hstack((np.ones(len(x))[:,None],x[:,None],x[:,None]**2))
+    def __call__(self,freqs,X_,gr_sc_):
+        A=self.regX(freqs)
+        B=20*np.log10(np.abs(X_))
+        W=np.diag(gr_sc_)
+        prms=linalg.lstsq(W@A,W@B)
+        return prms
+        
+def plot_amp_fit_points(line,col):
+    fitter=spect_shape_fitter()
     x=k[:,col]/N*SR
-    A=regX(x)
-    B=20*np.log10(np.abs(X[:,col]))
-    W=np.diag(gr_sc[:,col])
-    prms=linalg.lstsq(W@A,W@B)
+    prms=fitter(x,X[:,col],gr_sc[:,col])
     x_plt=np.arange(0,N,1./8)/N*SR
-    y_plt=regX(x_plt)@prms[0]
+    y_plt=fitter.regX(x_plt)@prms[0]
     if line is None:
         line, = ax_spec.plot(x_plt,y_plt)
     else:
@@ -217,6 +225,12 @@ def lstsq_fit_frame(x,v,Frows):
     alph,F=lstsq_fit_at_v(x,v,Frows)
     return (F@alph).T
 
+def lstsq_fit_amp(x,v,Frows):
+    # use the phase of x but the amplitudes from the least-squares fit
+    s=np.asarray(lstsq_fit_frame(x,v,Frows)).flatten()
+    ret=x/np.abs(x)*np.abs(s)
+    return ret[:,None]
+
 def filter_frame(x,v,Frows):
     F_=fdwt.fdw.R(v).T.todense()
     F=F_[Frows,:]
@@ -240,8 +254,10 @@ def lstsq_fit_ola_synth(X,V,Frows,W=None,sig_extractor=lstsq_fit_frame):
     Y is the frequency-domain signal (STFT) before synthesizing
     """
     Y=np.hstack([sig_extractor(x,v,Frows) for x,v in zip(X.T,V.T)])
-    window=fdwt.win_type.window(N)
-    y=signal.istft(Y,window=window,noverlap=N-N_h)[1]
+    # TODO: What window will invert this properly?
+    #window=fdwt.win_type.window(N)
+    #assert signal.check_COLA(window,N,N-N_h)
+    y=signal.istft(Y,window='hann',noverlap=N-N_h)[1]
     return (y,Y)
 
 # synthesize least squares fit in OLA fashion
