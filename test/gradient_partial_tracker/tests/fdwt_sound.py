@@ -213,7 +213,16 @@ def update_fig2(val):
     fig.canvas.draw_idle()
 track_slider.on_changed(update_fig2)
 
-def lstsq_fit_ola_synth(X,V,Frows,W=None):
+def lstsq_fit_frame(x,v,Frows):
+    alph,F=lstsq_fit_at_v(x,v,Frows)
+    return (F@alph).T
+
+def filter_frame(x,v,Frows):
+    F_=fdwt.fdw.R(v).T.todense()
+    F=F_[Frows,:]
+    return np.sum(np.asarray(F)*x[:,None],axis=1)[:,None]
+
+def lstsq_fit_ola_synth(X,V,Frows,W=None,sig_extractor=lstsq_fit_frame):
     """
     X is the DFT frames of the signal, each frame occupies a column of X.
     V is the set of frequencies at each frame. Each frequency set occupies a
@@ -222,14 +231,15 @@ def lstsq_fit_ola_synth(X,V,Frows,W=None):
     least squares fitting.
     W are optional weighting parameters. It must be the same size and shape as V
     (NOT IMPLEMENTED).
+    sig_extractor is a function that accepts the current frame (x) and the
+    frequencies detected in it (v) and extracts a frame containing only the
+    signal of interest based on the frequencies. The Frows parameter is the
+    indices of the rows in x that we are interested in.
     Returns y,Y
     y is the synthesized time-domain signal
     Y is the frequency-domain signal (STFT) before synthesizing
     """
-    def _f(x,v):
-        alph,F=lstsq_fit_at_v(x,v,Frows)
-        return (F@alph).T
-    Y=np.hstack([_f(x,v) for x,v in zip(X.T,V.T)])
+    Y=np.hstack([sig_extractor(x,v,Frows) for x,v in zip(X.T,V.T)])
     window=fdwt.win_type.window(N)
     y=signal.istft(Y,window=window,noverlap=N-N_h)[1]
     return (y,Y)
@@ -241,7 +251,7 @@ Xlsq=np.hstack([X_fr[fdwt.extract_ovbins(k_fr[:,col],fdwt.oversamp),col][:,None]
 Vlsq=np.hstack([k[:,col][:,None]/fdwt.N for col in cols])
 # This should always be the same length...
 Frows=np.arange(Xlsq.shape[0])
-y,Y=lstsq_fit_ola_synth(Xlsq,Vlsq,Frows)
+y,Y=lstsq_fit_ola_synth(Xlsq,Vlsq,Frows,sig_extractor=filter_frame)
 normalize(y.real).tofile('.'.join(OUT_FILE.split('.')[:-1]+['ola',OUT_FILE.split('.')[-1]]))
 fig,axs=plt.subplots()
 axs.imshow(20*np.log(np.abs(Y)),aspect='auto',origin='lower')
