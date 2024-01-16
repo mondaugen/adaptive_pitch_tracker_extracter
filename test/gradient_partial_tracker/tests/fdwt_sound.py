@@ -3,7 +3,7 @@ import numpy as np
 from numpy import linalg
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
-from dftdk import gradient_ascent_step_harm_lock
+from dftdk import gradient_ascent_step_harm_lock, gradient_ascent_step, combo_gradient
 from some_ft import normalize_sum_of_cos_A, sum_of_cos_dft
 from some_sig import comb_no_mod, sum_of_cos
 from scipy import signal, interpolate
@@ -18,6 +18,8 @@ OUT_FILE=get_env('OUT_FILE',default='/tmp/a.f64')
 SR=get_env('SR',default=44100,conv=float)
 T_START=get_env('T_START',default=0.6,conv=float)
 F_START=get_env('F_START',default=150.,conv=float)
+# lines on spectrum plot for the harmonics of arbitrary frequencies
+F_PLOT=get_env('F_PLOT',default='[%f]'%(F_START,),conv=eval)
 R=get_env('R',default=0.02,conv=float) # output rate
 # amount of time at the beginning that no time stretching is performed
 T_NO_R=get_env('T_NO_R',conv=float)
@@ -28,7 +30,16 @@ MAX_DEV_SEMITONES=get_env('MAX_DEV_SEMITONES',default=0.5,conv=float)
 # t_bounds stop criterion parameters
 T_MIN=get_env('T_MIN',conv=float)
 T_MAX=get_env('T_MAX',conv=float)
+GM=get_env('GM',default='gradient_ascent_step_harm_lock')
+grad_method=None
+if GM == 'gradient_ascent_step_harm_lock':
+    grad_method=gradient_ascent_step_harm_lock
+elif GM == 'gradient_ascent_step':
+    grad_method=gradient_ascent_step
+elif GM == 'combo_gradient':
+    grad_method=combo_gradient(0.3,1)
 
+AX_SPEC_LIMS=[-100,0] # y-limits of spectral frame plot in dB
 
 x=np.fromfile(IN_FILE)
 sr=SR
@@ -41,7 +52,7 @@ n_harms=40
 vstarts=np.multiply.outer(vstart,(1+np.arange(n_harms))).flatten()
 v_groups=np.multiply.outer(np.arange(len(vstart)),np.ones(n_harms)).flatten().astype('int')
 print(v_groups)
-N=2048
+N=get_env('N','2048',conv=int)
 N_h=N//8
 fdwt=fdw_tracker(N=N)
 
@@ -57,7 +68,7 @@ wrapped_x=inf_buf(x)
 h_fw=np.arange(n_start,len(x),N_h)
 h_bw=np.arange(n_start,0,-N_h)
 
-k,h,X,gr,X_fr,k_fr = multi_analyse_combine(fdwt,x=wrapped_x,vstarts=vstarts,h=[h_bw,h_fw],v_groups=v_groups,warm_up_hops=0,mu=0.2,n_steps=3,grad_weight='equal',stop_criterion=sc)
+k,h,X,gr,X_fr,k_fr = multi_analyse_combine(fdwt,x=wrapped_x,vstarts=vstarts,h=[h_bw,h_fw],v_groups=v_groups,warm_up_hops=0,mu=0.2,n_steps=3,grad_weight='equal',stop_criterion=sc,grad_method=grad_method)
 gr_sc=np.exp(-10*(gr*gr))
 fig_spec,ax_spec=plt.subplots()
 def plot_spec_line(line,col):
@@ -139,15 +150,19 @@ class update_spec:
         self.ana_points = plot_ana_points(None,0)
         self.amp_fit_points = plot_amp_fit_points(None,0)
         self.amp_lstsq_fit = plot_lstsq_fit_at_v(None,0)
-        ax_spec.set_ylim([-100,0])
+        ax_spec.set_ylim(AX_SPEC_LIMS)
     def __call__(self,val):
         self.spec_line = plot_spec_line(self.spec_line,spec_slider.val)
         self.ana_points = plot_ana_points(self.ana_points,spec_slider.val)
         self.amp_fit_points = plot_amp_fit_points(self.amp_fit_points,spec_slider.val)
         self.amp_lstsq_fit = plot_lstsq_fit_at_v(self.amp_lstsq_fit,spec_slider.val)
-        ax_spec.set_ylim([-100,0])
+        ax_spec.set_ylim(AX_SPEC_LIMS)
         fig_spec.canvas.draw_idle()
 spec_slider.on_changed(update_spec())
+#for frq in F_PLOT:
+#    from itertools import count, takewhile
+#    for f in takewhile(lambda f: f < 0.5*SR,[frq * (i+1) for i in count()]):
+#        ax_spec.plot([f,f],AX_SPEC_LIMS,color='k',linestyle='-')
     
 h_plot = h
 
@@ -211,13 +226,13 @@ def track_line(p):
     return track
 tr_line,=ax.plot(t_amp_track,track_line(0))
 gr_line,=ax_gr.plot(t_amp_track,gr_sc[0,:],c='g')
-ax.set_ylim([-100,0])
+ax.set_ylim(AX_SPEC_LIMS)
 ax_gr.set_ylim([0,1])
 track_slider=Slider(ax_track,"Track",0,X_abs.shape[0]-1,valinit=0,valstep=1)
 def update_fig2(val):
     tr_line.set_ydata(track_line(track_slider.val))
     gr_line.set_ydata(gr_sc[track_slider.val,:])
-    ax.set_ylim([-100,0])
+    ax.set_ylim(AX_SPEC_LIMS)
     fig.canvas.draw_idle()
 track_slider.on_changed(update_fig2)
 
@@ -236,7 +251,17 @@ def filter_frame(x,v,Frows):
     F=F_[Frows,:]
     return np.sum(np.asarray(F)*x[:,None],axis=1)[:,None]
 
-def lstsq_fit_ola_synth(X,V,Frows,W=None,sig_extractor=lstsq_fit_frame):
+def poly_fit_frame(x,v,Frows,xtr,grsc):
+    fitter=spect_shape_fitter()
+    prms=fitter(v,xtr,grsc)
+    F_=fdwt.fdw.R(v).T.todense()
+    F=F_[Frows,:]
+    f_sc=fitter.regX(v)@prms[0]
+    f_sc=np.power(10,f_sc/20)
+    return (np.asarray(F@f_sc).flatten()*x/(np.abs(x)+1e-10))[:,None]
+
+
+def lstsq_fit_ola_synth(X,V,Frows,W=None,sig_extractor=lstsq_fit_frame,X_tracked=None,track_weights=None):
     """
     X is the DFT frames of the signal, each frame occupies a column of X.
     V is the set of frequencies at each frame. Each frequency set occupies a
@@ -253,7 +278,10 @@ def lstsq_fit_ola_synth(X,V,Frows,W=None,sig_extractor=lstsq_fit_frame):
     y is the synthesized time-domain signal
     Y is the frequency-domain signal (STFT) before synthesizing
     """
-    Y=np.hstack([sig_extractor(x,v,Frows) for x,v in zip(X.T,V.T)])
+    if sig_extractor == poly_fit_frame:
+        Y=np.hstack([sig_extractor(x,v,Frows,xtr,grsc) for x,v,xtr,grsc in zip(X.T,V.T,X_tracked.T,track_weights.T)])
+    else:
+        Y=np.hstack([sig_extractor(x,v,Frows) for x,v in zip(X.T,V.T)])
     # TODO: What window will invert this properly?
     #window=fdwt.win_type.window(N)
     #assert signal.check_COLA(window,N,N-N_h)
@@ -267,7 +295,7 @@ Xlsq=np.hstack([X_fr[fdwt.extract_ovbins(k_fr[:,col],fdwt.oversamp),col][:,None]
 Vlsq=np.hstack([k[:,col][:,None]/fdwt.N for col in cols])
 # This should always be the same length...
 Frows=np.arange(Xlsq.shape[0])
-y,Y=lstsq_fit_ola_synth(Xlsq,Vlsq,Frows,sig_extractor=filter_frame)
+y,Y=lstsq_fit_ola_synth(Xlsq,Vlsq,Frows,sig_extractor=filter_frame,X_tracked=X,track_weights=gr_sc)
 normalize(y.real).tofile('.'.join(OUT_FILE.split('.')[:-1]+['ola',OUT_FILE.split('.')[-1]]))
 fig,axs=plt.subplots()
 axs.imshow(20*np.log(np.abs(Y)),aspect='auto',origin='lower')

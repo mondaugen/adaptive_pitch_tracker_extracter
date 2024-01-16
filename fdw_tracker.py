@@ -149,7 +149,8 @@ class fdw_tracker(soc_fdw_lookup):
         # DFT evaluated at those frequencies)
         # The function should return True if the tracking should stop or False to
         # continue
-        stop_criterion=lambda h,v,g,X: False
+        stop_criterion=lambda h,v,g,X: False,
+        grad_method=gradient_ascent_step_harm_lock
     ):
         """
         Returns tuple of frequency estimates and sample times at which they
@@ -223,7 +224,7 @@ class fdw_tracker(soc_fdw_lookup):
             X_list.append(bin_vals(buf_dft_frame,k0))
             k_frames_list.append(bins(k0))
             for m in range(n_steps):
-                k0=gradient_ascent_step_harm_lock(buf_dft_frame,
+                k0=grad_method(buf_dft_frame,
                 k0,mu,grad=grad(i),
                 groups=v_groups,
                 grad_weight=grad_weight)

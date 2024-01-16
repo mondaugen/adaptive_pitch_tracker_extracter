@@ -63,7 +63,7 @@ def dft_bin_log_ps_dk(x,k):
     dX=dft_bin(x,k,p=1)
     return log_ps_dk(X,dX)
 
-def gradient_ascent_step(x,k0,mu,grad=dft_bin_grad(1)):
+def gradient_ascent_step(x,k0,mu,grad=dft_bin_grad(1),grad_weight='equal',groups=None):
     k1 = k0 + mu * np.real(grad(x,k0))
     return k1
 
@@ -88,6 +88,18 @@ def gradient_ascent_step_harm_lock(x,k0,mu,grad=dft_bin_grad(1),grad_weight='equ
         step[group_mask] *= mu * (1+np.arange(group_mask.sum()))
     k1 = k0 + step
     return k1
+
+class combo_gradient:
+    def __init__(self,partial=1,whole=1):
+        # partial,whole define the ratio of mu
+        self.partial=partial
+        self.whole=whole
+    def __call__(self,x,k0,mu,grad=dft_bin_grad(1),grad_weight='equal',groups=None):
+        k1=gradient_ascent_step(x,k0,self.partial*mu,grad=grad,
+                                grad_weight=grad_weight,groups=groups)
+        k2=gradient_ascent_step_harm_lock(x,k1,self.whole*mu,grad=grad,
+                                grad_weight=grad_weight,groups=groups)
+        return k2
 
 def newton_ascent_step(x,k0,grad=dft_bin_grad(1),grad2=dft_bin_grad(2)):
     k1 = k0 + np.real(grad(x,k0)/grad2(x,k0))

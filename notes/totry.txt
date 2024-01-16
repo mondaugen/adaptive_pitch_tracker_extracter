@@ -1,0 +1,11 @@
+Use combination of adjusting partials individually and together as a harmonic
+comb.
+When each partial has been adjusted individually, they will probably not be
+harmonically spaced (each partial will have a frequency that isn't an integer
+multiple of the lowest partial). So to do the frequency update, the averaged
+gradient could be applied by adding it multiplied by this non-integer value.
+Maybe another way is possible.
+Should the scalars adjusting the partials individually have larger scalars
+("mu") the higher they are?
+We need a way for the partial tracks to disappear / die at some point, perhaps using amplitude thresholding, or the non-convergence of the gradient.
+
