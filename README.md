@@ -36,6 +36,14 @@ NOTE: You can see how these all come together in
 
 See for instance `test/pitch_shifting/examples/stretch_monk.sh`.
 
+Another thing you can try is something like
+```bash
+sox path/to/some/soundfile.suf -t f64 -r 16k -c 1 /tmp/in.f64 \
+    && LFO_TYPE=squarewave PMIN=1 PMAX=1.5 F0=2 F1=2 PYTHONPATH=. python3 \
+        test/pitch_shifting/ps_file_lfo_realtime.py \
+    && sox -r 16k -c 1 -t f64 /tmp/out.f64 -d
+```
+
 ## C implementations
 
 This is the next step, and the goal is to make these performant for use in
