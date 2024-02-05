@@ -21,4 +21,7 @@ def reassigned_stft(x,n,N,h,dh):
     X   in C^len(n)XN the spectrogram
     """
 
-    
+    n_r = n - np.real(STFT_Th * np.conj(STFT_h) / (STFT_h * np.conj(STFT_h)))
+    w = 2. * np.pi * np.arange(N) / N
+    w_r = w + np.imag(STFT_Dh * np.conj(STFT_h) / (STFT_h * np.conj(STFT_h)))
+    v_r = 

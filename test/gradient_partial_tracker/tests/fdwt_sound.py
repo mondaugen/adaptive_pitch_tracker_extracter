@@ -52,7 +52,7 @@ n_harms=40
 vstarts=np.multiply.outer(vstart,(1+np.arange(n_harms))).flatten()
 v_groups=np.multiply.outer(np.arange(len(vstart)),np.ones(n_harms)).flatten().astype('int')
 print(v_groups)
-N=get_env('N','2048',conv=int)
+N=get_env('N',2048,conv=int)
 N_h=N//8
 fdwt=fdw_tracker(N=N)
 
@@ -251,6 +251,28 @@ def filter_frame(x,v,Frows):
     F=F_[Frows,:]
     return np.sum(np.asarray(F)*x[:,None],axis=1)[:,None]
 
+class phase_the_frame:
+    """
+    Instead of just using the phases from the original X STFT when applying the
+    new spectral envelope, after the first frame, the subsequent frames are
+    computed by advancing the phase of the previous frame by the phase indicated
+    by the instantaneous frequency.
+    """
+    def __init__(self,H):
+        self.H=H
+        self.next_phasors=None
+    def __call__(self,x,v,Frows):
+        F_=fdwt.fdw.R(v).T.todense()
+        F=F_[Frows,:]
+        if self.next_phasors is None:
+            # TODO: How to extract the relevant starting phases?
+            self.next_phasors=x/np.abs(x)#*np.exp(-complex('j')*self.H*v*2.*np.pi)
+            #return np.sum(np.asarray(F)*x[:,None]/np.abs(x[:,None]),axis=1)[:,None]
+        #else:
+        ret = np.sum(np.asarray(F)*self.next_phasors[:,None],axis=1)[:,None]
+        self.next_phasors*=np.exp(-complex('j')*self.H*v*2.*np.pi)
+        return ret
+
 def poly_fit_frame(x,v,Frows,xtr,grsc):
     fitter=spect_shape_fitter()
     prms=fitter(v,xtr,grsc)
@@ -295,7 +317,7 @@ Xlsq=np.hstack([X_fr[fdwt.extract_ovbins(k_fr[:,col],fdwt.oversamp),col][:,None]
 Vlsq=np.hstack([k[:,col][:,None]/fdwt.N for col in cols])
 # This should always be the same length...
 Frows=np.arange(Xlsq.shape[0])
-y,Y=lstsq_fit_ola_synth(Xlsq,Vlsq,Frows,sig_extractor=filter_frame,X_tracked=X,track_weights=gr_sc)
+y,Y=lstsq_fit_ola_synth(Xlsq,Vlsq,Frows,sig_extractor=phase_the_frame(N_h),X_tracked=X,track_weights=gr_sc)
 normalize(y.real).tofile('.'.join(OUT_FILE.split('.')[:-1]+['ola',OUT_FILE.split('.')[-1]]))
 fig,axs=plt.subplots()
 axs.imshow(20*np.log(np.abs(Y)),aspect='auto',origin='lower')
